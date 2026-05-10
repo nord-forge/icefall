@@ -59,7 +59,7 @@ oauth2 = { version = "4", features = ["reqwest"] }
 
 # Webhook signature validation
 hmac = "0.12"
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 
 # Error handling
