@@ -79,7 +79,7 @@ flate2 = "1"
 bytes = "1"
 
 # System info
-sysinfo = "0.35"
+sysinfo = "0.39"
 
 # Utilities
 uuid = { version = "1", features = ["v7", "serde"] }
