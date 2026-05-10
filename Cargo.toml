@@ -45,7 +45,7 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1-rustl
 
 # Encryption
 aes-gcm = "0.10"
-rand = "0.8"
+rand = "0.9"
 base64 = "0.22"
 argon2 = "0.5"
 
