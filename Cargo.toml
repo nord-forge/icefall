@@ -55,7 +55,7 @@ qrcode = { version = "0.14", features = ["svg"] }
 data-encoding = "2"
 
 # OAuth 2.0
-oauth2 = { version = "4", features = ["reqwest"] }
+oauth2 = { version = "5", features = ["reqwest"] }
 
 # Webhook signature validation
 hmac = "0.12"
