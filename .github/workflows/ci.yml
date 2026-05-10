@@ -24,7 +24,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache Cargo registry, git, and build artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -58,7 +58,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Cache node_modules and Bun install cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             dashboard/node_modules/
