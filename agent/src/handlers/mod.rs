@@ -1,10 +1,11 @@
+pub mod build;
 pub mod caddy;
 pub mod docker;
 pub mod health;
 pub mod logs;
 pub mod metrics;
+pub mod system;
 pub mod terminal;
-pub mod build;
 
 use icefall_common::protocol::AgentMessage;
 use serde_json::Value;
@@ -61,6 +62,8 @@ pub async fn dispatch(ctx: &HandlerContext, id: String, method: &str, params: Va
         "caddy.add_route" => caddy::add_route(ctx, params).await,
         "caddy.update_route" => caddy::update_route(ctx, params).await,
         "caddy.remove_route" => caddy::remove_route(ctx, params).await,
+
+        "system.update" => system::update(ctx, params).await,
 
         _ => Err(HandlerError::UnknownMethod(method.to_string())),
     };

@@ -164,6 +164,27 @@ impl DaemonRunner {
             event_bus.clone(),
         );
 
+        // Daily audit log pruning (90-day retention)
+        {
+            let db_clone = db.clone();
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
+                loop {
+                    interval.tick().await;
+                    let cutoff = (chrono::Utc::now() - chrono::Duration::days(90))
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+                    match db_clone.prune_audit_logs(&cutoff).await {
+                        Ok(count) if count > 0 => {
+                            info!(pruned = count, "pruned expired audit log entries");
+                        }
+                        Err(e) => warn!(error = %e, "audit log pruning failed"),
+                        _ => {}
+                    }
+                }
+            });
+        }
+
         // Daily cleanup of old rollback binaries (7-day retention)
         {
             let data_dir = config.data_dir.clone();

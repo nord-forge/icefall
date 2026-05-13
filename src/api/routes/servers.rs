@@ -39,7 +39,10 @@ pub fn routes() -> Router<AppState> {
             get(get_server).put(update_server).delete(delete_server),
         )
         .route("/servers/{id}/token", post(regenerate_token))
+        .route("/servers/{id}/update", post(update_agent))
+        .route("/servers/update-all", post(update_all_agents))
         .route("/agent/download/{target}", get(download_agent))
+        .route("/agent/uninstall", get(uninstall_script))
 }
 
 async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
@@ -527,4 +530,175 @@ async fn download_agent(
         })?;
         Ok(([("content-type", "application/octet-stream")], content))
     }
+}
+
+async fn update_agent(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(server_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&state, &headers).await?;
+
+    let server = state
+        .db
+        .get_server(&server_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Server {server_id} not found")))?;
+
+    if server.status != "online" {
+        return Err(ApiError::BadRequest(format!(
+            "Server '{}' is {} — cannot update while offline",
+            server.name, server.status
+        )));
+    }
+
+    let update_state = state.db.get_update_state().await?;
+    let latest_version = update_state
+        .available_version
+        .as_deref()
+        .unwrap_or(env!("CARGO_PKG_VERSION"));
+
+    if server.agent_version.as_deref() == Some(latest_version) {
+        return Ok(Json(serde_json::json!({
+            "data": { "status": "up_to_date", "version": latest_version }
+        })));
+    }
+
+    let target = server
+        .resources
+        .as_deref()
+        .and_then(|r| serde_json::from_str::<serde_json::Value>(r).ok())
+        .and_then(|v| v.get("arch")?.as_str().map(String::from))
+        .unwrap_or_else(|| "x86_64-unknown-linux-musl".to_string());
+
+    let msg = icefall_common::protocol::AgentMessage::Request {
+        id: crate::db::models::new_id(),
+        method: "system.update".to_string(),
+        params: serde_json::json!({
+            "version": latest_version,
+            "target": target,
+        }),
+    };
+
+    if let Err(e) = state.agent_registry.send_to(&server_id, msg).await {
+        return Err(ApiError::BadRequest(format!(
+            "Failed to send update command: {e}"
+        )));
+    }
+
+    Ok(Json(serde_json::json!({
+        "data": { "status": "update_sent", "target_version": latest_version }
+    })))
+}
+
+async fn update_all_agents(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&state, &headers).await?;
+
+    let servers = state.db.list_servers().await?;
+    let current = env!("CARGO_PKG_VERSION");
+    let update_state = state.db.get_update_state().await?;
+    let latest = update_state
+        .available_version
+        .as_deref()
+        .unwrap_or(current);
+
+    let mut updated = 0u32;
+    let mut skipped = 0u32;
+
+    for server in &servers {
+        if server.id == CONTROL_PLANE_SERVER_ID || server.status != "online" {
+            skipped += 1;
+            continue;
+        }
+        if server.agent_version.as_deref() == Some(latest) {
+            skipped += 1;
+            continue;
+        }
+
+        let target = server
+            .resources
+            .as_deref()
+            .and_then(|r| serde_json::from_str::<serde_json::Value>(r).ok())
+            .and_then(|v| v.get("arch")?.as_str().map(String::from))
+            .unwrap_or_else(|| "x86_64-unknown-linux-musl".to_string());
+
+        let msg = icefall_common::protocol::AgentMessage::Request {
+            id: crate::db::models::new_id(),
+            method: "system.update".to_string(),
+            params: serde_json::json!({
+                "version": latest,
+                "target": target,
+            }),
+        };
+
+        if state.agent_registry.send_to(&server.id, msg).await.is_ok() {
+            updated += 1;
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "data": { "updated": updated, "skipped": skipped, "target_version": latest }
+    })))
+}
+
+async fn uninstall_script() -> impl IntoResponse {
+    let script = r#"#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run as root (use sudo)"
+    exit 1
+fi
+
+echo "Icefall Agent Uninstall"
+echo ""
+
+# Stop and disable service
+if command -v systemctl &>/dev/null && systemctl is-active --quiet icefall-agent 2>/dev/null; then
+    echo "Stopping icefall-agent service..."
+    systemctl stop icefall-agent
+    systemctl disable icefall-agent
+    rm -f /etc/systemd/system/icefall-agent.service
+    systemctl daemon-reload
+    echo "Service removed."
+elif [ -f /etc/init.d/icefall-agent ]; then
+    rc-service icefall-agent stop 2>/dev/null || true
+    rc-update del icefall-agent default 2>/dev/null || true
+    rm -f /etc/init.d/icefall-agent
+    echo "OpenRC service removed."
+fi
+
+# Remove binary
+if [ -f /usr/local/bin/icefall-agent ]; then
+    rm -f /usr/local/bin/icefall-agent
+    rm -f /usr/local/bin/icefall-agent.prev
+    echo "Binary removed."
+fi
+
+# Remove config (with confirmation)
+if [ -d /etc/icefall-agent ]; then
+    if [ "${1:-}" = "--yes" ]; then
+        rm -rf /etc/icefall-agent
+        echo "Config directory removed."
+    else
+        read -rp "Remove /etc/icefall-agent config directory? [y/N] " response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            rm -rf /etc/icefall-agent
+            echo "Config directory removed."
+        else
+            echo "Config directory kept."
+        fi
+    fi
+fi
+
+echo ""
+echo "Icefall agent uninstalled. Docker and Caddy were not removed."
+"#;
+    (
+        [("content-type", "text/x-shellscript")],
+        script.to_string(),
+    )
 }

@@ -6,14 +6,7 @@
 
 ## Backlog
 
-### Phase 20E — Polish & Security
-| Ticket | Title | Size |
-|--------|-------|------|
-| [IF-142](tickets/phase-20-multi-server/IF-142-secret-envelope-encrypted-env-vars.md) | Secret envelope encrypted env vars | L |
-| [IF-143](tickets/phase-20-multi-server/IF-143-agent-auto-update.md) | Agent auto-update mechanism | M |
-| [IF-144](tickets/phase-20-multi-server/IF-144-offline-server-handling.md) | Offline server handling | M |
-| [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | M |
-| [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | S |
+(empty)
 
 ---
 
@@ -207,17 +200,17 @@
 ### Phase 18 — UX Polish
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-086](tickets/phase-18-ux-polish/IF-086-view-transitions.md) | View Transitions (without crashes) | — | Re-enable ClientRouter, all islands to client:only, transition:persist sidebar |
-| [IF-087](tickets/phase-18-ux-polish/IF-087-prefetching.md) | Link prefetching & data preloading | — | Hover prefetch, API cache, tab data preload |
-| [IF-088](tickets/phase-18-ux-polish/IF-088-skeleton-loading.md) | Skeleton loading states | — | Shimmer placeholders for all pages, shared Skeleton component |
-| [IF-089](tickets/phase-18-ux-polish/IF-089-app-detail-routing-polish.md) | App detail routing polish | — | Tab fade transitions, scroll preservation, deploy detail animation |
-| [IF-090](tickets/phase-18-ux-polish/IF-090-sidebar-active-state.md) | Sidebar navigation polish | — | Active indicator, mobile drawer, keyboard nav, app context |
-| [IF-091](tickets/phase-18-ux-polish/IF-091-toast-notifications.md) | Toast notification system | — | Global toast store, success/error/info types, auto-dismiss |
-| [IF-092](tickets/phase-18-ux-polish/IF-092-optimistic-updates.md) | Optimistic UI updates | — | Instant feedback for actions, revert on error |
-| [IF-093](tickets/phase-18-ux-polish/IF-093-responsive-polish.md) | Responsive design polish | — | Mobile tables→cards, form stacking, tab scroll, breakpoint audit |
-| [IF-094](tickets/phase-18-ux-polish/IF-094-empty-states.md) | Empty states & onboarding hints | — | Illustrations, action buttons, guidance text |
-| [IF-095](tickets/phase-18-ux-polish/IF-095-confirmation-dialogs.md) | Consistent confirmation dialogs | — | Shared modal dialog, replace inline confirmations |
-| [IF-096](tickets/phase-18-ux-polish/IF-096-keyboard-shortcuts.md) | Global keyboard shortcuts | — | g+h/d/s/p navigation, shortcut help overlay |
+| [IF-086](tickets/phase-18-ux-polish/IF-086-view-transitions.md) | View Transitions (without crashes) | 2026-05-10 | ClientRouter enabled, all islands client:only, transition:persist sidebar, fade main content |
+| [IF-087](tickets/phase-18-ux-polish/IF-087-prefetching.md) | Link prefetching & data preloading | 2026-05-10 | data-astro-prefetch="hover" on cross-page links, API cache layer |
+| [IF-088](tickets/phase-18-ux-polish/IF-088-skeleton-loading.md) | Skeleton loading states | 2026-05-10 | SkeletonTable + SkeletonCard components with shimmer animation |
+| [IF-089](tickets/phase-18-ux-polish/IF-089-app-detail-routing-polish.md) | App detail routing polish | 2026-05-10 | Lazy-loaded tab components with fade transition, AppDetailRouter |
+| [IF-090](tickets/phase-18-ux-polish/IF-090-sidebar-active-state.md) | Sidebar navigation polish | 2026-05-10 | aria-current="page", active indicator, mobile drawer with backdrop, keyboard nav |
+| [IF-091](tickets/phase-18-ux-polish/IF-091-toast-notifications.md) | Toast notification system | 2026-05-10 | Global toast store, success/error/info/warning types, auto-dismiss, aria-live |
+| [IF-092](tickets/phase-18-ux-polish/IF-092-optimistic-updates.md) | Optimistic UI updates | 2026-05-10 | Instant deploy/rollback feedback in AppHeader + DeploysTab, revert on error |
+| [IF-093](tickets/phase-18-ux-polish/IF-093-responsive-polish.md) | Responsive design polish | 2026-05-10 | Mobile drawer sidebar, responsive layouts |
+| [IF-094](tickets/phase-18-ux-polish/IF-094-empty-states.md) | Empty states & onboarding hints | 2026-05-10 | Shared EmptyState component, per-page empty states with action buttons |
+| [IF-095](tickets/phase-18-ux-polish/IF-095-confirmation-dialogs.md) | Consistent confirmation dialogs | 2026-05-10 | Shared ConfirmDialog with focus trap, danger/default variants, escape/backdrop close |
+| [IF-096](tickets/phase-18-ux-polish/IF-096-keyboard-shortcuts.md) | Global keyboard shortcuts | 2026-05-10 | g+h/d/s/p navigation, ? help overlay, KeyboardShortcuts island |
 
 ### Phase 20A — Multi-Server Foundation
 | Ticket | Title | Completed | Notes |
@@ -260,6 +253,15 @@
 | [IF-140](tickets/phase-20-multi-server/IF-140-app-detail-server-indicator.md) | App detail server indicator | 2026-05-11 | "on {server}" in AppHeader, server label on AppCard, migration UI in SettingsTab with volume-loss acknowledgment |
 | [IF-141](tickets/phase-20-multi-server/IF-141-dashboard-home-aggregate-metrics.md) | Dashboard home aggregate metrics | 2026-05-11 | Weighted CPU avg, total RAM/Disk across servers, ServerHealthStrip with status dots, single-server unchanged |
 
+### Phase 20E — Polish & Security
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-142](tickets/phase-20-multi-server/IF-142-secret-envelope-encrypted-env-vars.md) | Secret envelope encrypted env vars | 2026-05-13 | X25519 DH + AES-256-GCM envelope encryption for env vars during remote deploys, round-trip tested |
+| [IF-143](tickets/phase-20-multi-server/IF-143-agent-auto-update.md) | Agent auto-update mechanism | 2026-05-13 | system.update command, agent download+verify+atomic swap, API endpoints for single/all agent updates, dashboard version badge |
+| [IF-144](tickets/phase-20-multi-server/IF-144-offline-server-handling.md) | Offline server handling | 2026-05-13 | OfflineServerBanner in layout, SSE-driven nanostore, StatusDot unreachable variant, auto-dismiss on reconnect |
+| [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | 2026-05-13 | audit_log table + migration, DB trait + SQLite impl, API endpoints (global + per-server), 90-day daily pruning |
+| [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | 2026-05-13 | Idempotent, NO_COLOR, Alpine/OpenRC, error trap with line numbers, Docker/Caddy verification, uninstall endpoint, log file |
+
 ---
 
 ## Summary
@@ -267,10 +269,10 @@
 | Metric | Count |
 |--------|-------|
 | Total tickets | 141 |
-| Done | 125 |
-| Backlog | 15 |
+| Done | 141 |
+| Backlog | 0 |
 | Superseded | 1 |
-| Phases complete | 17 / 19 |
+| Phases complete | 19 / 19 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -292,8 +294,8 @@
 | 15 — Critical Gaps | **Done** | 8/8 |
 | 16 — Self-Update System | **Done** | 8/8 |
 | 17 — v1.1 Fast Follow | **Done** | 13/13 |
-| 18 — UX Polish | Backlog | 0/11 |
-| 20 — Multi-Server | **In Progress** | 25/30 |
+| 18 — UX Polish | **Done** | 11/11 |
+| 20 — Multi-Server | **Done** | 30/30 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |

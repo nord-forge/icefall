@@ -12,6 +12,7 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
   success: 'Success',
   offline: 'Offline',
+  unreachable: 'Unreachable',
   enrolling: 'Enrolling',
   draining: 'Draining',
 };
@@ -29,6 +30,7 @@ const STATUS_SHAPES: Record<string, StatusShape> = {
   stopped: 'ring',
   cancelled: 'dash',
   offline: 'ring',
+  unreachable: 'ring',
   enrolling: 'triangle',
   draining: 'half',
 };

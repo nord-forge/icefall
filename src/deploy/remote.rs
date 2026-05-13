@@ -11,14 +11,21 @@ pub struct RemoteExecutor {
     registry: Arc<AgentRegistry>,
     pub server_id: String,
     pub server_host: String,
+    pub server_public_key: Option<String>,
 }
 
 impl RemoteExecutor {
-    pub fn new(registry: Arc<AgentRegistry>, server_id: String, server_host: String) -> Self {
+    pub fn new(
+        registry: Arc<AgentRegistry>,
+        server_id: String,
+        server_host: String,
+        server_public_key: Option<String>,
+    ) -> Self {
         Self {
             registry,
             server_id,
             server_host,
+            server_public_key,
         }
     }
 

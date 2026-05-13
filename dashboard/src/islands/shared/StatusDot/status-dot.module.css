@@ -34,6 +34,7 @@
 .stopped { color: var(--color-text-muted); }
 .cancelled { color: var(--color-text-muted); }
 .offline { color: var(--color-error); }
+.unreachable { color: var(--color-text-muted); }
 .enrolling { color: var(--color-warning); }
 .draining { color: oklch(0.65 0.17 50); }
 

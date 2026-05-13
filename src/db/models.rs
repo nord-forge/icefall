@@ -480,6 +480,27 @@ pub struct NewServerMetricsRecord {
     pub load_average: Option<String>,
 }
 
+// --- Audit Log ---
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AuditLogEntry {
+    pub id: String,
+    pub server_id: Option<String>,
+    pub user_id: Option<String>,
+    pub action: String,
+    pub details: String,
+    pub ip_address: Option<String>,
+    pub created_at: String,
+}
+
+pub struct NewAuditLogEntry {
+    pub server_id: Option<String>,
+    pub user_id: Option<String>,
+    pub action: String,
+    pub details: serde_json::Value,
+    pub ip_address: Option<String>,
+}
+
 pub fn now_iso8601() -> String {
     Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }

@@ -79,7 +79,12 @@ impl DeployManager {
             )));
         }
 
-        Ok(RemoteExecutor::new(registry, server_id.to_string(), server.host))
+        Ok(RemoteExecutor::new(
+            registry,
+            server_id.to_string(),
+            server.host,
+            server.public_key,
+        ))
     }
 
     pub async fn deploy(
@@ -162,10 +167,18 @@ impl DeployManager {
         // Container creation: local vs remote
         let container_id = match &remote {
             Some(exec) => {
+                let env_payload: serde_json::Value = if let Some(ref pub_key) = exec.server_public_key {
+                    let envelope = crate::deploy::envelope::encrypt_env_vars(&env_vars, pub_key)?;
+                    serde_json::to_value(&envelope).unwrap_or_default()
+                } else {
+                    serde_json::json!(env_vars)
+                };
+
                 let params = serde_json::json!({
                     "name": container_name,
                     "image": image_ref,
-                    "env": env_vars,
+                    "env": env_payload,
+                    "env_encrypted": exec.server_public_key.is_some(),
                     "labels": labels,
                     "ports": [{ "container_port": detected_port, "protocol": "tcp" }],
                     "restart_policy": "unless-stopped",

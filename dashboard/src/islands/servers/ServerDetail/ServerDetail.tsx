@@ -11,6 +11,7 @@ import AppCard from '@islands/dashboard/AppCard/AppCard';
 import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import Skeleton from '@islands/shared/Skeleton/Skeleton';
 import { Cpu, MemoryStick, HardDrive, Server as ServerIcon, Globe, Hash, Clock, Trash2, Unplug } from 'lucide-preact';
+import { addToast } from '@stores/toast';
 import formStyles from '@styles/form.module.css';
 import styles from './server-detail.module.css';
 
@@ -319,7 +320,25 @@ export default function ServerDetail() {
               {server.agent_version && (
                 <>
                   <dt class={styles.infoLabel}><Hash size={14} aria-hidden="true" /> Agent version</dt>
-                  <dd class={styles.infoValueMono}>{server.agent_version}</dd>
+                  <dd class={styles.infoValueMono}>
+                    {server.agent_version}
+                    {server.status === 'online' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await api.updateAgent(server.id);
+                            addToast('success', `Update sent to ${server.name}`);
+                          } catch (e: any) {
+                            addToast('error', e.message || 'Update failed');
+                          }
+                        }}
+                      >
+                        Update
+                      </Button>
+                    )}
+                  </dd>
                 </>
               )}
               {server.last_heartbeat_at && (

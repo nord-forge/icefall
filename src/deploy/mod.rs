@@ -1,4 +1,5 @@
 pub mod compose;
+pub mod envelope;
 pub mod health;
 pub mod manager;
 pub mod native;
@@ -42,4 +43,6 @@ pub enum DeployError {
     RemoteBuild(String),
     #[error("remote operation failed: {0}")]
     RemoteOp(String),
+    #[error("envelope encryption failed: {0}")]
+    EnvelopeEncrypt(String),
 }

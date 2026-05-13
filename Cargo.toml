@@ -159,6 +159,7 @@ hex = { workspace = true }
 
 # Self-update & release verification
 ed25519-dalek = { workspace = true }
+x25519-dalek = { workspace = true }
 semver = { workspace = true }
 
 # Systemd integration

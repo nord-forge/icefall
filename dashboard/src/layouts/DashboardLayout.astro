@@ -5,6 +5,7 @@ import CommandPalette from '@islands/shared/CommandPalette/CommandPalette';
 import KeyboardShortcuts from '@islands/shared/KeyboardShortcuts/KeyboardShortcuts';
 import Toast from '@islands/shared/Toast/Toast';
 import ReconnectOverlay from '@islands/update/ReconnectOverlay/ReconnectOverlay';
+import OfflineServerBanner from '@islands/shared/OfflineServerBanner/OfflineServerBanner';
 import sidebarStyles from '@styles/sidebar.module.css';
 import layoutStyles from '@styles/layout.module.css';
 import '../styles/global.css';
@@ -84,6 +85,7 @@ const { title } = Astro.props;
       <div id="sidebar-panel" transition:persist>
         <Sidebar />
       </div>
+      <OfflineServerBanner client:only="preact" transition:persist />
       <main id="main-content" tabindex="-1" class={`ice-main ${layoutStyles.main}`} transition:animate="fade">
         <div class={layoutStyles.content}>
           <slot />

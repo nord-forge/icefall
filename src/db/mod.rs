@@ -321,6 +321,17 @@ pub trait Database: Send + Sync + 'static {
     // Admin 2FA reset
     async fn admin_reset_user_2fa(&self, user_id: &str) -> Result<(), DbError>;
 
+    // Audit log
+    async fn create_audit_log(&self, entry: &NewAuditLogEntry) -> Result<(), DbError>;
+    async fn list_audit_logs(
+        &self,
+        server_id: Option<&str>,
+        action: Option<&str>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<AuditLogEntry>, DbError>;
+    async fn prune_audit_logs(&self, older_than: &str) -> Result<u64, DbError>;
+
     // Update state
     async fn get_update_state(&self) -> Result<UpdateState, DbError>;
     async fn set_update_available(

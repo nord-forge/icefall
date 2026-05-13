@@ -474,6 +474,16 @@ export const api = {
       method: 'POST',
     }),
 
+  updateAgent: (id: string) =>
+    request<{ data: { status: string; target_version?: string } }>(`/servers/${id}/update`, {
+      method: 'POST',
+    }),
+
+  updateAllAgents: () =>
+    request<{ data: { updated: number; skipped: number } }>('/servers/update-all', {
+      method: 'POST',
+    }),
+
   getServerMetrics: (id: string, range?: string) =>
     request<{ data: ServerMetricsSnapshot[] }>(
       `/servers/${id}/metrics${range ? `?range=${range}` : ''}`
