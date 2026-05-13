@@ -8,6 +8,7 @@ skills/
 PRD.md
 DESIGN.md
 .claude/internal/
+.claude/research/
 
 # Rust
 target/
