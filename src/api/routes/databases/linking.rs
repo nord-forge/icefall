@@ -20,7 +20,7 @@ pub(super) async fn link_to_app(
     let configs = db_configs();
     let type_config = configs
         .get(db.db_type.as_str())
-        .ok_or_else(|| ApiError::Internal(Box::new(std::io::Error::other("unknown db type"))))?;
+        .ok_or_else(|| ApiError::internal(std::io::Error::other("unknown db type")))?;
 
     let creds: serde_json::Value = serde_json::from_str(&db.credentials).unwrap_or_default();
     let conn_str = creds

@@ -70,11 +70,11 @@ async fn setup_totp(
         30,
         secret
             .to_bytes()
-            .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?,
+            .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?,
         Some(issuer.to_string()),
         user.email.clone(),
     )
-    .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+    .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
 
     let otpauth_url = totp.get_url();
 
@@ -286,7 +286,7 @@ fn build_totp(secret_base32: &str, account: &str) -> Result<TOTP, ApiError> {
     let secret = Secret::Encoded(secret_base32.to_string());
     let secret_bytes = secret
         .to_bytes()
-        .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+        .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
 
     TOTP::new(
         Algorithm::SHA1,
@@ -297,7 +297,7 @@ fn build_totp(secret_base32: &str, account: &str) -> Result<TOTP, ApiError> {
         Some("Icefall".to_string()),
         account.to_string(),
     )
-    .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))
+    .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))
 }
 
 /// Check a TOTP code. The TOTP is configured with skew=1, so it accepts
@@ -312,7 +312,7 @@ fn generate_qr_svg(data: &str) -> Result<String, ApiError> {
     use qrcode::QrCode;
 
     let code = QrCode::new(data.as_bytes())
-        .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+        .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
 
     let svg: String = code
         .render::<svg::Color<'_>>()
@@ -348,7 +348,7 @@ fn generate_backup_codes() -> Result<(Vec<String>, String), ApiError> {
         let salt = SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
         let hash = Argon2::default()
             .hash_password(code.as_bytes(), &salt)
-            .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+            .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
 
         plain_codes.push(code);
         hashed_entries.push(serde_json::json!({
@@ -358,7 +358,7 @@ fn generate_backup_codes() -> Result<(Vec<String>, String), ApiError> {
     }
 
     let hashed_json =
-        serde_json::to_string(&hashed_entries).map_err(|e| ApiError::Internal(Box::new(e)))?;
+        serde_json::to_string(&hashed_entries).map_err(ApiError::internal)?;
 
     Ok((plain_codes, hashed_json))
 }
@@ -376,7 +376,7 @@ async fn try_use_backup_code(
     };
 
     let mut entries: Vec<serde_json::Value> =
-        serde_json::from_str(backup_json).map_err(|e| ApiError::Internal(Box::new(e)))?;
+        serde_json::from_str(backup_json).map_err(ApiError::internal)?;
 
     let code_upper = code.to_uppercase();
 
@@ -404,7 +404,7 @@ async fn try_use_backup_code(
             // Mark as used
             entry["used"] = serde_json::Value::Bool(true);
             let updated_json =
-                serde_json::to_string(&entries).map_err(|e| ApiError::Internal(Box::new(e)))?;
+                serde_json::to_string(&entries).map_err(ApiError::internal)?;
             state
                 .db
                 .update_user_backup_codes(&user.id, &updated_json)
@@ -431,7 +431,7 @@ async fn create_2fa_session(
         .db
         .create_session(&user.id, &expires_at)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let body = serde_json::json!({
         "data": {
@@ -447,7 +447,7 @@ async fn create_2fa_session(
     let mut headers = axum::http::HeaderMap::new();
     headers.insert(
         "set-cookie",
-        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+        HeaderValue::from_str(&cookie).map_err(ApiError::internal)?,
     );
     Ok((headers, Json(body)).into_response())
 }

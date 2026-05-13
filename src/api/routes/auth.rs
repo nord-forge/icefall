@@ -83,7 +83,7 @@ async fn setup_admin(
     let mut headers = HeaderMap::new();
     headers.insert(
         "set-cookie",
-        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+        HeaderValue::from_str(&cookie).map_err(ApiError::internal)?,
     );
     Ok((headers, Json(body)).into_response())
 }
@@ -126,7 +126,7 @@ async fn login(
     let mut headers = HeaderMap::new();
     headers.insert(
         "set-cookie",
-        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+        HeaderValue::from_str(&cookie).map_err(ApiError::internal)?,
     );
     Ok((headers, Json(body)).into_response())
 }
@@ -177,7 +177,7 @@ async fn create_session_for_user(
         .db
         .create_session(user_id, &expires_at)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))
+        .map_err(ApiError::internal)
 }
 
 fn hash_password(password: &str) -> Result<String, ApiError> {
@@ -185,7 +185,7 @@ fn hash_password(password: &str) -> Result<String, ApiError> {
     let salt = SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+        .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
     Ok(hash.to_string())
 }
 

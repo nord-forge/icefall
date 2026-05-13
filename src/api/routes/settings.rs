@@ -41,7 +41,7 @@ async fn get_runtime_info(
         .docker
         .runtime_version()
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     Ok(Json(serde_json::json!({
         "data": {

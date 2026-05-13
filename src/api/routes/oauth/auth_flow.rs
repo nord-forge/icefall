@@ -182,7 +182,7 @@ pub(super) async fn oauth_callback(
         .await
         .map_err(|e| {
             tracing::error!("OAuth token exchange failed for {provider}: {e}");
-            ApiError::Internal(Box::new(e))
+            ApiError::internal(e)
         })?;
 
     if !token_response.status().is_success() {
@@ -193,7 +193,7 @@ pub(super) async fn oauth_callback(
 
     let token_data: serde_json::Value = token_response.json().await.map_err(|e| {
         tracing::error!("Failed to parse OAuth token response from {provider}: {e}");
-        ApiError::Internal(Box::new(e))
+        ApiError::internal(e)
     })?;
 
     let access_token = token_data["access_token"].as_str().ok_or_else(|| {
@@ -217,9 +217,9 @@ pub(super) async fn oauth_callback(
             .get_user_by_id(&identity.user_id)
             .await?
             .ok_or_else(|| {
-                ApiError::Internal(Box::new(std::io::Error::other(
+                ApiError::internal(std::io::Error::other(
                     "Linked user account not found",
-                )))
+                ))
             })?,
         // Case 2: No OAuth identity yet
         None => {
@@ -290,7 +290,7 @@ pub(super) async fn oauth_callback(
         .db
         .create_session(&user.id, &expires_at)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     // Set cookie and redirect to dashboard
     let cookie = format!(
@@ -300,7 +300,7 @@ pub(super) async fn oauth_callback(
     let mut headers = HeaderMap::new();
     headers.insert(
         "set-cookie",
-        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+        HeaderValue::from_str(&cookie).map_err(ApiError::internal)?,
     );
     headers.insert("location", HeaderValue::from_static("/"));
 
@@ -312,6 +312,6 @@ pub(super) fn hash_password_for_oauth(password: &str) -> Result<String, ApiError
     let salt = SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+        .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
     Ok(hash.to_string())
 }

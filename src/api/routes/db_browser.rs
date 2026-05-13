@@ -103,7 +103,7 @@ async fn list_tables(
         .docker
         .exec_in_container(&info.container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let items: Vec<&str> = output.trim().lines().filter(|l| !l.is_empty()).collect();
 
@@ -191,7 +191,7 @@ async fn execute_sql_query(
         .docker
         .exec_in_container(&info.container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let sep = if info.db_type == "postgres" {
         ','
@@ -260,7 +260,7 @@ async fn execute_mongo_query(
         .docker
         .exec_in_container(&info.container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let trimmed = output.trim();
     let docs: Vec<serde_json::Value> = serde_json::from_str(trimmed)
@@ -329,7 +329,7 @@ async fn execute_redis_query(
         .docker
         .exec_in_container(&info.container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let trimmed = output.trim();
     let lines: Vec<&str> = trimmed.lines().filter(|l| !l.is_empty()).collect();

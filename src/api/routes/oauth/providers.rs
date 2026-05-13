@@ -77,10 +77,10 @@ async fn fetch_github_profile(
         .header("User-Agent", "icefall")
         .send()
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?
+        .map_err(ApiError::internal)?
         .json()
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let provider_user_id = user_info["id"]
         .as_i64()
@@ -100,7 +100,7 @@ async fn fetch_github_profile(
             .header("User-Agent", "icefall")
             .send()
             .await
-            .map_err(|e| ApiError::Internal(Box::new(e)))?
+            .map_err(ApiError::internal)?
             .json()
             .await
             .unwrap_or_default();
@@ -130,10 +130,10 @@ async fn fetch_google_profile(
         .header("Authorization", format!("Bearer {access_token}"))
         .send()
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?
+        .map_err(ApiError::internal)?
         .json()
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let provider_user_id = user_info["id"]
         .as_str()

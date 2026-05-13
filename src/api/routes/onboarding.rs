@@ -87,7 +87,7 @@ async fn complete_onboarding(
         .db
         .update_onboarding_state("completed", &json, Some(&now))
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     Ok(Json(serde_json::json!({
         "message": "Onboarding complete! Welcome to Icefall.",
@@ -304,7 +304,7 @@ async fn get_or_create(state: &AppState) -> Result<serde_json::Value, ApiError> 
         .db
         .get_onboarding()
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     match row {
         Some((step, completed, started, completed_at)) => {
@@ -325,7 +325,7 @@ async fn get_or_create(state: &AppState) -> Result<serde_json::Value, ApiError> 
                 .db
                 .create_onboarding(&now)
                 .await
-                .map_err(|e| ApiError::Internal(Box::new(e)))?;
+                .map_err(ApiError::internal)?;
             Ok(serde_json::json!({
                 "current_step": "admin_account",
                 "completed_steps": [],
@@ -362,12 +362,12 @@ async fn mark_step_complete(state: &AppState, step: &str) -> Result<(), ApiError
         .db
         .update_onboarding_state(&next, &json, None)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     Ok(())
 }
 
 fn hash_password(password: &str) -> Result<String, ApiError> {
     crate::api::utils::hash_password(password)
-        .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e))))
+        .map_err(|e| ApiError::internal(std::io::Error::other(e)))
 }
