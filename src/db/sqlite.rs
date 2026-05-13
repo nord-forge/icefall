@@ -38,6 +38,17 @@ impl SqliteDatabase {
             .connect_with(options)
             .await?;
 
+        sqlx::query("PRAGMA journal_size_limit = 67108864")
+            .execute(&pool)
+            .await?;
+        sqlx::query("PRAGMA auto_vacuum = 2").execute(&pool).await?;
+        sqlx::query("PRAGMA wal_autocheckpoint = 5000")
+            .execute(&pool)
+            .await?;
+        sqlx::query("PRAGMA cache_size = -64000")
+            .execute(&pool)
+            .await?;
+
         Ok(Self { pool, encryptor })
     }
 
@@ -1078,7 +1089,9 @@ impl Database for SqliteDatabase {
     // --- Lookup helpers ---
 
     async fn get_app_by_repo(&self, repo_url: &str) -> Result<Option<App>, DbError> {
-        let apps = self.list_apps().await?;
+        let apps = sqlx::query_as::<_, App>("SELECT * FROM apps WHERE git_repo IS NOT NULL")
+            .fetch_all(&self.pool)
+            .await?;
         let normalized = normalize_repo_url(repo_url);
         Ok(apps
             .into_iter()
@@ -2183,6 +2196,59 @@ impl Database for SqliteDatabase {
             .bind(older_than)
             .execute(&self.pool)
             .await?;
+        Ok(result.rows_affected())
+    }
+
+    // --- Cleanup / Pruning ---
+
+    async fn prune_expired_sessions(&self, older_than: &str) -> Result<u64, DbError> {
+        let result = sqlx::query("DELETE FROM sessions WHERE expires_at < ?")
+            .bind(older_than)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
+    async fn prune_expired_tokens(&self) -> Result<u64, DbError> {
+        let now = crate::db::models::now_iso8601();
+        let result =
+            sqlx::query("DELETE FROM api_tokens WHERE expires_at IS NOT NULL AND expires_at < ?")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+        Ok(result.rows_affected())
+    }
+
+    async fn prune_expired_invitations(&self) -> Result<u64, DbError> {
+        let now = crate::db::models::now_iso8601();
+        let result = sqlx::query("DELETE FROM invitations WHERE expires_at < ?")
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
+    async fn prune_health_check_events(&self, older_than: &str) -> Result<u64, DbError> {
+        let result = sqlx::query("DELETE FROM health_check_events WHERE checked_at < ?")
+            .bind(older_than)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
+    async fn prune_old_deploys(&self, older_than: &str, keep_per_app: i64) -> Result<u64, DbError> {
+        let result = sqlx::query(
+            "DELETE FROM deploys WHERE created_at < ? AND id NOT IN (
+                SELECT id FROM deploys d2
+                WHERE d2.app_id = deploys.app_id
+                ORDER BY d2.created_at DESC
+                LIMIT ?
+            )",
+        )
+        .bind(older_than)
+        .bind(keep_per_app)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected())
     }
 

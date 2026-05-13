@@ -4,6 +4,9 @@ use tracing::{error, info, warn};
 
 use crate::caddy::{CaddyClient, CaddyError};
 
+const MAX_RETRIES: u32 = 3;
+const MAX_QUEUE_SIZE: usize = 500;
+
 #[derive(Debug, Clone)]
 pub enum RouteOperation {
     Add {
@@ -20,8 +23,13 @@ pub enum RouteOperation {
     },
 }
 
+struct QueuedOp {
+    operation: RouteOperation,
+    retries: u32,
+}
+
 pub struct RouteQueue {
-    queue: Arc<Mutex<Vec<RouteOperation>>>,
+    queue: Arc<Mutex<Vec<QueuedOp>>>,
     client: CaddyClient,
 }
 
@@ -34,11 +42,22 @@ impl RouteQueue {
     }
 
     pub async fn enqueue(&self, operation: RouteOperation) {
-        self.queue.lock().await.push(operation);
+        let mut queue = self.queue.lock().await;
+        if queue.len() >= MAX_QUEUE_SIZE {
+            warn!(
+                "Route queue at capacity ({}), dropping oldest operation",
+                MAX_QUEUE_SIZE
+            );
+            queue.remove(0);
+        }
+        queue.push(QueuedOp {
+            operation,
+            retries: 0,
+        });
     }
 
     pub async fn flush(&self) -> Result<usize, CaddyError> {
-        let ops: Vec<RouteOperation> = {
+        let ops: Vec<QueuedOp> = {
             let mut queue = self.queue.lock().await;
             std::mem::take(&mut *queue)
         };
@@ -46,8 +65,8 @@ impl RouteQueue {
         let count = ops.len();
         let mut failed = Vec::new();
 
-        for op in ops {
-            let result = match &op {
+        for mut queued in ops {
+            let result = match &queued.operation {
                 RouteOperation::Add {
                     domain,
                     path,
@@ -64,8 +83,19 @@ impl RouteQueue {
             };
 
             if let Err(e) = result {
-                warn!("Failed to flush route operation: {e}");
-                failed.push(op);
+                queued.retries += 1;
+                if queued.retries >= MAX_RETRIES {
+                    error!(
+                        "Dropping route operation after {} retries: {:?} — {e}",
+                        MAX_RETRIES, queued.operation
+                    );
+                } else {
+                    warn!(
+                        "Route operation failed (retry {}/{}): {e}",
+                        queued.retries, MAX_RETRIES
+                    );
+                    failed.push(queued);
+                }
             }
         }
 

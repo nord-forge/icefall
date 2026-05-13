@@ -85,28 +85,39 @@ pub fn spawn_metrics_collector(
     db: Arc<dyn Database>,
 ) {
     tokio::spawn(async move {
-        let mut sys = sysinfo::System::new();
         let mut tick: u64 = 0;
         loop {
-            sys.refresh_cpu_all();
-            sys.refresh_memory();
             tokio::time::sleep(std::time::Duration::from_secs(COLLECT_INTERVAL_SECS)).await;
-            sys.refresh_cpu_all();
 
-            let disks = sysinfo::Disks::new_with_refreshed_list();
-            let (disk_used, disk_total) = disks.iter().fold((0u64, 0u64), |(used, total), disk| {
-                (
-                    used + (disk.total_space() - disk.available_space()),
-                    total + disk.total_space(),
-                )
-            });
+            let snapshot = tokio::task::spawn_blocking(|| {
+                let mut sys = sysinfo::System::new();
+                sys.refresh_cpu_all();
+                sys.refresh_memory();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                sys.refresh_cpu_all();
 
-            let snapshot = ServerMetrics {
-                cpu_percent: sys.global_cpu_usage(),
-                memory_used_bytes: sys.used_memory(),
-                memory_total_bytes: sys.total_memory(),
-                disk_used_bytes: disk_used,
-                disk_total_bytes: disk_total,
+                let disks = sysinfo::Disks::new_with_refreshed_list();
+                let (disk_used, disk_total) =
+                    disks.iter().fold((0u64, 0u64), |(used, total), disk| {
+                        (
+                            used + (disk.total_space() - disk.available_space()),
+                            total + disk.total_space(),
+                        )
+                    });
+
+                ServerMetrics {
+                    cpu_percent: sys.global_cpu_usage(),
+                    memory_used_bytes: sys.used_memory(),
+                    memory_total_bytes: sys.total_memory(),
+                    disk_used_bytes: disk_used,
+                    disk_total_bytes: disk_total,
+                }
+            })
+            .await;
+
+            let snapshot = match snapshot {
+                Ok(s) => s,
+                Err(_) => continue,
             };
 
             let snap = history.record(&snapshot).await;
