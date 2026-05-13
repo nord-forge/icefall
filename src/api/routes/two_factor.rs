@@ -381,7 +381,10 @@ async fn try_use_backup_code(
     let code_upper = code.to_uppercase();
 
     for entry in entries.iter_mut() {
-        let used = entry.get("used").and_then(serde_json::Value::as_bool).unwrap_or(true);
+        let used = entry
+            .get("used")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(true);
         if used {
             continue;
         }
@@ -442,6 +445,9 @@ async fn create_2fa_session(
         session.id
     );
     let mut headers = axum::http::HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?);
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     Ok((headers, Json(body)).into_response())
 }

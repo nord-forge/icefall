@@ -27,7 +27,10 @@ pub(super) async fn try_pre_download(
         return Ok(());
     }
 
-    let version = state.available_version.as_deref().expect("guarded by is_none() check");
+    let version = state
+        .available_version
+        .as_deref()
+        .expect("guarded by is_none() check");
     info!(version, "auto-update: starting pre-download");
 
     db.set_update_download_state("downloading", 0, None).await?;

@@ -138,7 +138,10 @@ async fn run_http_check(check: &HealthCheck) -> bool {
         .and_then(|c| serde_json::from_str::<serde_json::Value>(c).ok())
         .unwrap_or_default();
 
-    let port = config.get("port").and_then(serde_json::Value::as_u64).unwrap_or(80) as u16;
+    let port = config
+        .get("port")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(80) as u16;
     let path = config.get("path").and_then(|v| v.as_str()).unwrap_or("/");
 
     let url = format!("http://127.0.0.1:{port}{path}");

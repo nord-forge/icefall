@@ -81,7 +81,10 @@ async fn setup_admin(
         session.id
     );
     let mut headers = HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?);
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     Ok((headers, Json(body)).into_response())
 }
 
@@ -121,7 +124,10 @@ async fn login(
         session.id
     );
     let mut headers = HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?);
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     Ok((headers, Json(body)).into_response())
 }
 

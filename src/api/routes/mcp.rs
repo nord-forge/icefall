@@ -112,7 +112,10 @@ async fn call_tool(
         "get_logs" => {
             let id = str_param(p, "app_id")?;
             let search = p.get("search").and_then(|v| v.as_str());
-            let limit = p.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(100) as usize;
+            let limit = p
+                .get("limit")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(100) as usize;
             let logs = state.log_store.search(&id, search, None, limit).await;
             let count = logs.len();
             serde_json::json!({ "logs": logs, "count": count })
@@ -173,9 +176,7 @@ async fn call_tool(
             let mut results = Vec::new();
             for check in &checks {
                 let events = state.db.get_health_events(&check.id, 10).await?;
-                let status = events
-                    .first()
-                    .map_or("unknown", |e| e.status.as_str());
+                let status = events.first().map_or("unknown", |e| e.status.as_str());
                 results.push(serde_json::json!({ "check_type": check.check_type, "status": status, "recent_events": events.len() }));
             }
             serde_json::json!({ "health_checks": results })

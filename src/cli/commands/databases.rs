@@ -78,7 +78,10 @@ pub async fn backup(db: &str) {
         Ok(resp) => {
             if let Some(data) = resp.get("data") {
                 let filename = data.get("filename").and_then(|v| v.as_str()).unwrap_or("?");
-                let size = data.get("size_bytes").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                let size = data
+                    .get("size_bytes")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
                 println!("Backup complete: {filename} ({size} bytes)");
             }
         }

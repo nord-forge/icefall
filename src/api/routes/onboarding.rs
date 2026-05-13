@@ -354,7 +354,8 @@ async fn mark_step_complete(state: &AppState, step: &str) -> Result<(), ApiError
 
     let next = STEPS
         .iter()
-        .find(|s| !completed.contains(&s.to_string())).map_or_else(|| "completed".to_string(), std::string::ToString::to_string);
+        .find(|s| !completed.contains(&s.to_string()))
+        .map_or_else(|| "completed".to_string(), std::string::ToString::to_string);
 
     let json = serde_json::to_string(&completed).unwrap_or_else(|_| "[]".to_string());
     state

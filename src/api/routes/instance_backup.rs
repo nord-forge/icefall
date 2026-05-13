@@ -48,7 +48,8 @@ async fn update_config(
         .unwrap_or_else(|| current.as_ref().is_some_and(|c| c.enabled));
     let cron_schedule = body.cron_schedule.unwrap_or_else(|| {
         current
-            .as_ref().map_or_else(|| "daily".to_string(), |c| c.cron_schedule.clone())
+            .as_ref()
+            .map_or_else(|| "daily".to_string(), |c| c.cron_schedule.clone())
     });
     let retention_count = body
         .retention_count

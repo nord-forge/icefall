@@ -79,8 +79,7 @@ pub(super) fn do_backup_sync(
         .finish()
         .map_err(|e| format!("failed to compress archive: {e}"))?;
 
-    let size_bytes = std::fs::metadata(&archive_path)
-        .map_or(0, |m| m.len() as i64);
+    let size_bytes = std::fs::metadata(&archive_path).map_or(0, |m| m.len() as i64);
 
     let s3_bucket = std::env::var("ICEFALL_BACKUP_S3_BUCKET").ok();
     if let Some(bucket) = s3_bucket {

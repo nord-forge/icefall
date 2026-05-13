@@ -113,9 +113,7 @@ async fn list_sessions(
         .into_iter()
         .filter(|s| s.expires_at > now)
         .map(|s| {
-            let is_current = current_session_id
-                .as_ref()
-                .is_some_and(|cid| cid == &s.id);
+            let is_current = current_session_id.as_ref().is_some_and(|cid| cid == &s.id);
             serde_json::json!({
                 "id": s.id,
                 "created_at": s.created_at,

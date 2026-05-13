@@ -26,7 +26,11 @@ pub(super) async fn try_auto_apply(
         return Ok(());
     }
 
-    let version = state.available_version.as_deref().expect("guarded by is_none() check").to_string();
+    let version = state
+        .available_version
+        .as_deref()
+        .expect("guarded by is_none() check")
+        .to_string();
 
     let now = chrono::Local::now();
     if !is_in_maintenance_window(

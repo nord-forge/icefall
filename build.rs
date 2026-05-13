@@ -8,13 +8,21 @@ fn main() {
         .args(["rev-parse", "--short=7", "HEAD"])
         .output()
         .ok()
-        .filter(|o| o.status.success()).map_or_else(|| "unknown".into(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        .filter(|o| o.status.success())
+        .map_or_else(
+            || "unknown".into(),
+            |o| String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        );
 
     let build_date = Command::new("date")
         .args(["-u", "+%Y-%m-%d"])
         .output()
         .ok()
-        .filter(|o| o.status.success()).map_or_else(|| "unknown".into(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        .filter(|o| o.status.success())
+        .map_or_else(
+            || "unknown".into(),
+            |o| String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        );
 
     println!("cargo:rustc-env=ICEFALL_GIT_COMMIT={commit}");
     println!("cargo:rustc-env=ICEFALL_BUILD_DATE={build_date}");

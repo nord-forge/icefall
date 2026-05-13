@@ -33,9 +33,7 @@ async fn get_health(
     for check in &checks {
         let events = state.db.get_health_events(&check.id, params.limit).await?;
         let uptime = calculate_uptime(&events);
-        let current_status = events
-            .first()
-            .map_or("unknown", |e| e.status.as_str());
+        let current_status = events.first().map_or("unknown", |e| e.status.as_str());
 
         results.push(serde_json::json!({
             "check": check,

@@ -49,7 +49,10 @@ pub(super) async fn create_deploy(
     let env_clone = env.clone();
 
     if is_compose_deploy {
-        let compose_yaml = app.compose_content.clone().expect("guarded by is_compose_deploy");
+        let compose_yaml = app
+            .compose_content
+            .clone()
+            .expect("guarded by is_compose_deploy");
 
         tokio::spawn(async move {
             let deployer = ComposeDeployer::new(
