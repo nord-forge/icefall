@@ -17,7 +17,9 @@ use crate::db::Database;
 use crate::deploy::DeployError;
 use crate::events::{EventBus, EventType};
 
-use helpers::{atomic_symlink, cleanup_old_deploys, copy_dir_recursive, install_command, run_command};
+use helpers::{
+    atomic_symlink, cleanup_old_deploys, copy_dir_recursive, install_command, run_command,
+};
 
 /// Determines whether a detected framework should use the native (static) pipeline.
 pub fn should_use_native(detection: &DetectionResult) -> bool {

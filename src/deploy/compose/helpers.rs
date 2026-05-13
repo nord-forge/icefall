@@ -77,7 +77,10 @@ pub(super) fn resolve_service_ports(service: &ComposeService) -> Vec<PortMapping
 }
 
 /// Extract volume mounts, prefixing named volumes with the app name.
-pub(super) fn resolve_service_volumes(service: &ComposeService, app_name: &str) -> Vec<VolumeMount> {
+pub(super) fn resolve_service_volumes(
+    service: &ComposeService,
+    app_name: &str,
+) -> Vec<VolumeMount> {
     service
         .volumes
         .iter()

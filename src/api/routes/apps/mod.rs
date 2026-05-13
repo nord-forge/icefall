@@ -12,7 +12,9 @@ pub fn routes() -> Router<AppState> {
         .route("/apps", get(crud::list_apps).post(crud::create_app))
         .route(
             "/apps/{id}",
-            get(crud::get_app).put(crud::update_app).delete(crud::delete_app),
+            get(crud::get_app)
+                .put(crud::update_app)
+                .delete(crud::delete_app),
         )
         .route("/apps/{id}/start", post(lifecycle::start_app))
         .route("/apps/{id}/stop", post(lifecycle::stop_app))

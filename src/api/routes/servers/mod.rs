@@ -13,7 +13,10 @@ use crate::api::AppState;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/servers", get(crud::list_servers).post(crud::create_server))
+        .route(
+            "/servers",
+            get(crud::list_servers).post(crud::create_server),
+        )
         .route("/servers/setup", get(scripts::setup_script))
         .route(
             "/servers/{id}",

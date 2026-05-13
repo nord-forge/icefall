@@ -35,8 +35,8 @@ fn static_frameworks_are_native() {
 
 #[test]
 fn install_commands_correct() {
-    use crate::build::PackageManager;
     use super::helpers::install_command;
+    use crate::build::PackageManager;
 
     assert_eq!(install_command(&PackageManager::Npm), "npm ci");
     assert_eq!(

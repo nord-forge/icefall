@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use bollard::models::{
-    ContainerCreateBody, HostConfig, NetworkConnectRequest, PortBinding,
-};
+use bollard::models::{ContainerCreateBody, HostConfig, NetworkConnectRequest, PortBinding};
 use bollard::query_parameters::{
     CreateContainerOptions, ListContainersOptions, RemoveContainerOptions, StopContainerOptions,
 };

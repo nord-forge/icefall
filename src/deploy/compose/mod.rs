@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 pub use types::{
-    ComposeCommand, ComposeDeployResult, ComposeEnvironment, ComposeFile, ComposeService,
-    ComposeServiceResult, ComposeDependsOn, deserialize_string_or_number_vec,
+    deserialize_string_or_number_vec, ComposeCommand, ComposeDependsOn, ComposeDeployResult,
+    ComposeEnvironment, ComposeFile, ComposeService, ComposeServiceResult,
 };
 
 use crate::db::models::App;

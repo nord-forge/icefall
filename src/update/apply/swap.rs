@@ -24,10 +24,7 @@ impl UpdateApplier {
         Ok(rollback_path)
     }
 
-    pub(super) async fn backup_database(
-        &self,
-        db: &dyn Database,
-    ) -> Result<PathBuf, UpdateError> {
+    pub(super) async fn backup_database(&self, db: &dyn Database) -> Result<PathBuf, UpdateError> {
         let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
         let backup_dir = self.data_dir.join("backups");
         std::fs::create_dir_all(&backup_dir)?;
@@ -75,10 +72,7 @@ impl UpdateApplier {
         Ok(Some(backup_path))
     }
 
-    pub(super) async fn run_update_migrations(
-        &self,
-        new_binary: &Path,
-    ) -> Result<(), UpdateError> {
+    pub(super) async fn run_update_migrations(&self, new_binary: &Path) -> Result<(), UpdateError> {
         let output = tokio::process::Command::new(new_binary)
             .args(["db", "migrate"])
             .output()
