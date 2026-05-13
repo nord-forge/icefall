@@ -1,0 +1,390 @@
+use axum::extract::{Path, State};
+use axum::Json;
+
+use crate::api::error::ApiError;
+use crate::api::AppState;
+use crate::build::orchestrator::BuildOrchestrator;
+use crate::build::BuildConfig;
+use crate::db::models::NewDeploy;
+use crate::deploy::compose::ComposeDeployer;
+use crate::deploy::manager::DeployManager;
+use crate::deploy::native::NativeDeployer;
+
+pub(super) async fn create_deploy(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let app = state
+        .db
+        .get_app(&id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
+
+    let is_compose_deploy = app.compose_content.is_some();
+    let is_image_deploy = app.image_ref.is_some();
+
+    if !is_compose_deploy && !is_image_deploy {
+        app.git_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::BadRequest("app has no git_repo configured".into()))?;
+    }
+
+    let envs = state.db.list_environments(&id).await?;
+    let env = envs
+        .first()
+        .ok_or_else(|| ApiError::BadRequest("app has no environments".into()))?;
+
+    let deploy = state
+        .db
+        .create_deploy(&NewDeploy {
+            app_id: id.clone(),
+            environment_id: env.id.clone(),
+            git_sha: None,
+            server_id: None,
+        })
+        .await?;
+
+    let deploy_id = deploy.id.clone();
+    let app_clone = app.clone();
+    let env_clone = env.clone();
+
+    if is_compose_deploy {
+        let compose_yaml = app.compose_content.clone().unwrap();
+
+        tokio::spawn(async move {
+            let deployer = ComposeDeployer::new(
+                state.docker.clone(),
+                state.db.clone(),
+                state.event_bus.clone(),
+            );
+
+            let env_vars_list = state
+                .db
+                .get_env_vars(&env_clone.id)
+                .await
+                .unwrap_or_default();
+            let env_map: std::collections::HashMap<String, String> = env_vars_list
+                .into_iter()
+                .map(|v| (v.key, v.value))
+                .collect();
+
+            if let Err(e) = deployer
+                .deploy(&app_clone, &deploy_id, &compose_yaml, &env_map)
+                .await
+            {
+                tracing::error!("Compose deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
+            }
+        });
+    } else if is_image_deploy {
+        let image_ref = app.image_ref.clone().unwrap();
+
+        tokio::spawn(async move {
+            let manager = DeployManager::new(
+                state.docker.clone(),
+                state.caddy.clone(),
+                state.db.clone(),
+                state.config.clone(),
+                state.event_bus.clone(),
+                Some(state.agent_registry.clone()),
+            );
+
+            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
+                Ok(Some(d)) => d,
+                _ => return,
+            };
+
+            if let Err(e) = manager
+                .deploy(&updated_deploy, &app_clone, &env_clone, &image_ref)
+                .await
+            {
+                tracing::error!("Image deploy failed for {deploy_id}: {e}");
+            }
+        });
+    } else if app.deploy_mode == "native" {
+        let build_config: Option<BuildConfig> = app
+            .build_config
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+
+        let lock = state.build_locks.acquire(&id).await;
+
+        tokio::spawn(async move {
+            let _guard = lock.lock().await;
+
+            let deployer = NativeDeployer::new(
+                state.caddy.clone(),
+                state.db.clone(),
+                state.config.clone(),
+                state.event_bus.clone(),
+            );
+
+            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
+                Ok(Some(d)) => d,
+                _ => return,
+            };
+
+            if let Err(e) = deployer
+                .deploy(&updated_deploy, &app_clone, &env_clone, build_config)
+                .await
+            {
+                tracing::error!("Native deploy failed for {deploy_id}: {e}");
+            }
+        });
+    } else {
+        let build_config: Option<BuildConfig> = app
+            .build_config
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+
+        let lock = state.build_locks.acquire(&id).await;
+        let is_auto_mode = app.deploy_mode == "auto";
+
+        tokio::spawn(async move {
+            let _guard = lock.lock().await;
+
+            if is_auto_mode {
+                let work_dir = state.config.data_dir.join("builds").join(&deploy_id);
+                let git_repo = match app_clone.git_repo.as_deref() {
+                    Some(r) => r,
+                    None => {
+                        tracing::error!("Auto-mode deploy failed: no git_repo");
+                        return;
+                    }
+                };
+
+                let clone_opts = crate::build::git::GitCloneOptions {
+                    repo_url: git_repo.to_string(),
+                    branch: Some(app_clone.git_branch.clone()),
+                    sha: None,
+                    ssh_key_path: None,
+                    token: None,
+                };
+
+                match crate::build::git::clone_repo(&clone_opts, &work_dir).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::error!("Auto-mode clone failed for {deploy_id}: {e}");
+                        let _ = state
+                            .db
+                            .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                            .await;
+                        return;
+                    }
+                }
+
+                let detection = crate::build::detect::detect(&work_dir, build_config.as_ref());
+                let use_native = detection
+                    .as_ref()
+                    .map(crate::deploy::native::should_use_native)
+                    .unwrap_or(false);
+
+                let _ = tokio::fs::remove_dir_all(&work_dir).await;
+
+                if use_native {
+                    let deployer = NativeDeployer::new(
+                        state.caddy.clone(),
+                        state.db.clone(),
+                        state.config.clone(),
+                        state.event_bus.clone(),
+                    );
+
+                    let updated_deploy = match state.db.get_deploy(&deploy_id).await {
+                        Ok(Some(d)) => d,
+                        _ => return,
+                    };
+
+                    if let Err(e) = deployer
+                        .deploy(
+                            &updated_deploy,
+                            &app_clone,
+                            &env_clone,
+                            build_config.clone(),
+                        )
+                        .await
+                    {
+                        tracing::error!("Native deploy failed for {deploy_id}: {e}");
+                    }
+                    return;
+                }
+            }
+
+            let manager = DeployManager::new(
+                state.docker.clone(),
+                state.caddy.clone(),
+                state.db.clone(),
+                state.config.clone(),
+                state.event_bus.clone(),
+                Some(state.agent_registry.clone()),
+            );
+
+            let target = manager.resolve_target(&app_clone);
+
+            let image_ref = match target {
+                crate::deploy::DeployTarget::Remote { ref server_id } => {
+                    let executor = match manager.make_remote_executor(server_id).await {
+                        Ok(e) => e,
+                        Err(e) => {
+                            tracing::error!("Cannot reach server for deploy {deploy_id}: {e}");
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
+                            return;
+                        }
+                    };
+
+                    let git_repo = match app_clone.git_repo.as_deref() {
+                        Some(r) => r,
+                        None => {
+                            tracing::error!("Remote deploy failed: no git_repo");
+                            return;
+                        }
+                    };
+
+                    let timeout = std::time::Duration::from_secs(
+                        build_config
+                            .as_ref()
+                            .and_then(|c| c.build_timeout_secs)
+                            .unwrap_or(state.config.build_timeout_secs),
+                    );
+
+                    let config_json = build_config
+                        .as_ref()
+                        .and_then(|c| serde_json::to_value(c).ok());
+
+                    match executor
+                        .run_build(
+                            git_repo,
+                            &app_clone.git_branch,
+                            &deploy_id,
+                            &app_clone.name,
+                            &[],
+                            config_json.as_ref(),
+                            timeout,
+                        )
+                        .await
+                    {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            tracing::error!("Remote build failed for {deploy_id}: {e}");
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
+                            return;
+                        }
+                    }
+                }
+                crate::deploy::DeployTarget::Local => {
+                    let orchestrator = BuildOrchestrator::new(
+                        state.docker.clone(),
+                        state.db.clone(),
+                        state.config.clone(),
+                    );
+
+                    match orchestrator
+                        .build(&deploy_id, &app_clone, build_config)
+                        .await
+                    {
+                        Ok(result) => result.image_ref,
+                        Err(e) => {
+                            tracing::error!("Build failed for deploy {deploy_id}: {e}");
+                            return;
+                        }
+                    }
+                }
+            };
+
+            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
+                Ok(Some(d)) => d,
+                _ => return,
+            };
+
+            if let Err(e) = manager
+                .deploy(&updated_deploy, &app_clone, &env_clone, &image_ref)
+                .await
+            {
+                tracing::error!("Deploy failed for {deploy_id}: {e}");
+            }
+        });
+    }
+
+    Ok(Json(serde_json::json!({ "data": deploy })))
+}
+
+pub(super) async fn rollback_deploy(
+    State(state): State<AppState>,
+    Path((app_id, deploy_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let app = state
+        .db
+        .get_app(&app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("app {app_id}")))?;
+
+    let target_deploy = state
+        .db
+        .get_deploy(&deploy_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    let image_ref = target_deploy
+        .image_ref
+        .as_ref()
+        .ok_or_else(|| {
+            ApiError::BadRequest("Target deploy has no image reference — cannot rollback".into())
+        })?
+        .clone();
+
+    let envs = state.db.list_environments(&app_id).await?;
+    let env = envs
+        .first()
+        .ok_or_else(|| ApiError::BadRequest("app has no environments".into()))?;
+
+    let rollback_deploy = state
+        .db
+        .create_deploy(&NewDeploy {
+            app_id: app_id.clone(),
+            environment_id: env.id.clone(),
+            git_sha: target_deploy.git_sha.clone(),
+            server_id: None,
+        })
+        .await?;
+
+    let env_snapshot: Option<Vec<String>> = target_deploy
+        .env_snapshot
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok());
+
+    let rollback_id = rollback_deploy.id.clone();
+    let env_clone = env.clone();
+
+    tokio::spawn(async move {
+        let manager = DeployManager::new(
+            state.docker.clone(),
+            state.caddy.clone(),
+            state.db.clone(),
+            state.config.clone(),
+            state.event_bus.clone(),
+            Some(state.agent_registry.clone()),
+        );
+
+        let deploy = match state.db.get_deploy(&rollback_id).await {
+            Ok(Some(d)) => d,
+            _ => return,
+        };
+
+        if let Err(e) = manager
+            .deploy_with_env(&deploy, &app, &env_clone, &image_ref, env_snapshot)
+            .await
+        {
+            tracing::error!("Rollback deploy failed for {rollback_id}: {e}");
+        }
+    });
+
+    Ok(Json(serde_json::json!({ "data": rollback_deploy })))
+}
