@@ -91,6 +91,12 @@ export default defineConfig({
             { label: 'Updates', slug: 'management/updates' },
           ],
         },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'Podman Runtime', slug: 'reference/podman' },
+          ],
+        },
       ],
     }),
   ],
