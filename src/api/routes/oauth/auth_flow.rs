@@ -217,9 +217,7 @@ pub(super) async fn oauth_callback(
             .get_user_by_id(&identity.user_id)
             .await?
             .ok_or_else(|| {
-                ApiError::internal(std::io::Error::other(
-                    "Linked user account not found",
-                ))
+                ApiError::internal(std::io::Error::other("Linked user account not found"))
             })?,
         // Case 2: No OAuth identity yet
         None => {

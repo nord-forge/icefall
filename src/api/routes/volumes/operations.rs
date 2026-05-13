@@ -191,9 +191,7 @@ pub(super) async fn upload_file(
         builder
             .append_data(&mut header, &filename, &body[..])
             .map_err(ApiError::internal)?;
-        builder
-            .finish()
-            .map_err(ApiError::internal)?;
+        builder.finish().map_err(ApiError::internal)?;
     }
 
     use bollard::query_parameters::UploadToContainerOptions;

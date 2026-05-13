@@ -40,9 +40,11 @@ impl IntoResponse for ApiError {
                     "Internal server error".to_string(),
                 )
             }
-            ApiError::ServiceUnavailable(msg) => {
-                (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable", msg.clone())
-            }
+            ApiError::ServiceUnavailable(msg) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "service_unavailable",
+                msg.clone(),
+            ),
         };
 
         let body = serde_json::json!({ "error": code, "message": message });

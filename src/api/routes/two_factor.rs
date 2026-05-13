@@ -357,8 +357,7 @@ fn generate_backup_codes() -> Result<(Vec<String>, String), ApiError> {
         }));
     }
 
-    let hashed_json =
-        serde_json::to_string(&hashed_entries).map_err(ApiError::internal)?;
+    let hashed_json = serde_json::to_string(&hashed_entries).map_err(ApiError::internal)?;
 
     Ok((plain_codes, hashed_json))
 }
@@ -403,8 +402,7 @@ async fn try_use_backup_code(
         {
             // Mark as used
             entry["used"] = serde_json::Value::Bool(true);
-            let updated_json =
-                serde_json::to_string(&entries).map_err(ApiError::internal)?;
+            let updated_json = serde_json::to_string(&entries).map_err(ApiError::internal)?;
             state
                 .db
                 .update_user_backup_codes(&user.id, &updated_json)
