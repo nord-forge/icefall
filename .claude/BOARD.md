@@ -262,17 +262,37 @@
 | [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | 2026-05-13 | audit_log table + migration, DB trait + SQLite impl, API endpoints (global + per-server), 90-day daily pruning |
 | [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | 2026-05-13 | Idempotent, NO_COLOR, Alpine/OpenRC, error trap with line numbers, Docker/Caddy verification, uninstall endpoint, log file |
 
+### Phase 22 — Expansion (v1.2)
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-147](tickets/phase-22-expansion/IF-147-environments-per-project.md) | Environments per project | — | Production/staging/dev per project, 3-level variable cascade |
+| [IF-148](tickets/phase-22-expansion/IF-148-one-click-service-templates.md) | One-click service templates | — | 20 templates (Ghost, Plausible, etc.), Compose-based deploy, template browser UI |
+| [IF-149](tickets/phase-22-expansion/IF-149-reverse-proxy-management-ui.md) | Reverse proxy management UI | — | Read-only Caddy viewer, middleware presets, advanced edit mode |
+| [IF-150](tickets/phase-22-expansion/IF-150-log-drains.md) | Log drains | — | Grafana Loki, Axiom, generic HTTP; batched shipping, per-app + global |
+| [IF-151](tickets/phase-22-expansion/IF-151-cloudflare-tunnel-integration.md) | Cloudflare Tunnel integration | — | Managed cloudflared container, per-domain tunnel routing |
+| [IF-152](tickets/phase-22-expansion/IF-152-automated-docker-cleanup.md) | Automated Docker cleanup | — | Scheduled + threshold-based cleanup, deploy-aware, per-server |
+
+### Phase 23 — Rust Quality & Performance
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-153](tickets/phase-23-rust-quality/IF-153-sqlite-module-split.md) | Split sqlite.rs into domain modules | — | 2204 lines / 128 functions → 16 sub-modules under src/db/sqlite/ |
+| [IF-154](tickets/phase-23-rust-quality/IF-154-large-file-splits.md) | Split remaining large Rust files | — | 11 files over 500 lines → directory modules |
+| [IF-155](tickets/phase-23-rust-quality/IF-155-performance-audit.md) | Rust performance audit | — | Allocation hotspots, async bottlenecks, query efficiency, criterion benchmarks |
+| [IF-156](tickets/phase-23-rust-quality/IF-156-rust-code-quality-audit.md) | Rust code quality audit | — | Safety, error handling, idiomatic patterns, unwrap audit |
+| [IF-157](tickets/phase-23-rust-quality/IF-157-error-type-consolidation.md) | Error type consolidation | — | Consolidate error enums, preserve context, consistent API error shape |
+| [IF-158](tickets/phase-23-rust-quality/IF-158-test-coverage-expansion.md) | Test coverage expansion | — | Deploy pipeline, API routes, agent protocol tests, coverage reporting |
+
 ---
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 141 |
+| Total tickets | 153 |
 | Done | 141 |
-| Backlog | 0 |
+| Backlog | 12 |
 | Superseded | 1 |
-| Phases complete | 19 / 19 |
+| Phases complete | 19 / 21 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -296,37 +316,29 @@
 | 17 — v1.1 Fast Follow | **Done** | 13/13 |
 | 18 — UX Polish | **Done** | 11/11 |
 | 20 — Multi-Server | **Done** | 30/30 |
+| 22 — Expansion (v1.2) | Backlog | 0/6 |
+| 23 — Rust Quality | Backlog | 0/6 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |
 |------|-------|-----------------|
-| S | 19 | 1-2 days each |
-| M | 71 | 3-5 days each |
-| L | 18 | 1-2 weeks each |
+| S | 20 | 1-2 days each |
+| M | 76 | 3-5 days each |
+| L | 21 | 1-2 weeks each |
 
 ### Critical path (must complete in order)
 ```
-Phases 1-15 (done)
+Phases 1-20 (done)
 
-Self-Update (Phase 16):
-  IF-097 (release pipeline) → IF-098 (discovery) → IF-099 (download) → IF-100 (apply) → IF-101 (rollback)
-  IF-100 (apply) → IF-102 (dashboard UI)
-  IF-100 (apply) → IF-103 (auto-update)
-  IF-098 + IF-099 + IF-100 + IF-101 → IF-104 (CLI)
+Expansion (Phase 22):
+  IF-074 (projects) → IF-147 (environments per project)
+  IF-073 (Docker Compose) → IF-148 (one-click templates)
+  IF-148 can start immediately (Compose is done)
 
-v1.1 Fast Follow (Phase 17):
-  IF-064 (volumes) → IF-073 (Docker Compose)
-  IF-065 (Docker image deploy) → IF-073 (Docker Compose)
-  IF-072 (tags) + IF-074 (projects) → IF-078 (command palette)
-  IF-075 (2FA) → IF-076 (OAuth)
-
-Multi-Server (Phase 20):
-  IF-117 → IF-118 → IF-119 (done)
-  IF-120 → IF-121 → IF-122 → IF-123 → IF-124 (done)
-  IF-121 → IF-125..IF-130 (done)
-  IF-117 + IF-118 → IF-131 → IF-132 → IF-133 (done)
-  IF-131 → IF-134 + IF-135 (done)
-  IF-118 → IF-136..IF-141 (done)
-  IF-122 → IF-142 (secret envelope)
-  IF-124 → IF-143 (agent auto-update)
+Rust Quality (Phase 23):
+  IF-153 (sqlite split) → IF-154 (remaining splits)
+  IF-153 → IF-155 (performance audit)
+  IF-156 (quality audit) — no dependencies, can run in parallel
+  IF-153 → IF-157 (error consolidation)
+  IF-153 + IF-157 → IF-158 (test coverage)
 ```
