@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::info;
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -36,6 +37,48 @@ pub struct BackupConfig {
     pub s3_endpoint: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub enum ContainerRuntime {
+    #[default]
+    #[serde(rename = "docker")]
+    Docker,
+    #[serde(rename = "podman")]
+    Podman,
+}
+
+impl std::fmt::Display for ContainerRuntime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Docker => write!(f, "docker"),
+            Self::Podman => write!(f, "podman"),
+        }
+    }
+}
+
+impl ContainerRuntime {
+    pub fn default_socket(&self) -> &'static str {
+        match self {
+            Self::Docker => "/var/run/docker.sock",
+            Self::Podman => "/run/podman/podman.sock",
+        }
+    }
+
+    pub fn compose_command(&self) -> &'static str {
+        match self {
+            Self::Docker => "docker compose",
+            Self::Podman => "podman compose",
+        }
+    }
+
+    pub fn from_socket(socket: &str) -> Self {
+        if socket.contains("podman") {
+            Self::Podman
+        } else {
+            Self::Docker
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IcefallConfig {
     #[serde(default = "defaults::listen_addr")]
@@ -46,8 +89,10 @@ pub struct IcefallConfig {
     pub data_dir: PathBuf,
     #[serde(default = "defaults::sqlite_path")]
     pub sqlite_path: PathBuf,
-    #[serde(default = "defaults::docker_socket")]
-    pub docker_socket: String,
+    #[serde(default)]
+    pub runtime: ContainerRuntime,
+    #[serde(default = "defaults::container_socket", alias = "docker_socket")]
+    pub container_socket: String,
     #[serde(default = "defaults::caddy_admin_url")]
     pub caddy_admin_url: String,
     pub base_domain: Option<String>,
@@ -155,8 +200,33 @@ impl IcefallConfig {
         if let Ok(val) = std::env::var("ICEFALL_SQLITE_PATH") {
             self.sqlite_path = PathBuf::from(val);
         }
-        if let Ok(val) = std::env::var("ICEFALL_DOCKER_SOCKET") {
-            self.docker_socket = val;
+        if let Ok(val) = std::env::var("ICEFALL_CONTAINER_SOCKET") {
+            self.container_socket = val.clone();
+            self.runtime = ContainerRuntime::from_socket(&val);
+        } else if let Ok(val) = std::env::var("ICEFALL_DOCKER_SOCKET") {
+            self.container_socket = val.clone();
+            self.runtime = ContainerRuntime::from_socket(&val);
+        }
+        if let Ok(val) = std::env::var("ICEFALL_RUNTIME") {
+            match val.as_str() {
+                "podman" => {
+                    self.runtime = ContainerRuntime::Podman;
+                    if self.container_socket == defaults::container_socket() {
+                        self.container_socket =
+                            ContainerRuntime::Podman.default_socket().to_string();
+                    }
+                }
+                "docker" => {
+                    self.runtime = ContainerRuntime::Docker;
+                    if self.container_socket == defaults::container_socket() {
+                        self.container_socket =
+                            ContainerRuntime::Docker.default_socket().to_string();
+                    }
+                }
+                other => {
+                    info!("Unknown ICEFALL_RUNTIME value '{other}', using default");
+                }
+            }
         }
         if let Ok(val) = std::env::var("ICEFALL_CADDY_URL") {
             self.caddy_admin_url = val;
@@ -183,7 +253,8 @@ impl Default for IcefallConfig {
             listen_port: defaults::listen_port(),
             data_dir: defaults::data_dir(),
             sqlite_path: defaults::sqlite_path(),
-            docker_socket: defaults::docker_socket(),
+            runtime: ContainerRuntime::default(),
+            container_socket: defaults::container_socket(),
             caddy_admin_url: defaults::caddy_admin_url(),
             base_domain: None,
             encryption_key: None,

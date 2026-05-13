@@ -86,15 +86,22 @@ async fn main() {
             info!("Icefall agent starting");
             info!("Control plane: {}", cfg.control_plane_url);
             info!("Server ID: {}", cfg.server_id);
+            info!(
+                "Container runtime: {} ({})",
+                cfg.runtime, cfg.container_socket
+            );
 
             let docker = match bollard::Docker::connect_with_socket(
-                &cfg.docker_socket,
+                &cfg.container_socket,
                 120,
                 bollard::API_DEFAULT_VERSION,
             ) {
                 Ok(d) => d,
                 Err(e) => {
-                    eprintln!("Failed to connect to Docker at {}: {e}", cfg.docker_socket);
+                    eprintln!(
+                        "Failed to connect to {} at {}: {e}",
+                        cfg.runtime, cfg.container_socket
+                    );
                     std::process::exit(1);
                 }
             };

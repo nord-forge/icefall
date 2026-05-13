@@ -99,14 +99,21 @@ impl DaemonRunner {
         info!("Database connected and migrations applied");
         let db: Arc<dyn Database> = Arc::new(db);
 
-        // Connect to Docker
-        let docker = match DockerClient::connect(&config.docker_socket).await {
+        // Connect to container runtime
+        info!(
+            "Connecting to {} runtime at {}",
+            config.runtime, config.container_socket
+        );
+        let docker = match DockerClient::connect(&config.container_socket).await {
             Ok(client) => {
-                info!("Docker connection established");
+                info!("Container runtime connected ({})", config.runtime);
                 Arc::new(client)
             }
             Err(e) => {
-                error!("Docker connection failed: {e}");
+                error!(
+                    "Container runtime connection failed ({}): {e}",
+                    config.runtime
+                );
                 return Err(DaemonError::Docker(e));
             }
         };

@@ -1,15 +1,41 @@
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use crate::config::IcefallConfig;
+use crate::config::{ContainerRuntime, IcefallConfig};
 use crate::db::encryption::Encryptor;
+
+fn detect_runtime() -> (ContainerRuntime, String) {
+    let podman_sockets = ["/run/podman/podman.sock", "/var/run/podman/podman.sock"];
+    let docker_socket = "/var/run/docker.sock";
+
+    for socket in &podman_sockets {
+        if std::path::Path::new(socket).exists() {
+            return (ContainerRuntime::Podman, socket.to_string());
+        }
+    }
+    if std::path::Path::new(docker_socket).exists() {
+        return (ContainerRuntime::Docker, docker_socket.to_string());
+    }
+    (ContainerRuntime::Docker, docker_socket.to_string())
+}
 
 pub async fn run() {
     println!("Icefall — Initial Setup\n");
 
+    let (detected_runtime, detected_socket) = detect_runtime();
+    println!(
+        "Detected container runtime: {} ({})",
+        detected_runtime, detected_socket
+    );
+
     let data_dir = prompt("Data directory", "/var/lib/icefall");
     let listen_port: u16 = prompt("Listen port", "3000").parse().unwrap_or(3000);
     let base_domain = prompt_optional("Base domain (e.g. apps.example.com)");
+    let runtime_input = prompt("Container runtime", &detected_runtime.to_string());
+    let (runtime, container_socket) = match runtime_input.as_str() {
+        "podman" => (ContainerRuntime::Podman, detected_socket.clone()),
+        _ => (ContainerRuntime::Docker, detected_socket.clone()),
+    };
 
     let encryption_key = base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
@@ -21,7 +47,8 @@ pub async fn run() {
         listen_port,
         data_dir: PathBuf::from(&data_dir),
         sqlite_path: PathBuf::from(&data_dir).join("icefall.db"),
-        docker_socket: "/var/run/docker.sock".to_string(),
+        runtime,
+        container_socket,
         caddy_admin_url: "http://localhost:2019".to_string(),
         base_domain,
         encryption_key: Some(encryption_key),

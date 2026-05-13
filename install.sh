@@ -84,15 +84,63 @@ check_prereqs() {
         error "systemd is required (not found). Alpine uses OpenRC."
     fi
 
-    install_docker
+    install_container_runtime
 }
 
-install_docker() {
-    if command -v docker &>/dev/null; then
-        if docker info &>/dev/null; then
-            ok "Docker $(docker --version | cut -d' ' -f3 | tr -d ',') (running)"
-            return
+CONTAINER_RUNTIME=""
+CONTAINER_SOCKET=""
+
+detect_container_runtime() {
+    if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+        CONTAINER_RUNTIME="docker"
+        CONTAINER_SOCKET="/var/run/docker.sock"
+        ok "Docker $(docker --version | cut -d' ' -f3 | tr -d ',') detected (running)"
+        return 0
+    fi
+
+    if command -v podman &>/dev/null && podman info &>/dev/null 2>&1; then
+        CONTAINER_RUNTIME="podman"
+        if [ -S "/run/podman/podman.sock" ]; then
+            CONTAINER_SOCKET="/run/podman/podman.sock"
+        else
+            CONTAINER_SOCKET="/var/run/podman/podman.sock"
         fi
+        local podman_version
+        podman_version=$(podman --version | awk '{print $3}')
+        local podman_major
+        podman_major=$(echo "$podman_version" | cut -d. -f1)
+        if [ "$podman_major" -lt 4 ]; then
+            warn "Podman $podman_version detected but Icefall requires >= 4.0"
+            return 1
+        fi
+        ok "Podman $podman_version detected (running)"
+        return 0
+    fi
+
+    return 1
+}
+
+ensure_podman_socket() {
+    if is_alpine; then
+        return 0
+    fi
+    if ! systemctl is-active --quiet podman.socket 2>/dev/null; then
+        info "Enabling Podman API socket..."
+        systemctl enable --now podman.socket 2>/dev/null || true
+    fi
+    ok "Podman socket active"
+}
+
+install_container_runtime() {
+    if detect_container_runtime; then
+        if [ "$CONTAINER_RUNTIME" = "podman" ]; then
+            ensure_podman_socket
+        fi
+        return
+    fi
+
+    # Neither runtime found — try to start existing installs
+    if command -v docker &>/dev/null; then
         warn "Docker is installed but not running"
         if is_alpine; then
             rc-service docker start 2>/dev/null || true
@@ -100,17 +148,48 @@ install_docker() {
             systemctl start docker 2>/dev/null || true
         fi
         if docker info &>/dev/null; then
+            CONTAINER_RUNTIME="docker"
+            CONTAINER_SOCKET="/var/run/docker.sock"
             ok "Docker started"
             return
         fi
-        error "Docker is installed but cannot start. Check: journalctl -u docker"
     fi
 
-    warn "Docker is not installed"
-    if ! confirm "Install Docker via official script?"; then
-        error "Docker is required for Icefall"
+    if command -v podman &>/dev/null; then
+        warn "Podman is installed but not running"
+        ensure_podman_socket
+        if podman info &>/dev/null; then
+            CONTAINER_RUNTIME="podman"
+            CONTAINER_SOCKET="/run/podman/podman.sock"
+            ok "Podman started"
+            return
+        fi
     fi
 
+    # Nothing installed — ask user which to install
+    info "No container runtime detected."
+    echo ""
+    echo "  1) Docker (recommended — widest compatibility)"
+    echo "  2) Podman (daemonless, lower resource usage)"
+    echo ""
+
+    if [ "$NONINTERACTIVE" = "--yes" ]; then
+        local choice="1"
+    else
+        read -rp "Install [1/2]: " choice
+    fi
+
+    case "$choice" in
+        2)
+            install_podman
+            ;;
+        *)
+            install_docker
+            ;;
+    esac
+}
+
+install_docker() {
     info "Installing Docker..."
     curl -fsSL https://get.docker.com | sh
 
@@ -126,11 +205,41 @@ install_docker() {
         error "Docker installed but failed to start"
     fi
 
-    if ! docker ps &>/dev/null; then
-        error "Docker socket not accessible. Check /var/run/docker.sock permissions."
+    CONTAINER_RUNTIME="docker"
+    CONTAINER_SOCKET="/var/run/docker.sock"
+    ok "Docker installed and verified"
+}
+
+install_podman() {
+    info "Installing Podman..."
+    case "$OS_ID" in
+        ubuntu|debian)
+            apt-get update &>/dev/null
+            apt-get install -y podman &>/dev/null
+            ;;
+        fedora)
+            dnf install -y podman &>/dev/null
+            ;;
+        centos|rhel|rocky|almalinux)
+            dnf install -y podman &>/dev/null || yum install -y podman &>/dev/null
+            ;;
+        alpine)
+            apk add --no-cache podman &>/dev/null
+            ;;
+        *)
+            error "Cannot auto-install Podman for $OS_ID. Install manually: https://podman.io/docs/installation"
+            ;;
+    esac
+
+    ensure_podman_socket
+
+    if ! podman info &>/dev/null; then
+        error "Podman installed but failed to start"
     fi
 
-    ok "Docker installed and verified"
+    CONTAINER_RUNTIME="podman"
+    CONTAINER_SOCKET="/run/podman/podman.sock"
+    ok "Podman installed and verified"
 }
 
 install_caddy() {
@@ -244,7 +353,8 @@ listen_addr = "0.0.0.0"
 listen_port = 3000
 data_dir = "$ICEFALL_DATA"
 sqlite_path = "$ICEFALL_DATA/icefall.db"
-docker_socket = "/var/run/docker.sock"
+runtime = "$CONTAINER_RUNTIME"
+container_socket = "$CONTAINER_SOCKET"
 caddy_admin_url = "http://localhost:2019"
 encryption_key = "$encryption_key"
 log_level = "info"
@@ -267,11 +377,21 @@ setup_service() {
 setup_systemd() {
     info "Configuring systemd service..."
 
-    cat > "$ICEFALL_SERVICE" << 'EOF'
+    local runtime_dep=""
+    local runtime_after="network.target caddy.service"
+    if [ "$CONTAINER_RUNTIME" = "podman" ]; then
+        runtime_dep="Requires=podman.socket"
+        runtime_after="network.target podman.socket caddy.service"
+    else
+        runtime_dep="Requires=docker.service"
+        runtime_after="network.target docker.service caddy.service"
+    fi
+
+    cat > "$ICEFALL_SERVICE" << EOF
 [Unit]
 Description=Icefall Deployment Platform
-After=network.target docker.service caddy.service
-Requires=docker.service
+After=$runtime_after
+$runtime_dep
 
 [Service]
 Type=notify
@@ -299,7 +419,12 @@ setup_openrc() {
     info "Configuring OpenRC service..."
     local init_script="/etc/init.d/icefall"
 
-    cat > "$init_script" << 'EOF'
+    local rc_dep="docker"
+    if [ "$CONTAINER_RUNTIME" = "podman" ]; then
+        rc_dep="podman"
+    fi
+
+    cat > "$init_script" << EOF
 #!/sbin/openrc-run
 name="icefall"
 description="Icefall Deployment Platform"
@@ -308,7 +433,7 @@ command_args="daemon start"
 command_background="yes"
 pidfile="/var/run/icefall.pid"
 depend() {
-    need net docker
+    need net $rc_dep
     after caddy
 }
 EOF
@@ -342,6 +467,7 @@ print_success() {
     info "Icefall is installed and running!"
     echo ""
     echo "  Dashboard: http://${server_ip}:3000"
+    echo "  Runtime:   $CONTAINER_RUNTIME ($CONTAINER_SOCKET)"
     echo "  Config:    $ICEFALL_CONFIG"
     echo "  Data:      $ICEFALL_DATA"
     if is_alpine; then

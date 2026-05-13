@@ -16,8 +16,37 @@ pub fn sqlite_path() -> PathBuf {
     data_dir().join("icefall.db")
 }
 
-pub fn docker_socket() -> String {
+pub fn container_runtime() -> String {
+    "docker".to_string()
+}
+
+pub fn container_socket() -> String {
+    detect_socket()
+}
+
+pub fn detect_socket() -> String {
+    let podman_paths = ["/run/podman/podman.sock", "/var/run/podman/podman.sock"];
+    let docker_paths = ["/var/run/docker.sock"];
+
+    for path in &podman_paths {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    for path in &docker_paths {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
     "/var/run/docker.sock".to_string()
+}
+
+pub fn detect_runtime_from_socket(socket: &str) -> String {
+    if socket.contains("podman") {
+        "podman".to_string()
+    } else {
+        "docker".to_string()
+    }
 }
 
 pub fn caddy_admin_url() -> String {
