@@ -377,8 +377,8 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     // --- apply_env_overrides() ---
 
-    /// Helper to clean up env vars that apply_env_overrides reads, preventing
-    /// cross-test interference when tests run in parallel.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn clear_icefall_env_vars() {
         for var in &[
             "ICEFALL_LISTEN_ADDR",
@@ -400,6 +400,7 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     #[test]
     fn env_override_runtime_podman() {
+        let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
         let mut config = IcefallConfig::default();
 
@@ -413,9 +414,9 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     #[test]
     fn env_override_runtime_docker() {
+        let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
         let mut config = IcefallConfig::default();
-        // First set to podman so we can verify docker override works
         config.runtime = ContainerRuntime::Podman;
         config.container_socket = defaults::container_socket();
 
@@ -428,6 +429,7 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     #[test]
     fn env_override_container_socket() {
+        let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
         let mut config = IcefallConfig::default();
         let custom_socket = "/custom/podman.sock";
@@ -437,12 +439,12 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         std::env::remove_var("ICEFALL_CONTAINER_SOCKET");
 
         assert_eq!(config.container_socket, custom_socket);
-        // The socket contains "podman", so runtime should be Podman
         assert_eq!(config.runtime, ContainerRuntime::Podman);
     }
 
     #[test]
     fn env_override_port() {
+        let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
         let mut config = IcefallConfig::default();
 
@@ -455,6 +457,7 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     #[test]
     fn env_override_port_invalid_ignored() {
+        let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
         let mut config = IcefallConfig::default();
         let original_port = config.listen_port;
@@ -468,6 +471,7 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     #[test]
     fn env_override_data_dir() {
+        let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
         let mut config = IcefallConfig::default();
 
