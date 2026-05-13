@@ -313,6 +313,36 @@
 | [IF-180](tickets/phase-25-icefall-plus/IF-180-app-dependency-graph.md) | App dependency graph | — | Interactive infrastructure visualization |
 | [IF-181](tickets/phase-25-icefall-plus/IF-181-api-playground.md) | Built-in API playground | — | Interactive API explorer from OpenAPI spec |
 | [IF-182](tickets/phase-25-icefall-plus/IF-182-deployment-approvals.md) | Deployment approval gates | — | Require admin approval for production deploys |
+| [IF-183](tickets/phase-25-icefall-plus/IF-183-ghost-mode-hibernation.md) | Ghost Mode (container hibernation) | — | Auto-suspend idle containers, wake on first request, Rust proxy holds connection |
+| [IF-184](tickets/phase-25-icefall-plus/IF-184-mcp-deploy-copilot.md) | MCP Deploy Copilot | — | Multi-step conversational deploys, diagnose, suggest_fix tools |
+| [IF-185](tickets/phase-25-icefall-plus/IF-185-drift-detective.md) | Drift Detective | — | Continuous config reconciliation, detect out-of-band changes, one-click revert |
+| [IF-186](tickets/phase-25-icefall-plus/IF-186-canary-probe.md) | Canary Probe | — | Post-deploy synthetic load test, auto-rollback on regression |
+| [IF-187](tickets/phase-25-icefall-plus/IF-187-config-time-machine.md) | Config Time Machine | — | Full config versioning, diff any two points, one-click restore |
+| [IF-188](tickets/phase-25-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | — | Structured deploy event streams, deploy diff comparison |
+| [IF-189](tickets/phase-25-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | — | Flag idle apps, suggest hibernate/delete, weekly digest |
+| [IF-190](tickets/phase-25-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | — | `icefall tunnel` — local port forwarding via agent WebSocket, no SSH |
+| [IF-191](tickets/phase-25-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | — | Right-size resource limits, co-location suggestions, savings estimates |
+| [IF-192](tickets/phase-25-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | — | Export/import `.icefall` files for app sharing |
+| [IF-193](tickets/phase-25-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | — | Collapse repetitive lines, anomaly highlighting, noise suppression |
+| [IF-194](tickets/phase-25-icefall-plus/IF-194-power-nap-scheduler.md) | Power Nap Scheduler | — | Quiet hours: suspend low-priority apps, reduce resources for standard apps |
+
+### Phase 26 — MCP Expansion
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-195](tickets/phase-26-mcp-expansion/IF-195-mcp-workflow-tools.md) | MCP workflow orchestration tools | — | ~30 tools: bulk ops, resource creation, server management, utilities |
+| [IF-196](tickets/phase-26-mcp-expansion/IF-196-mcp-resource-protocol.md) | MCP resources & prompts protocol | — | Browsable resources (icefall://apps), pre-built prompt templates |
+| [IF-197](tickets/phase-26-mcp-expansion/IF-197-mcp-claude-code-integration-guide.md) | MCP integration guides | — | Claude Code, Cursor, Windsurf setup + example workflows |
+
+### Phase 27 — Comprehensive Documentation
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-198](tickets/phase-27-comprehensive-docs/IF-198-docs-getting-started-overhaul.md) | Getting started overhaul | — | 6 pages: intro, install, quickstart, first DB, domain, auto-deploy |
+| [IF-199](tickets/phase-27-comprehensive-docs/IF-199-docs-concepts-deep-dives.md) | Concepts deep dives | — | 8 pages: architecture, builds, deploys, networking, security, multi-server, envs, databases |
+| [IF-200](tickets/phase-27-comprehensive-docs/IF-200-docs-framework-guides-complete.md) | Complete framework guides | — | 19 frameworks: Astro, Next.js, Remix, SvelteKit, Laravel, Rails, Django, Go, Rust, .NET, etc. |
+| [IF-201](tickets/phase-27-comprehensive-docs/IF-201-docs-how-to-guides.md) | How-to guides | — | 35+ task-oriented guides covering every common workflow |
+| [IF-202](tickets/phase-27-comprehensive-docs/IF-202-docs-api-reference-complete.md) | Complete API reference | — | Every REST endpoint + MCP tool with examples, error codes, auth |
+| [IF-203](tickets/phase-27-comprehensive-docs/IF-203-docs-troubleshooting-faq.md) | Troubleshooting & FAQ | — | Symptom-first troubleshooting, 6 categories + FAQ |
+| [IF-204](tickets/phase-27-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | — | Migrate from Coolify, Dokku, CapRover, Heroku, Docker Compose |
 
 ---
 
@@ -320,11 +350,11 @@
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 177 |
+| Total tickets | 199 |
 | Done | 141 |
-| Backlog | 36 |
+| Backlog | 58 |
 | Superseded | 1 |
-| Phases complete | 19 / 25 |
+| Phases complete | 19 / 27 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -351,14 +381,16 @@
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
 | 23 — Rust Quality | Backlog | 0/6 |
 | 24 — Parity Gaps | Backlog | 0/16 |
-| 25 — Icefall+ | Backlog | 0/8 |
+| 25 — Icefall+ | Backlog | 0/20 |
+| 26 — MCP Expansion | Backlog | 0/3 |
+| 27 — Comprehensive Docs | Backlog | 0/7 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |
 |------|-------|-----------------|
-| S | 28 | 1-2 days each |
-| M | 90 | 3-5 days each |
-| L | 23 | 1-2 weeks each |
+| S | 31 | 1-2 days each |
+| M | 101 | 3-5 days each |
+| L | 28 | 1-2 weeks each |
 
 ### Critical path (must complete in order)
 ```
@@ -380,10 +412,19 @@ Parity Gaps (Phase 24):
   IF-174 (GitHub App) is the largest, start early
 
 Icefall+ (Phase 25):
-  IF-175 (deploy analytics) — no deps
-  IF-176 (forecasting) — needs 7+ days of metrics data
-  IF-177 (screenshots) — needs headless browser setup
-  IF-178 (incidents) — depends on health check + deploy data
-  IF-179 (scheduled deploys) — no deps
-  IF-182 (approval gates) — no deps
+  IF-183 (Ghost Mode) is the headline feature — start early
+  IF-183 → IF-189 (Dead App Detector) → IF-194 (Power Nap)
+  IF-184 (MCP Copilot) — high demo value, no deps
+  IF-186 (Canary Probe) — no deps
+  IF-187 (Config Time Machine) + IF-188 (Deploy Replay) — small, start first
+  IF-190 (Secure Tunnel) — no deps
+
+MCP Expansion (Phase 26):
+  IF-195 (workflow tools) → IF-196 (resources + prompts) → IF-197 (integration guides)
+
+Comprehensive Docs (Phase 27):
+  IF-198 (getting started) — do first
+  IF-200 (frameworks) + IF-201 (how-to) — can run in parallel
+  IF-202 (API ref) — after IF-195/IF-196 (MCP expansion)
+  IF-204 (migration guides) — after all features are stable
 ```
