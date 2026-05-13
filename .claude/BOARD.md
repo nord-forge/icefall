@@ -282,17 +282,49 @@
 | [IF-157](tickets/phase-23-rust-quality/IF-157-error-type-consolidation.md) | Error type consolidation | — | Consolidate error enums, preserve context, consistent API error shape |
 | [IF-158](tickets/phase-23-rust-quality/IF-158-test-coverage-expansion.md) | Test coverage expansion | — | Deploy pipeline, API routes, agent protocol tests, coverage reporting |
 
+### Phase 24 — Parity Gaps
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-159](tickets/phase-24-parity-gaps/IF-159-registration-toggle.md) | Registration enable/disable | — | Settings toggle, 403 when disabled |
+| [IF-160](tickets/phase-24-parity-gaps/IF-160-monorepo-base-directory.md) | Monorepo support (base directory) | — | `base_directory` field, build context subdirectory |
+| [IF-161](tickets/phase-24-parity-gaps/IF-161-multiple-domains-per-app.md) | Multiple domains per app | — | Primary domain indicator, Caddy multi-route |
+| [IF-162](tickets/phase-24-parity-gaps/IF-162-deploy-by-tag.md) | Deploy by git tag | — | Tag checkout, tag autocomplete, webhook tag events |
+| [IF-163](tickets/phase-24-parity-gaps/IF-163-post-deploy-commands.md) | Post-deployment commands | — | Docker exec after deploy, SSE streamed output |
+| [IF-164](tickets/phase-24-parity-gaps/IF-164-backup-retention-config.md) | Configurable backup retention | — | Per-database retention count, replaces hardcoded 7 |
+| [IF-165](tickets/phase-24-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | — | Extend IF-077 to DB containers, type-specific shells |
+| [IF-166](tickets/phase-24-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | — | Deploy branch field, branch autocomplete |
+| [IF-167](tickets/phase-24-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | — | Wire 3 event types to notification dispatch |
+| [IF-168](tickets/phase-24-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | — | Granular read/write/deploy permissions per token |
+| [IF-169](tickets/phase-24-parity-gaps/IF-169-ssh-key-management.md) | SSH key management | — | Generate/import Ed25519/RSA keys, git auth integration |
+| [IF-170](tickets/phase-24-parity-gaps/IF-170-docker-registry-credentials.md) | Docker registry credentials | — | Registry CRUD, pull/push auth, Docker Hub/GHCR/GitLab |
+| [IF-171](tickets/phase-24-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | — | Auto `{app}.icefall.internal` hostnames for service-to-service |
+| [IF-172](tickets/phase-24-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | — | Caddy L4 TCP proxy for external DB access, IP whitelist |
+| [IF-173](tickets/phase-24-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | — | Pass-through to docker compose, advanced users |
+| [IF-174](tickets/phase-24-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | — | Auto webhooks, PR status checks, PR comments, repo browser |
+
+### Phase 25 — Icefall+ Differentiators
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-175](tickets/phase-25-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | — | Frequency, success rate, build time trends, heatmap |
+| [IF-176](tickets/phase-25-icefall-plus/IF-176-resource-usage-forecasting.md) | Resource usage forecasting | — | "Disk full in X days" predictions via linear regression |
+| [IF-177](tickets/phase-25-icefall-plus/IF-177-deploy-preview-screenshots.md) | Deploy preview screenshots | — | Auto-capture after deploy, visual timeline |
+| [IF-178](tickets/phase-25-icefall-plus/IF-178-incident-timeline.md) | Incident timeline & status page | — | Auto-detect incidents, public status page per app |
+| [IF-179](tickets/phase-25-icefall-plus/IF-179-scheduled-deploys.md) | Scheduled deploys | — | Deploy at a specific time, maintenance window support |
+| [IF-180](tickets/phase-25-icefall-plus/IF-180-app-dependency-graph.md) | App dependency graph | — | Interactive infrastructure visualization |
+| [IF-181](tickets/phase-25-icefall-plus/IF-181-api-playground.md) | Built-in API playground | — | Interactive API explorer from OpenAPI spec |
+| [IF-182](tickets/phase-25-icefall-plus/IF-182-deployment-approvals.md) | Deployment approval gates | — | Require admin approval for production deploys |
+
 ---
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 153 |
+| Total tickets | 177 |
 | Done | 141 |
-| Backlog | 12 |
+| Backlog | 36 |
 | Superseded | 1 |
-| Phases complete | 19 / 21 |
+| Phases complete | 19 / 25 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -318,13 +350,15 @@
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
 | 23 — Rust Quality | Backlog | 0/6 |
+| 24 — Parity Gaps | Backlog | 0/16 |
+| 25 — Icefall+ | Backlog | 0/8 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |
 |------|-------|-----------------|
-| S | 20 | 1-2 days each |
-| M | 76 | 3-5 days each |
-| L | 21 | 1-2 weeks each |
+| S | 28 | 1-2 days each |
+| M | 90 | 3-5 days each |
+| L | 23 | 1-2 weeks each |
 
 ### Critical path (must complete in order)
 ```
@@ -333,12 +367,23 @@ Phases 1-20 (done)
 Expansion (Phase 22):
   IF-074 (projects) → IF-147 (environments per project)
   IF-073 (Docker Compose) → IF-148 (one-click templates)
-  IF-148 can start immediately (Compose is done)
 
 Rust Quality (Phase 23):
   IF-153 (sqlite split) → IF-154 (remaining splits)
   IF-153 → IF-155 (performance audit)
-  IF-156 (quality audit) — no dependencies, can run in parallel
+  IF-156 (quality audit) — no deps, parallel
   IF-153 → IF-157 (error consolidation)
   IF-153 + IF-157 → IF-158 (test coverage)
+
+Parity Gaps (Phase 24):
+  All tickets independent — can run in parallel
+  IF-174 (GitHub App) is the largest, start early
+
+Icefall+ (Phase 25):
+  IF-175 (deploy analytics) — no deps
+  IF-176 (forecasting) — needs 7+ days of metrics data
+  IF-177 (screenshots) — needs headless browser setup
+  IF-178 (incidents) — depends on health check + deploy data
+  IF-179 (scheduled deploys) — no deps
+  IF-182 (approval gates) — no deps
 ```
