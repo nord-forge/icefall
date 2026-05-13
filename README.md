@@ -1,30 +1,41 @@
 # Icefall
 
-A fast, simple, self-hosted deployment platform. Push code, get a URL.
+A fast, simple self-hosted deployment platform that ships as a single Rust binary — no PostgreSQL, no Redis, no runtime dependencies. One `curl | bash` and you're running.
 
-Icefall is built for developers who want Vercel/Railway-level simplicity on their own infrastructure. No complexity, no cryptic errors — just deployments that work.
+Icefall idles at 30 MB while traditional PaaS platforms burn 500 MB before a single app is deployed. Static sites deploy in under 5 seconds without Docker overhead. Container apps get zero-downtime blue-green deploys with automatic rollback when health checks fail. Remote servers connect via persistent WebSocket agents instead of SSH, so multi-server operations feel instant.
+
+Secrets traveling to worker nodes are sealed with X25519 envelope encryption. The binary self-updates atomically with a systemd watchdog that auto-rolls back if the new version crashes. And Icefall is the only self-hosted PaaS with a native MCP server — deploy, debug, and manage infrastructure through natural language in your IDE.
+
+Three interfaces. One binary. Zero dependencies.
 
 ## Status
 
-🚧 **Early development** — not yet usable. See [PRD.md](./PRD.md) for the full product plan and [DESIGN.md](./DESIGN.md) for the visual design system.
+**Early development** — not yet usable. See [PRD.md](./PRD.md) for the full product plan and [DESIGN.md](./DESIGN.md) for the visual design system.
 
-## What it does
+## Features
 
 - **Git-push deploys** — connect a repo, push to main, your app is live
-- **Preview environments** — feature branches auto-deploy with isolated config
-- **Framework detection** — Astro, Next.js, React, Vue, Nuxt, Node.js, Docker, static sites
-- **Managed databases** — one-click Postgres, MySQL, Redis, MongoDB with auto-backups
-- **Real-time build logs** — structured, collapsible steps that tell you exactly what went wrong
+- **Native static site deploys** — no Docker image build, just files served straight from Caddy in under 5 seconds
+- **Zero-downtime container deploys** — blue-green with automatic rollback on health check failure
+- **Preview environments** — feature branches auto-deploy with glob pattern matching (`feature/*`, `release-*`)
+- **Framework detection** — Astro, Next.js, React, Vue, Nuxt, Node.js, Docker, static sites — auto-selects native or container pipeline
+- **Multi-server** — WebSocket agent architecture with enrollment, heartbeat monitoring, and encrypted env var transfer
+- **Managed databases** — PostgreSQL, MySQL, Redis, MongoDB, MariaDB, ClickHouse, KeyDB, DragonFly, CockroachDB, Valkey, Cassandra
+- **Docker Compose support** — multi-service stacks with variable interpolation and dependency ordering
+- **MCP server** — 13 tools for AI-assisted deployment from Claude, Cursor, or any MCP client
+- **CLI** — full-featured terminal interface for every operation
+- **Self-update** — atomic binary swap with systemd watchdog rollback and maintenance window scheduling
 - **Automatic HTTPS** — powered by Caddy, zero SSL config
-- **Health monitoring** — TCP + Docker health checks with email/webhook notifications
+- **Real-time streaming** — SSE build logs, deploy status, health events, metrics
+- **Health monitoring** — TCP + Docker health checks with auto-restart and uptime timeline
 
 ## Architecture
 
-- **Rust daemon** — build engine, container management, API server
-- **Astro + Preact dashboard** — lightweight admin UI with light/dark themes
-- **Caddy** — reverse proxy with automatic HTTPS
-- **Docker** — container runtime (managed via API, not CLI)
-- **SQLite** — zero-ops default database (Postgres-ready for clusters)
+- **Rust daemon** — build engine, container orchestration, API server, WebSocket agent registry (~28k lines)
+- **Astro + Preact dashboard** — lightweight admin UI with view transitions, command palette, keyboard shortcuts
+- **Caddy** — reverse proxy with automatic HTTPS and native file serving for static deploys
+- **Docker** — container runtime managed via Bollard (API, not CLI)
+- **SQLite** — embedded database in WAL mode, zero configuration, hot backups via `VACUUM INTO`
 
 ## Install
 
