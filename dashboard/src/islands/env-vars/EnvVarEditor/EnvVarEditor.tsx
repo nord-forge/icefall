@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '@lib/api';
 import type { EnvVar } from '@lib/types';
 import Button from '@islands/shared/Button/Button';
+import Select from '@islands/shared/Select/Select';
 import { Plus, Eye, EyeOff, Trash2, Upload, Save } from 'lucide-preact';
 import styles from './env-var-editor.module.css';
 import formStyles from '@styles/form.module.css';
@@ -151,16 +152,17 @@ export default function EnvVarEditor({ appId }: Props) {
                 </td>
                 <td class={styles.tdAdd}>
                   <label htmlFor="new-env-scope" class="sr-only">Scope</label>
-                  <select
+                  <Select
                     id="new-env-scope"
+                    options={[
+                      { value: 'shared', label: 'All' },
+                      { value: 'production', label: 'Production' },
+                      { value: 'preview', label: 'Preview' },
+                    ]}
                     value={newScope}
-                    onChange={(e) => setNewScope((e.target as HTMLSelectElement).value)}
-                    class={formStyles.select}
-                  >
-                    <option value="shared">All</option>
-                    <option value="production">Production</option>
-                    <option value="preview">Preview</option>
-                  </select>
+                    onChange={setNewScope}
+                    size="sm"
+                  />
                 </td>
                 <td class={styles.tdAddActions}>
                   <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>Cancel</Button>

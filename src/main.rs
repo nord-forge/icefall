@@ -59,8 +59,12 @@ async fn main() {
         } => match command {
             None => icefall::cli::commands::update::run(yes, channel.as_deref(), json).await,
             Some(UpdateCommands::Check) => icefall::cli::commands::update::check(json).await,
-            Some(UpdateCommands::Rollback { yes: rb_yes }) => {
-                icefall::cli::commands::update::rollback(yes || rb_yes).await
+            Some(UpdateCommands::Rollback { yes: rb_yes, check }) => {
+                if check {
+                    icefall::cli::commands::update::rollback_check().await
+                } else {
+                    icefall::cli::commands::update::rollback(yes || rb_yes).await
+                }
             }
             Some(UpdateCommands::FromFile {
                 file,

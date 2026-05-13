@@ -99,6 +99,7 @@ async fn handle_agent_connection(
 
     let registry = Arc::clone(&state.agent_registry);
     let db = Arc::clone(&state.db);
+    let event_bus = Arc::clone(&state.event_bus);
     let sid_recv = server_id.clone();
     let recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = ws_stream.next().await {
@@ -110,12 +111,13 @@ async fn handle_agent_connection(
                                 let id = id.clone();
                                 registry.resolve_response(&id, agent_msg).await;
                             }
-                            AgentMessage::Event { .. } => {
-                                // Agent-side events can be processed here
+                            AgentMessage::Event {
+                                ref event_type,
+                                ref data,
+                            } => {
+                                forward_agent_event(&event_bus, &sid_recv, event_type, data);
                             }
-                            AgentMessage::Request { .. } => {
-                                // Agents don't send requests to the control plane
-                            }
+                            AgentMessage::Request { .. } => {}
                         }
                     }
                 }
@@ -147,6 +149,31 @@ async fn handle_agent_connection(
         None,
         serde_json::json!({ "server_id": &server_id, "name": &server_name, "reason": "disconnected" }),
     );
+}
+
+fn forward_agent_event(
+    event_bus: &crate::events::EventBus,
+    server_id: &str,
+    event_type: &str,
+    data: &serde_json::Value,
+) {
+    let etype = match event_type {
+        "build.step" => EventType::BuildStepStart,
+        "build.output" => EventType::BuildStepOutput,
+        "build.complete" => EventType::BuildComplete,
+        "build.failed" => EventType::BuildComplete,
+        "metrics.system" | "metrics.container" => EventType::HealthStatus,
+        "container.logs" => EventType::BuildStepOutput,
+        _ => return,
+    };
+
+    let mut payload = data.clone();
+    if let Some(obj) = payload.as_object_mut() {
+        obj.insert("server_id".to_string(), serde_json::json!(server_id));
+    }
+
+    let app_id = data["app_id"].as_str().or(data["deploy_id"].as_str());
+    event_bus.emit(etype, app_id, None, payload);
 }
 
 #[derive(Deserialize)]

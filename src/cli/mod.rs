@@ -105,6 +105,10 @@ pub enum UpdateCommands {
         /// Skip confirmation prompt
         #[arg(long)]
         yes: bool,
+
+        /// Automated check for ExecStopPost — only rolls back if pending update marker is recent
+        #[arg(long)]
+        check: bool,
     },
     /// Update from a local file (air-gapped / offline)
     FromFile {

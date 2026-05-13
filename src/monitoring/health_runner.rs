@@ -42,10 +42,16 @@ pub fn spawn_health_runner(
                     continue;
                 }
 
+                let is_native = app.deploy_mode == "native";
+
                 let container_label = format!("icefall.app={}", app.id);
-                let containers = match docker.list_containers(Some(&container_label)).await {
-                    Ok(c) => c,
-                    Err(_) => continue,
+                let containers = if is_native {
+                    vec![]
+                } else {
+                    match docker.list_containers(Some(&container_label)).await {
+                        Ok(c) => c,
+                        Err(_) => continue,
+                    }
                 };
                 let running_container = containers.iter().find(|c| c.state == "running");
 
@@ -55,7 +61,9 @@ pub fn spawn_health_runner(
                         continue;
                     }
 
-                    let healthy = if let Some(container) = running_container {
+                    let healthy = if is_native {
+                        run_http_check(check).await
+                    } else if let Some(container) = running_container {
                         run_check(check, &docker, &container.id).await
                     } else {
                         false
@@ -123,6 +131,32 @@ pub fn spawn_health_runner(
             }
         }
     });
+}
+
+async fn run_http_check(check: &HealthCheck) -> bool {
+    let config = check
+        .config
+        .as_deref()
+        .and_then(|c| serde_json::from_str::<serde_json::Value>(c).ok())
+        .unwrap_or_default();
+
+    let port = config.get("port").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+    let path = config.get("path").and_then(|v| v.as_str()).unwrap_or("/");
+
+    let url = format!("http://127.0.0.1:{port}{path}");
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build();
+
+    let client = match client {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    match client.get(&url).send().await {
+        Ok(resp) => resp.status().is_success(),
+        Err(_) => false,
+    }
 }
 
 async fn run_check(check: &HealthCheck, docker: &DockerClient, container_id: &str) -> bool {

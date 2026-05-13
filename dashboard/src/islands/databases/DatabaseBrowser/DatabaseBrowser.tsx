@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '@lib/api';
 import Button from '@islands/shared/Button/Button';
+import Select from '@islands/shared/Select/Select';
 import { Table, Play, ArrowUpDown, ChevronLeft, ChevronRight, Terminal, ChevronsUpDown, ChevronsDownUp } from 'lucide-preact';
 import styles from './database-browser.module.css';
 import formStyles from '@styles/form.module.css';
@@ -319,15 +320,14 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
         <>
           {tableResult.columns.length > 1 && (
             <div class={styles.filterRow}>
-              <select
-                class={styles.filterSelect}
+              <Select
+                options={[{ value: '', label: 'Filter by column...' }, ...tableResult.columns.map(c => ({ value: c, label: c }))]}
                 value={filterColumn}
-                onChange={e => { setFilterColumn((e.target as HTMLSelectElement).value); setPage(0); }}
+                onChange={(v) => { setFilterColumn(v); setPage(0); }}
                 aria-label="Filter by column"
-              >
-                <option value="">Filter by column...</option>
-                {tableResult.columns.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+                size="sm"
+                id="db-filter-col"
+              />
               {filterColumn && (
                 <input
                   class={styles.filterInput}

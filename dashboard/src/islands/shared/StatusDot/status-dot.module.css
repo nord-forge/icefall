@@ -4,10 +4,17 @@
   gap: var(--space-2);
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
+.shapeWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.icon {
+  display: block;
   flex-shrink: 0;
 }
 
@@ -16,12 +23,33 @@
   color: var(--color-text-secondary);
 }
 
-.online { background: var(--color-success); }
-.running { background: var(--color-success); }
-.success { background: var(--color-success); }
-.building { background: var(--color-primary); }
-.deploying { background: var(--color-primary); }
-.pending { background: var(--color-text-muted); }
-.failed { background: var(--color-error); }
-.stopped { background: var(--color-text-muted); }
-.cancelled { background: var(--color-text-muted); }
+/* Color classes — applied to the SVG for currentColor inheritance */
+.online { color: var(--color-success); }
+.running { color: var(--color-success); }
+.success { color: var(--color-success); }
+.building { color: var(--color-primary); }
+.deploying { color: var(--color-primary); }
+.pending { color: var(--color-text-muted); }
+.failed { color: var(--color-error); }
+.stopped { color: var(--color-text-muted); }
+.cancelled { color: var(--color-text-muted); }
+.offline { color: var(--color-error); }
+.unreachable { color: var(--color-text-muted); }
+.enrolling { color: var(--color-warning); }
+.draining { color: oklch(0.65 0.17 50); }
+
+/* a11y [WCAG 1.4.1]: pulse animation provides motion cue for in-progress states */
+.pulseAnim {
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulseAnim {
+    animation: none;
+  }
+}

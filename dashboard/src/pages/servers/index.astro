@@ -1,0 +1,8 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import ServersPage from '@islands/servers/ServersPage/ServersPage';
+---
+
+<DashboardLayout title="Servers">
+  <ServersPage client:only="preact" />
+</DashboardLayout>

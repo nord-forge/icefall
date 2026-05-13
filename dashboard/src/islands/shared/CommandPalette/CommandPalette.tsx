@@ -195,7 +195,7 @@ export default function CommandPalette() {
     }
     dialog.addEventListener('keydown', handleTab);
     return () => dialog.removeEventListener('keydown', handleTab);
-  }, [open, results, confirm]);
+  }, [open, query, confirm]);
 
   /* ---------------------------------------------------------------- */
   /*  Determine mode (search vs action)                                */

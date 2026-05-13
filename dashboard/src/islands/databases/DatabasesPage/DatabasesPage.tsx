@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/preact';
 import { $databases, $databasesLoaded } from '@stores/databases';
 import type { ManagedDb } from '@stores/databases';
 import Button from '@islands/shared/Button/Button';
+import Select from '@islands/shared/Select/Select';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import DatabaseBrowser from '@islands/databases/DatabaseBrowser/DatabaseBrowser';
 import { formatRelativeTime, formatBytes } from '@lib/format';
@@ -157,7 +158,7 @@ export default function DatabasesPage() {
             <h3 class={styles.cardTitle}>Connection</h3>
             <div class={styles.connectionRow}>
               <code class={showCredentials ? styles.connectionStringRevealed : styles.connectionStringHidden}>
-                {showCredentials ? (connStr || 'No credentials stored — recreate the database to generate new credentials') : '••••••••••••••••••••••••'}
+                {showCredentials ? (connStr || 'No credentials stored. Recreate the database to generate new credentials') : '••••••••••••••••••••••••'}
               </code>
               {/* a11y [4.1.2]: aria-label on icon-only button */}
               <button onClick={() => setShowCredentials(!showCredentials)} class={styles.iconButton} aria-label={showCredentials ? 'Hide credentials' : 'Show credentials'}>
@@ -193,7 +194,7 @@ export default function DatabasesPage() {
                     <tr key={b.id} class={styles.tableRow}>
                       <td class={styles.tdMono}>{b.filename}</td>
                       <td class={styles.tdSecondary}>{formatBytes(b.size_bytes)}</td>
-                      <td class={styles.tdMuted}>{b.created_at ? formatRelativeTime(b.created_at) : '—'}</td>
+                      <td class={styles.tdMuted}>{b.created_at ? formatRelativeTime(b.created_at) : '-'}</td>
                       <td class={styles.td}><StatusDot status={b.status === 'completed' ? 'success' : 'failed'} /></td>
                       <td class={styles.tdActions}>
                         {b.status === 'completed' && (
@@ -290,12 +291,18 @@ export default function DatabasesPage() {
             </div>
             <div>
               <label htmlFor="db-create-type" class={formStyles.label}>Type</label>
-              <select id="db-create-type" class={formStyles.select} value={newDb.db_type} onChange={(e) => setNewDb({ ...newDb, db_type: (e.target as HTMLSelectElement).value })}>
-                <option value="postgres">PostgreSQL</option>
-                <option value="mysql">MySQL</option>
-                <option value="redis">Redis</option>
-                <option value="mongo">MongoDB</option>
-              </select>
+              <Select
+                id="db-create-type"
+                options={[
+                  { value: 'postgres', label: 'PostgreSQL' },
+                  { value: 'mysql', label: 'MySQL' },
+                  { value: 'redis', label: 'Redis' },
+                  { value: 'mongo', label: 'MongoDB' },
+                ]}
+                value={newDb.db_type}
+                onChange={(v) => setNewDb({ ...newDb, db_type: v })}
+                fullWidth
+              />
             </div>
           </div>
           <div class={styles.createActions}>

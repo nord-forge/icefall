@@ -61,6 +61,10 @@ table {
   width: 100%;
 }
 
+thead {
+  border-bottom: 1px solid var(--color-border);
+}
+
 /* a11y [WCAG 2.4.1]: skip link visible on focus */
 .skip-link {
   position: absolute;
@@ -131,4 +135,25 @@ h2 {
     overflow-x: visible;
     mask-image: none;
   }
+}
+
+/* Inline links in hint/description/empty-state text */
+.ice-main p a,
+.ice-main dd a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.ice-main p a:hover,
+.ice-main dd a:hover {
+  color: var(--color-primary-hover);
+}
+
+.ice-main p a:focus-visible,
+.ice-main dd a:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }

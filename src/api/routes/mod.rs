@@ -1,5 +1,6 @@
 pub mod agent_ws;
 pub mod apps;
+pub mod audit;
 pub mod auth;
 pub mod backups;
 pub mod databases;
@@ -64,5 +65,6 @@ pub fn api_routes() -> Router<AppState> {
         .merge(projects::routes())
         .merge(volumes::routes())
         .merge(update::routes())
+        .merge(audit::routes())
         .merge(openapi::routes())
 }

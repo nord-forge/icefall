@@ -82,6 +82,17 @@ impl AgentRegistry {
         method: String,
         params: serde_json::Value,
     ) -> Result<AgentMessage, String> {
+        self.send_request_with_timeout(server_id, method, params, REQUEST_TIMEOUT)
+            .await
+    }
+
+    pub async fn send_request_with_timeout(
+        self: &Arc<Self>,
+        server_id: &str,
+        method: String,
+        params: serde_json::Value,
+        timeout: Duration,
+    ) -> Result<AgentMessage, String> {
         let id = crate::db::models::new_id();
 
         let (tx, rx) = oneshot::channel();
@@ -100,7 +111,7 @@ impl AgentRegistry {
 
         let registry = Arc::clone(self);
         let req_id = id.clone();
-        match tokio::time::timeout(REQUEST_TIMEOUT, rx).await {
+        match tokio::time::timeout(timeout, rx).await {
             Ok(Ok(response)) => Ok(response),
             Ok(Err(_)) => {
                 registry.pending_requests.write().await.remove(&req_id);

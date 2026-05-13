@@ -193,6 +193,29 @@ impl UpdateRollback {
         })
     }
 
+    /// Entry point for `ExecStopPost` in the systemd unit.
+    ///
+    /// Checks if a pending update marker exists and is recent (< 5 min).
+    /// If so, executes a full rollback and exits. Otherwise, exits silently.
+    /// Returns the process exit code (0 = no action, 1 = rollback executed, 2 = error).
+    pub fn check_and_rollback(&self) -> i32 {
+        if !self.needs_rollback() {
+            return 0;
+        }
+
+        info!("rollback check: pending update is recent, executing rollback");
+        match self.execute_rollback() {
+            Ok(()) => {
+                info!("rollback completed successfully");
+                1
+            }
+            Err(e) => {
+                error!(error = %e, "rollback failed");
+                2
+            }
+        }
+    }
+
     /// Remove old rollback files that exceed `max_age_days` in age.
     ///
     /// Keeps disk usage in check after a successful update has been running

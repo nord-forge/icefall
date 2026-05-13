@@ -106,7 +106,7 @@ impl BuildOrchestrator {
                 finish_step(&mut step, BuildStepStatus::Failed);
                 steps.push(step);
                 self.fail_deploy(deploy_id, &all_output).await;
-                return Err(e);
+                return Err(e.into());
             }
         };
         steps.push(step);
@@ -145,7 +145,7 @@ impl BuildOrchestrator {
                     finish_step(&mut step, BuildStepStatus::Failed);
                     steps.push(step);
                     self.fail_deploy(deploy_id, &all_output).await;
-                    return Err(e);
+                    return Err(e.into());
                 }
             }
         } else {

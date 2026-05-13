@@ -4,10 +4,9 @@ import styles from './onboarding-layout.module.css';
 
 interface Props {
   title: string;
-  step: number;
 }
 
-const { title, step } = Astro.props;
+const { title } = Astro.props;
 ---
 
 <!DOCTYPE html>
@@ -15,7 +14,7 @@ const { title, step } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} — Icefall Setup</title>
+    <title>{title} | Icefall Setup</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -44,22 +43,6 @@ const { title, step } = Astro.props;
     <main class={styles.main}>
       <slot />
     </main>
-
-    <footer class={styles.footer}>
-      <div class={styles.stepDots}>
-        {[1, 2, 3, 4, 5, 6].map((s) => (
-          <span
-            class:list={[
-              styles.dot,
-              s <= step && styles.dotComplete,
-              s === step && styles.dotActive,
-            ]}
-            aria-hidden="true"
-          />
-        ))}
-        <span class={styles.stepLabel}>Step {step} of 6</span>
-      </div>
-    </footer>
 
   </body>
 </html>

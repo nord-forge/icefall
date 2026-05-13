@@ -156,6 +156,19 @@
   margin-top: var(--space-2);
 }
 
+.hint a,
+.inlineLink {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.hint a:hover,
+.inlineLink:hover {
+  color: var(--color-primary-hover);
+}
+
 .mcpDescription {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
@@ -242,8 +255,8 @@
 }
 
 .toggleOn {
-  background: var(--color-success);
-  border-color: var(--color-success);
+  background: var(--color-ice);
+  border-color: var(--color-ice);
 }
 
 .toggleKnob {
@@ -255,10 +268,34 @@
   border-radius: 50%;
   background: var(--color-primary-text);
   transition: transform var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toggleOn .toggleKnob {
   transform: translateX(20px);
+}
+
+.toggleIcon {
+  display: block;
+}
+
+.toggleCheck {
+  color: var(--color-success);
+  display: none;
+}
+
+.toggleCross {
+  color: var(--color-text-muted);
+}
+
+.toggleOn .toggleCheck {
+  display: block;
+}
+
+.toggleOn .toggleCross {
+  display: none;
 }
 
 .toggleLabel {

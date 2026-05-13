@@ -2,6 +2,7 @@
 import styles from '@styles/sidebar.module.css';
 import ThemeToggle from '../theme/ThemeToggle';
 import LogoutButton from '@islands/shared/LogoutButton/LogoutButton';
+import SystemStatus from '@islands/shared/SystemStatus/SystemStatus';
 import UpdatePill from '@islands/update/UpdatePill/UpdatePill';
 import UpdateDialog from '@islands/update/UpdateDialog/UpdateDialog';
 import pkg from '../../../package.json';
@@ -12,11 +13,11 @@ const navItems = [
   { href: '/', label: 'Apps', icon: 'grid' },
   { href: '/projects', label: 'Projects', icon: 'folder' },
   { href: '/databases', label: 'Databases', icon: 'database' },
-  { href: '/server', label: 'Server', icon: 'server' },
+  { href: '/servers', label: 'Servers', icon: 'server' },
   { href: '/users', label: 'Users', icon: 'users' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
   { href: '/settings', label: 'Settings', icon: 'settings' },
-  { href: '/docs', label: 'Docs', icon: 'book' },
+  { href: '/docs', label: 'Docs', icon: 'book', external: true },
 ];
 
 function isActive(href: string): boolean {
@@ -29,19 +30,22 @@ function isActive(href: string): boolean {
 ---
 
 <aside class={`ice-sidebar ${styles.sidebar}`}>
-  <a href="/" class={styles.logo}>
-    <span class={styles.logoIcon}>
-      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 512 512" fill="none">
-        <path d="M161 291L231 426L221 231L131 321Z" fill="currentColor"/>
-        <path d="M236 86L326 181L251 426L231 426Z" fill="currentColor"/>
-        <path d="M361 321L271 426L306 251L381 296Z" fill="currentColor"/>
-      </svg>
-    </span>
-    <span>
-      Icefall
-      <span class={styles.subtitle}>v{pkg.version}</span>
-    </span>
-  </a>
+  <div class={styles.logoRow}>
+    <a href="/" class={styles.logo}>
+      <span class={styles.logoIcon}>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 512 512" fill="none">
+          <path d="M161 291L231 426L221 231L131 321Z" fill="currentColor"/>
+          <path d="M236 86L326 181L251 426L231 426Z" fill="currentColor"/>
+          <path d="M361 321L271 426L306 251L381 296Z" fill="currentColor"/>
+        </svg>
+      </span>
+      <span>
+        Icefall
+        <span class={styles.subtitle}>v{pkg.version}</span>
+      </span>
+    </a>
+    <SystemStatus client:idle />
+  </div>
 
   {/* a11y [WCAG 2.1.1]: arrow-key navigation via roving tabindex managed by inline script */}
   <nav aria-label="Main" class={styles.nav} id="sidebar-nav">
@@ -50,9 +54,11 @@ function isActive(href: string): boolean {
         href={item.href}
         aria-current={isActive(item.href) ? 'page' : undefined}
         class:list={[styles.navItem, isActive(item.href) && styles.navItemActive]}
-        data-astro-prefetch="hover"
+        data-astro-prefetch={item.external ? undefined : "hover"}
         tabindex={i === 0 ? 0 : -1}
         data-nav-index={i}
+        target={item.external ? '_blank' : undefined}
+        rel={item.external ? 'noopener noreferrer' : undefined}
       >
         <svg aria-hidden="true" class={styles.navIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           {item.icon === 'grid' && <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></>}
@@ -72,10 +78,6 @@ function isActive(href: string): boolean {
   <div class={styles.footer}>
     <UpdatePill client:only="preact" />
     <UpdateDialog client:only="preact" />
-    <div class={styles.footerStatus}>
-      <span class={styles.statusDotGreen} aria-hidden="true"></span>
-      Operational
-    </div>
     <div class={styles.footerActions}>
       <LogoutButton client:only="preact" />
       <ThemeToggle client:only="preact" />
@@ -123,6 +125,47 @@ function isActive(href: string): boolean {
     });
   }
 
+  function updateActiveNav() {
+    const nav = document.getElementById('sidebar-nav');
+    if (!nav) return;
+    const links = Array.from(nav.querySelectorAll<HTMLAnchorElement>('[data-nav-index]'));
+    const path = window.location.pathname;
+
+    // Find the CSS module class for the active state from the currently active link
+    const currentActive = nav.querySelector<HTMLAnchorElement>('[aria-current="page"]');
+    let activeClass = '';
+    if (currentActive) {
+      for (const cls of currentActive.classList) {
+        if (cls.includes('navItemActive') || cls.includes('Active')) {
+          activeClass = cls;
+          break;
+        }
+      }
+    }
+
+    for (const link of links) {
+      const href = link.getAttribute('href') || '';
+      let isActive = false;
+      if (href === '/') {
+        isActive = path === '/' || path.startsWith('/apps');
+      } else {
+        isActive = path.startsWith(href);
+      }
+
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+        if (activeClass) link.classList.add(activeClass);
+      } else {
+        link.removeAttribute('aria-current');
+        if (activeClass) link.classList.remove(activeClass);
+      }
+    }
+  }
+
   initSidebarKeyboard();
-  document.addEventListener('astro:after-swap', initSidebarKeyboard);
+  updateActiveNav();
+  document.addEventListener('astro:after-swap', () => {
+    updateActiveNav();
+    initSidebarKeyboard();
+  });
 </script>

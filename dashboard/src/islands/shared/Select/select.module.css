@@ -1,0 +1,144 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.fullWidth {
+  display: flex;
+  width: 100%;
+}
+
+.fullWidth .trigger {
+  width: 100%;
+}
+
+/* Trigger */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.triggerMd {
+  height: var(--input-height);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.triggerSm {
+  height: 32px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.trigger:hover:not(.triggerDisabled) {
+  border-color: var(--color-border-focus);
+  background-color: var(--color-surface-alt);
+}
+
+.triggerOpen {
+  border-color: var(--color-border-focus);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.triggerDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.triggerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.triggerOpen .chevron {
+  transform: rotate(180deg);
+}
+
+/* Listbox */
+
+.listbox {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  min-width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
+  padding: var(--space-1);
+  z-index: 200;
+  list-style: none;
+}
+
+/* Option */
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.optionFocused {
+  background: var(--color-surface-alt);
+}
+
+.optionSelected {
+  font-weight: var(--weight-semibold);
+}
+
+.optionIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.optionLabel {
+  flex: 1;
+}
+
+.checkIcon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .chevron {
+    transition: none;
+  }
+}

@@ -1,9 +1,17 @@
 mod config;
 mod connection;
+mod context;
 mod enroll;
+mod handlers;
+
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
+use tokio::sync::Mutex;
 use tracing::info;
+
+use crate::context::HandlerContext;
 
 const VERSION_LONG: &str = const_format::formatcp!(
     "{} ({} {} {})",
@@ -79,7 +87,32 @@ async fn main() {
             info!("Control plane: {}", cfg.control_plane_url);
             info!("Server ID: {}", cfg.server_id);
 
+            let docker = match bollard::Docker::connect_with_socket(
+                &cfg.docker_socket,
+                120,
+                bollard::API_DEFAULT_VERSION,
+            ) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Failed to connect to Docker at {}: {e}", cfg.docker_socket);
+                    std::process::exit(1);
+                }
+            };
+
             let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
+            let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+
+            let ctx = HandlerContext {
+                docker,
+                caddy_url: cfg.caddy_admin_url.clone(),
+                http: reqwest::Client::new(),
+                event_tx,
+                config: Arc::new(cfg),
+                active_logs: Arc::new(Mutex::new(HashMap::new())),
+                active_terminals: Arc::new(Mutex::new(HashMap::new())),
+                shutdown: shutdown_rx.clone(),
+            };
 
             tokio::spawn(async move {
                 let mut sigterm =
@@ -95,7 +128,10 @@ async fn main() {
                 let _ = shutdown_tx.send(true);
             });
 
-            connection::run_connection_loop(&cfg, shutdown_rx).await;
+            // Spawn background metrics collector
+            handlers::metrics::spawn_metrics_collector(ctx.clone());
+
+            connection::run_connection_loop(ctx, shutdown_rx).await;
             info!("Agent shut down cleanly");
         }
     }

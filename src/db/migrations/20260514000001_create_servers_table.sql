@@ -38,7 +38,7 @@ ALTER TABLE deploys ADD COLUMN server_id TEXT REFERENCES servers(id);
 -- Auto-seed the control-plane server record
 INSERT INTO servers (id, name, host, role, status, created_at, updated_at)
 VALUES (
-    '00000000-0000-0000-0000-000000000001',
+    'cp_ctrl_0000000001',
     'Control Plane',
     'localhost',
     'control-plane',
@@ -48,5 +48,5 @@ VALUES (
 );
 
 -- Backfill existing apps and deploys to the control-plane server
-UPDATE apps SET server_id = '00000000-0000-0000-0000-000000000001' WHERE server_id IS NULL;
-UPDATE deploys SET server_id = '00000000-0000-0000-0000-000000000001' WHERE server_id IS NULL;
+UPDATE apps SET server_id = 'cp_ctrl_0000000001' WHERE server_id IS NULL;
+UPDATE deploys SET server_id = 'cp_ctrl_0000000001' WHERE server_id IS NULL;

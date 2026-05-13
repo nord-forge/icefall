@@ -1,48 +1,12 @@
 # Icefall — Project Board
 
-> Last updated: 2026-05-11
+> Last updated: 2026-05-13
 
 ---
 
 ## Backlog
 
-### Phase 20B — Agent Core
-| Ticket | Title | Size |
-|--------|-------|------|
-| [IF-125](tickets/phase-20-multi-server/IF-125-agent-docker-operations-handler.md) | Agent Docker operations handler | L |
-| [IF-126](tickets/phase-20-multi-server/IF-126-agent-log-streaming.md) | Agent log streaming | M |
-| [IF-127](tickets/phase-20-multi-server/IF-127-agent-metrics-collection.md) | Agent metrics collection | M |
-| [IF-128](tickets/phase-20-multi-server/IF-128-agent-health-check-execution.md) | Agent health check execution | M |
-| [IF-129](tickets/phase-20-multi-server/IF-129-agent-terminal-proxy.md) | Agent terminal proxy | M |
-| [IF-130](tickets/phase-20-multi-server/IF-130-agent-caddy-management.md) | Agent Caddy management | M |
-
-### Phase 20C — Deploy Pipeline
-| Ticket | Title | Size |
-|--------|-------|------|
-| [IF-131](tickets/phase-20-multi-server/IF-131-server-aware-deploy-manager.md) | Server-aware deploy manager | L |
-| [IF-132](tickets/phase-20-multi-server/IF-132-agent-build-pipeline.md) | Agent build pipeline | L |
-| [IF-133](tickets/phase-20-multi-server/IF-133-worker-caddy-route-management.md) | Worker Caddy route management | M |
-| [IF-134](tickets/phase-20-multi-server/IF-134-app-migration-between-servers.md) | App migration between servers | L |
-| [IF-135](tickets/phase-20-multi-server/IF-135-server-selection-app-creation.md) | Server selection in app creation | M |
-
-### Phase 20D — Dashboard UI
-| Ticket | Title | Size |
-|--------|-------|------|
-| [IF-136](tickets/phase-20-multi-server/IF-136-servers-list-page.md) | Servers list page | M |
-| [IF-137](tickets/phase-20-multi-server/IF-137-add-server-flow-dashboard.md) | Add server flow (dashboard) | M |
-| [IF-138](tickets/phase-20-multi-server/IF-138-server-detail-page.md) | Server detail page | M |
-| [IF-139](tickets/phase-20-multi-server/IF-139-app-creation-server-selection.md) | App creation server selection | S |
-| [IF-140](tickets/phase-20-multi-server/IF-140-app-detail-server-indicator.md) | App detail server indicator | S |
-| [IF-141](tickets/phase-20-multi-server/IF-141-dashboard-home-aggregate-metrics.md) | Dashboard home aggregate metrics | M |
-
-### Phase 20E — Polish & Security
-| Ticket | Title | Size |
-|--------|-------|------|
-| [IF-142](tickets/phase-20-multi-server/IF-142-secret-envelope-encrypted-env-vars.md) | Secret envelope encrypted env vars | L |
-| [IF-143](tickets/phase-20-multi-server/IF-143-agent-auto-update.md) | Agent auto-update mechanism | M |
-| [IF-144](tickets/phase-20-multi-server/IF-144-offline-server-handling.md) | Offline server handling | M |
-| [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | M |
-| [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | S |
+(empty)
 
 ---
 
@@ -207,14 +171,14 @@
 ### Phase 16 — Self-Update System
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-097](tickets/phase-16-self-update/IF-097-release-pipeline-signing.md) | Release pipeline & binary signing | — | GitHub Actions multi-arch musl builds, Ed25519 manifest signing, release workflow |
-| [IF-098](tickets/phase-16-self-update/IF-098-update-discovery-api.md) | Update discovery & version checking | — | GitHub Releases polling, manifest verification, semver comparison, API endpoints |
-| [IF-099](tickets/phase-16-self-update/IF-099-update-download-verify.md) | Update download & integrity verification | — | Streaming download with progress, SHA-256 + Ed25519 chain, extraction & validation |
-| [IF-100](tickets/phase-16-self-update/IF-100-update-apply-restart.md) | Update apply, restart & graceful shutdown | — | Atomic binary swap, SQLite backup + migrations, systemd socket activation, zero-downtime |
-| [IF-101](tickets/phase-16-self-update/IF-101-update-rollback.md) | Update rollback & failure recovery | — | Automatic rollback via ExecStopPost, systemd watchdog, manual rollback CLI/API |
-| [IF-102](tickets/phase-16-self-update/IF-102-update-dashboard-ui.md) | Update dashboard UI | — | Sidebar pill, 7-step update dialog, reconnection overlay, settings section |
-| [IF-103](tickets/phase-16-self-update/IF-103-auto-update-scheduling.md) | Auto-update scheduling | — | Maintenance window, pre-download, deploy-aware, breaking change skip |
-| [IF-104](tickets/phase-16-self-update/IF-104-cli-update-command.md) | CLI update command | — | Interactive + scripted update, offline --from-file, rollback subcommand |
+| [IF-097](tickets/phase-16-self-update/IF-097-release-pipeline-signing.md) | Release pipeline & binary signing | 2026-05-13 | GitHub Actions multi-arch musl builds, Ed25519 manifest signing, release workflow, real keypair generated |
+| [IF-098](tickets/phase-16-self-update/IF-098-update-discovery-api.md) | Update discovery & version checking | 2026-05-13 | GitHub Releases polling, manifest verification, semver comparison, API endpoints |
+| [IF-099](tickets/phase-16-self-update/IF-099-update-download-verify.md) | Update download & integrity verification | 2026-05-13 | Streaming download with progress, SHA-256 + Ed25519 chain, extraction & validation |
+| [IF-100](tickets/phase-16-self-update/IF-100-update-apply-restart.md) | Update apply, restart & graceful shutdown | 2026-05-13 | Atomic binary swap, SQLite backup + migrations, systemd socket activation (listenfd + sd-notify), zero-downtime, WatchdogSec=60 |
+| [IF-101](tickets/phase-16-self-update/IF-101-update-rollback.md) | Update rollback & failure recovery | 2026-05-13 | Automatic rollback via ExecStopPost, systemd watchdog, manual rollback CLI/API, `rollback --check` entry point, 7-day cleanup task |
+| [IF-102](tickets/phase-16-self-update/IF-102-update-dashboard-ui.md) | Update dashboard UI | 2026-05-13 | Sidebar pill, 7-step update dialog, reconnection overlay, settings section |
+| [IF-103](tickets/phase-16-self-update/IF-103-auto-update-scheduling.md) | Auto-update scheduling | 2026-05-13 | Maintenance window, pre-download, deploy-aware, breaking change skip |
+| [IF-104](tickets/phase-16-self-update/IF-104-cli-update-command.md) | CLI update command | 2026-05-13 | Interactive + scripted update, offline --from-file, rollback subcommand |
 
 ### Phase 17 — v1.1 Fast Follow
 | Ticket | Title | Completed | Notes |
@@ -228,25 +192,25 @@
 | [IF-079](tickets/phase-17-v1.1-fast-follow/IF-079-volume-management.md) | Volume management & browsing | 2026-05-08 | File browser drawer, upload/download, size tracking, path validation |
 | [IF-080](tickets/phase-17-v1.1-fast-follow/IF-080-s3-object-storage-mounts.md) | S3 / object storage mounts | 2026-05-08 | rclone sidecar, S3 volume type in settings, shared Docker volumes |
 | [IF-081](tickets/phase-17-v1.1-fast-follow/IF-081-expanded-database-support.md) | Expanded database support | 2026-05-08 | MariaDB, ClickHouse, KeyDB, DragonFly, CockroachDB, Valkey, Cassandra + backups for all |
-| [IF-082](tickets/phase-17-v1.1-fast-follow/IF-082-native-static-deploy.md) | Native static site deployment | — | No-Docker deploy for static sites, Caddy file_server, symlink rollback, <5s deploys |
-| [IF-083](tickets/phase-17-v1.1-fast-follow/IF-083-user-profile-page.md) | User profile page | — | Profile view and edit |
-| [IF-084](tickets/phase-17-v1.1-fast-follow/IF-084-user-preferences.md) | User preferences | — | Per-user settings and preferences |
-| [IF-085](tickets/phase-17-v1.1-fast-follow/IF-085-admin-user-management.md) | Admin user management | — | Admin panel for user CRUD |
+| [IF-082](tickets/phase-17-v1.1-fast-follow/IF-082-native-static-deploy.md) | Native static site deployment | 2026-05-13 | No-Docker deploy for static sites, Caddy file_server, symlink rollback, <5s deploys, HTTP health check, deploy mode badges |
+| [IF-083](tickets/phase-17-v1.1-fast-follow/IF-083-user-profile-page.md) | User profile page | 2026-05-13 | 8-section profile page: account info, password, email, 2FA, OAuth, tokens, sessions, preferences, danger zone |
+| [IF-084](tickets/phase-17-v1.1-fast-follow/IF-084-user-preferences.md) | User preferences | 2026-05-13 | Theme, timezone, default project, email notification preferences; DB-persisted, API endpoints |
+| [IF-085](tickets/phase-17-v1.1-fast-follow/IF-085-admin-user-management.md) | Admin user management | 2026-05-13 | Registration controls, role management, password/2FA reset, invite with SMTP email, pending invites |
 
 ### Phase 18 — UX Polish
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-086](tickets/phase-18-ux-polish/IF-086-view-transitions.md) | View Transitions (without crashes) | — | Re-enable ClientRouter, all islands to client:only, transition:persist sidebar |
-| [IF-087](tickets/phase-18-ux-polish/IF-087-prefetching.md) | Link prefetching & data preloading | — | Hover prefetch, API cache, tab data preload |
-| [IF-088](tickets/phase-18-ux-polish/IF-088-skeleton-loading.md) | Skeleton loading states | — | Shimmer placeholders for all pages, shared Skeleton component |
-| [IF-089](tickets/phase-18-ux-polish/IF-089-app-detail-routing-polish.md) | App detail routing polish | — | Tab fade transitions, scroll preservation, deploy detail animation |
-| [IF-090](tickets/phase-18-ux-polish/IF-090-sidebar-active-state.md) | Sidebar navigation polish | — | Active indicator, mobile drawer, keyboard nav, app context |
-| [IF-091](tickets/phase-18-ux-polish/IF-091-toast-notifications.md) | Toast notification system | — | Global toast store, success/error/info types, auto-dismiss |
-| [IF-092](tickets/phase-18-ux-polish/IF-092-optimistic-updates.md) | Optimistic UI updates | — | Instant feedback for actions, revert on error |
-| [IF-093](tickets/phase-18-ux-polish/IF-093-responsive-polish.md) | Responsive design polish | — | Mobile tables→cards, form stacking, tab scroll, breakpoint audit |
-| [IF-094](tickets/phase-18-ux-polish/IF-094-empty-states.md) | Empty states & onboarding hints | — | Illustrations, action buttons, guidance text |
-| [IF-095](tickets/phase-18-ux-polish/IF-095-confirmation-dialogs.md) | Consistent confirmation dialogs | — | Shared modal dialog, replace inline confirmations |
-| [IF-096](tickets/phase-18-ux-polish/IF-096-keyboard-shortcuts.md) | Global keyboard shortcuts | — | g+h/d/s/p navigation, shortcut help overlay |
+| [IF-086](tickets/phase-18-ux-polish/IF-086-view-transitions.md) | View Transitions (without crashes) | 2026-05-10 | ClientRouter enabled, all islands client:only, transition:persist sidebar, fade main content |
+| [IF-087](tickets/phase-18-ux-polish/IF-087-prefetching.md) | Link prefetching & data preloading | 2026-05-10 | data-astro-prefetch="hover" on cross-page links, API cache layer |
+| [IF-088](tickets/phase-18-ux-polish/IF-088-skeleton-loading.md) | Skeleton loading states | 2026-05-10 | SkeletonTable + SkeletonCard components with shimmer animation |
+| [IF-089](tickets/phase-18-ux-polish/IF-089-app-detail-routing-polish.md) | App detail routing polish | 2026-05-10 | Lazy-loaded tab components with fade transition, AppDetailRouter |
+| [IF-090](tickets/phase-18-ux-polish/IF-090-sidebar-active-state.md) | Sidebar navigation polish | 2026-05-10 | aria-current="page", active indicator, mobile drawer with backdrop, keyboard nav |
+| [IF-091](tickets/phase-18-ux-polish/IF-091-toast-notifications.md) | Toast notification system | 2026-05-10 | Global toast store, success/error/info/warning types, auto-dismiss, aria-live |
+| [IF-092](tickets/phase-18-ux-polish/IF-092-optimistic-updates.md) | Optimistic UI updates | 2026-05-10 | Instant deploy/rollback feedback in AppHeader + DeploysTab, revert on error |
+| [IF-093](tickets/phase-18-ux-polish/IF-093-responsive-polish.md) | Responsive design polish | 2026-05-10 | Mobile drawer sidebar, responsive layouts |
+| [IF-094](tickets/phase-18-ux-polish/IF-094-empty-states.md) | Empty states & onboarding hints | 2026-05-10 | Shared EmptyState component, per-page empty states with action buttons |
+| [IF-095](tickets/phase-18-ux-polish/IF-095-confirmation-dialogs.md) | Consistent confirmation dialogs | 2026-05-10 | Shared ConfirmDialog with focus trap, danger/default variants, escape/backdrop close |
+| [IF-096](tickets/phase-18-ux-polish/IF-096-keyboard-shortcuts.md) | Global keyboard shortcuts | 2026-05-10 | g+h/d/s/p navigation, ? help overlay, KeyboardShortcuts island |
 
 ### Phase 20A — Multi-Server Foundation
 | Ticket | Title | Completed | Notes |
@@ -260,6 +224,44 @@
 | [IF-123](tickets/phase-20-multi-server/IF-123-install-script-control-plane.md) | Install script served by control plane | 2026-05-11 | Full bash script: Docker/Caddy auto-install, architecture detection, SHA-256 checksum verification, hardened systemd service, colored output with NO_COLOR support, `GET /agent/download/{target}` endpoint |
 | [IF-124](tickets/phase-20-multi-server/IF-124-release-workflow-agent-binary.md) | Release workflow for agent binary | 2026-05-11 | Workspace builds both binaries, agent packaged as separate tarball per arch, `agent_artifacts` in signed manifest, `build.rs` embeds version/commit/target/date |
 
+### Phase 20B — Agent Core
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-125](tickets/phase-20-multi-server/IF-125-agent-docker-operations-handler.md) | Agent Docker operations handler | 2026-05-11 | Container CRUD + inspect + list, image pull/build, volume CRUD, network create/remove via bollard |
+| [IF-126](tickets/phase-20-multi-server/IF-126-agent-log-streaming.md) | Agent log streaming | 2026-05-11 | Subscribe/unsubscribe handlers, event streaming via `container.log` events |
+| [IF-127](tickets/phase-20-multi-server/IF-127-agent-metrics-collection.md) | Agent metrics collection | 2026-05-11 | 10s interval, sysinfo (CPU/RAM/disk/load), per-container Docker stats, `metrics.system` + `metrics.container` events |
+| [IF-128](tickets/phase-20-multi-server/IF-128-agent-health-check-execution.md) | Agent health check execution | 2026-05-11 | HTTP health checks with configurable port/path/attempts/interval/timeout, retry logic |
+| [IF-129](tickets/phase-20-multi-server/IF-129-agent-terminal-proxy.md) | Agent terminal proxy | 2026-05-11 | Terminal open/input/resize/close via Docker exec TTY, base64 data, `terminal.output` events |
+| [IF-130](tickets/phase-20-multi-server/IF-130-agent-caddy-management.md) | Agent Caddy management | 2026-05-11 | Caddy route add/update/remove via admin API at localhost:2019 |
+
+### Phase 20C — Deploy Pipeline
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-131](tickets/phase-20-multi-server/IF-131-server-aware-deploy-manager.md) | Server-aware deploy manager | 2026-05-11 | `resolve_target()` + `make_remote_executor()`, remote blue-green deploy via RemoteExecutor, backward-compatible local path |
+| [IF-132](tickets/phase-20-multi-server/IF-132-agent-build-pipeline.md) | Agent build pipeline | 2026-05-11 | `build.run` via RemoteExecutor, git clone + detect + Dockerfile gen + docker build on worker, streamed output |
+| [IF-133](tickets/phase-20-multi-server/IF-133-worker-caddy-route-management.md) | Worker Caddy route management | 2026-05-11 | Caddy route add/update/remove delegated to agent on deploy, TLS via ACME on worker |
+| [IF-134](tickets/phase-20-multi-server/IF-134-app-migration-between-servers.md) | App migration between servers | 2026-05-11 | `PUT /apps/{id}/migrate`, validation (server exists/connected/not draining), volume loss acknowledgment, 202 with migration deploy |
+| [IF-135](tickets/phase-20-multi-server/IF-135-server-selection-app-creation.md) | Server selection in app creation | 2026-05-11 | `server_id` on create, validation (exists/connected/not draining), `recommendation_score` on server list, weighted composite scoring |
+
+### Phase 20D — Dashboard UI
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-136](tickets/phase-20-multi-server/IF-136-servers-list-page.md) | Servers list page | 2026-05-11 | `/servers` page with ServerCard grid, SSE real-time status, single-server redirect, sidebar updated |
+| [IF-137](tickets/phase-20-multi-server/IF-137-add-server-flow-dashboard.md) | Add server flow (dashboard) | 2026-05-11 | Inline AddServerPanel: name/host inputs, setup command with copy, token countdown, 4-step SSE enrollment progress |
+| [IF-138](tickets/phase-20-multi-server/IF-138-server-detail-page.md) | Server detail page | 2026-05-11 | `/servers/[id]` with 4 tabs (Overview/Apps/Metrics/Settings), metric cards, charts, danger zone for workers |
+| [IF-139](tickets/phase-20-multi-server/IF-139-app-creation-server-selection.md) | App creation server selection | 2026-05-11 | Radio-card ServerSelectStep in wizard (2+ servers only), recommendation badge, resource bars, `server_id` in create API |
+| [IF-140](tickets/phase-20-multi-server/IF-140-app-detail-server-indicator.md) | App detail server indicator | 2026-05-11 | "on {server}" in AppHeader, server label on AppCard, migration UI in SettingsTab with volume-loss acknowledgment |
+| [IF-141](tickets/phase-20-multi-server/IF-141-dashboard-home-aggregate-metrics.md) | Dashboard home aggregate metrics | 2026-05-11 | Weighted CPU avg, total RAM/Disk across servers, ServerHealthStrip with status dots, single-server unchanged |
+
+### Phase 20E — Polish & Security
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-142](tickets/phase-20-multi-server/IF-142-secret-envelope-encrypted-env-vars.md) | Secret envelope encrypted env vars | 2026-05-13 | X25519 DH + AES-256-GCM envelope encryption for env vars during remote deploys, round-trip tested |
+| [IF-143](tickets/phase-20-multi-server/IF-143-agent-auto-update.md) | Agent auto-update mechanism | 2026-05-13 | system.update command, agent download+verify+atomic swap, API endpoints for single/all agent updates, dashboard version badge |
+| [IF-144](tickets/phase-20-multi-server/IF-144-offline-server-handling.md) | Offline server handling | 2026-05-13 | OfflineServerBanner in layout, SSE-driven nanostore, StatusDot unreachable variant, auto-dismiss on reconnect |
+| [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | 2026-05-13 | audit_log table + migration, DB trait + SQLite impl, API endpoints (global + per-server), 90-day daily pruning |
+| [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | 2026-05-13 | Idempotent, NO_COLOR, Alpine/OpenRC, error trap with line numbers, Docker/Caddy verification, uninstall endpoint, log file |
+
 ---
 
 ## Summary
@@ -267,10 +269,10 @@
 | Metric | Count |
 |--------|-------|
 | Total tickets | 141 |
-| Done | 96 |
-| Backlog | 45 |
+| Done | 141 |
+| Backlog | 0 |
 | Superseded | 1 |
-| Phases complete | 15 / 19 |
+| Phases complete | 19 / 19 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -290,10 +292,10 @@
 | 13 — Onboarding | **Done** | 10/10 |
 | 14 — Dashboard Surface | **Done** | 6/6 |
 | 15 — Critical Gaps | **Done** | 8/8 |
-| 16 — Self-Update System | Backlog | 0/8 |
-| 17 — v1.1 Fast Follow | Partial | 9/13 |
-| 18 — UX Polish | Backlog | 0/11 |
-| 20 — Multi-Server | **In Progress** | 8/30 |
+| 16 — Self-Update System | **Done** | 8/8 |
+| 17 — v1.1 Fast Follow | **Done** | 13/13 |
+| 18 — UX Polish | **Done** | 11/11 |
+| 20 — Multi-Server | **Done** | 30/30 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |
@@ -321,10 +323,10 @@ v1.1 Fast Follow (Phase 17):
 Multi-Server (Phase 20):
   IF-117 → IF-118 → IF-119 (done)
   IF-120 → IF-121 → IF-122 → IF-123 → IF-124 (done)
-  IF-121 → IF-125..IF-130 (agent handlers)
-  IF-117 + IF-118 → IF-131 (server-aware deploys) → IF-132 (agent build) → IF-133 (worker Caddy)
-  IF-131 → IF-134 (app migration) + IF-135 (server selection)
-  IF-118 → IF-136..IF-141 (dashboard UI)
+  IF-121 → IF-125..IF-130 (done)
+  IF-117 + IF-118 → IF-131 → IF-132 → IF-133 (done)
+  IF-131 → IF-134 + IF-135 (done)
+  IF-118 → IF-136..IF-141 (done)
   IF-122 → IF-142 (secret envelope)
   IF-124 → IF-143 (agent auto-update)
 ```

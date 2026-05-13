@@ -76,6 +76,12 @@ export default function UpdateSettings() {
     api.getUpdateHistory().then((res) => {
       setHistory(res.data || []);
     }).catch(() => {});
+
+    if (!info) {
+      api.checkForUpdate().then((res) => {
+        $updateInfo.set(res.data as UpdateInfo);
+      }).catch(() => {});
+    }
   }, []);
 
   async function handleCheck() {
@@ -184,7 +190,12 @@ export default function UpdateSettings() {
             class={`${styles.toggle} ${prefs.auto_update_enabled ? styles.toggleOn : ''}`}
             onClick={() => setPrefs((p) => ({ ...p, auto_update_enabled: !p.auto_update_enabled }))}
           >
-            <span class={styles.toggleKnob} />
+            <span class={styles.toggleKnob}>
+              <svg class={styles.toggleIcon} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                <path class={styles.toggleCheck} d="M2.5 5 L4.5 7 L7.5 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path class={styles.toggleCross} d="M3 3 L7 7 M7 3 L3 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </span>
           </button>
           <span class={styles.toggleLabel}>
             {prefs.auto_update_enabled ? 'On' : 'Off'}

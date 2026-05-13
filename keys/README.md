@@ -4,8 +4,10 @@ This directory contains the public keys used to verify Icefall release artifacts
 
 ## Current Key
 
-**Not yet generated.** The placeholder key in `src/update/keys.rs` will be replaced
-when the first release signing key is created.
+- **ID**: `icefall-release-2026`
+- **Fingerprint**: `sha256:cd5a5845d0ccce1f`
+- **Public key**: `icefall-release.pub`
+- **Active since**: 2026-01-01
 
 ## Generating a Signing Keypair
 

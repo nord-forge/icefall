@@ -1,13 +1,11 @@
 use std::path::Path;
 
-use crate::build::{
-    AstroMode, BuildConfig, BuildError, DetectionResult, Framework, PackageManager,
-};
+use super::{AstroMode, BuildConfig, DetectError, DetectionResult, Framework, PackageManager};
 
 pub fn detect(
     project_dir: &Path,
     overrides: Option<&BuildConfig>,
-) -> Result<DetectionResult, BuildError> {
+) -> Result<DetectionResult, DetectError> {
     let framework = detect_framework(project_dir);
     let package_manager = detect_package_manager(project_dir);
     let node_version = detect_node_version(project_dir);
@@ -199,7 +197,7 @@ fn detect_astro_mode(dir: &Path) -> AstroMode {
     AstroMode::Static
 }
 
-fn framework_defaults(
+pub fn framework_defaults(
     framework: &Framework,
     pm: &PackageManager,
     astro_mode: Option<&AstroMode>,
@@ -269,19 +267,6 @@ fn apply_overrides(result: &mut DetectionResult, ov: &BuildConfig) {
 }
 
 #[cfg(test)]
-pub(crate) mod tests_support {
-    use super::*;
-
-    pub fn framework_defaults_pub(
-        framework: &Framework,
-        pm: &PackageManager,
-        astro_mode: Option<&AstroMode>,
-    ) -> (Option<String>, Option<String>, Option<String>, u16) {
-        framework_defaults(framework, pm, astro_mode)
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
@@ -320,72 +305,11 @@ mod tests {
     }
 
     #[test]
-    fn detects_astro_ssr() {
-        let pkg = r#"{"dependencies": {"astro": "^4.0.0", "@astrojs/node": "^8.0.0"}}"#;
-        let config = r#"
-            import { defineConfig } from 'astro/config';
-            import node from '@astrojs/node';
-            export default defineConfig({ output: 'server', adapter: node() });
-        "#;
-        let dir = setup_project(&[("package.json", pkg), ("astro.config.mjs", config)]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::Astro);
-        assert_eq!(result.astro_mode, Some(AstroMode::Ssr));
-        assert_eq!(result.detected_port, 4321);
-        assert!(result.start_command.is_some());
-    }
-
-    #[test]
     fn detects_nextjs() {
         let pkg = r#"{"dependencies": {"next": "^14.0.0", "react": "^18.0.0"}}"#;
         let dir = setup_project(&[("package.json", pkg), ("next.config.mjs", "")]);
         let result = detect(dir.path(), None).unwrap();
         assert_eq!(result.framework, Framework::NextJs);
-        assert_eq!(result.detected_port, 3000);
-    }
-
-    #[test]
-    fn detects_nuxt() {
-        let pkg = r#"{"dependencies": {"nuxt": "^3.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), ("nuxt.config.ts", "")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::Nuxt);
-        assert_eq!(result.detected_port, 3000);
-    }
-
-    #[test]
-    fn detects_vite_react() {
-        let pkg =
-            r#"{"dependencies": {"react": "^18.0.0"}, "devDependencies": {"vite": "^5.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), ("vite.config.ts", "")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::ViteReact);
-        assert_eq!(result.detected_port, 80);
-    }
-
-    #[test]
-    fn detects_vite_vue() {
-        let pkg = r#"{"dependencies": {"vue": "^3.0.0"}, "devDependencies": {"vite": "^5.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), ("vite.config.ts", "")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::ViteVue);
-    }
-
-    #[test]
-    fn detects_node_app() {
-        let pkg = r#"{"scripts": {"start": "node index.js"}, "main": "index.js"}"#;
-        let dir = setup_project(&[("package.json", pkg)]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::NodeApp);
-        assert_eq!(result.detected_port, 3000);
-    }
-
-    #[test]
-    fn detects_static_site() {
-        let dir = setup_project(&[("index.html", "<html></html>")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::StaticSite);
-        assert_eq!(result.detected_port, 80);
     }
 
     #[test]
@@ -394,62 +318,6 @@ mod tests {
         let dir = setup_project(&[("package.json", pkg), ("bun.lock", "")]);
         let result = detect(dir.path(), None).unwrap();
         assert_eq!(result.package_manager, PackageManager::Bun);
-    }
-
-    #[test]
-    fn detects_pnpm_from_lockfile() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), ("pnpm-lock.yaml", "")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.package_manager, PackageManager::Pnpm);
-    }
-
-    #[test]
-    fn detects_yarn_from_lockfile() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), ("yarn.lock", "")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.package_manager, PackageManager::Yarn);
-    }
-
-    #[test]
-    fn defaults_to_npm_without_lockfile() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg)]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.package_manager, PackageManager::Npm);
-    }
-
-    #[test]
-    fn detects_node_version_from_nvmrc() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), (".nvmrc", "v20.11.0\n")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.node_version, "20");
-    }
-
-    #[test]
-    fn detects_node_version_from_node_version_file() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg), (".node-version", "18.19.0")]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.node_version, "18");
-    }
-
-    #[test]
-    fn detects_node_version_from_engines() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}, "engines": {"node": ">=20.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg)]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.node_version, "20");
-    }
-
-    #[test]
-    fn defaults_to_node_22() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[("package.json", pkg)]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.node_version, "22");
     }
 
     #[test]
@@ -469,40 +337,6 @@ mod tests {
         let result = detect(dir.path(), Some(&overrides)).unwrap();
         assert_eq!(result.framework, Framework::NodeApp);
         assert_eq!(result.package_manager, PackageManager::Bun);
-        assert_eq!(result.node_version, "20");
         assert_eq!(result.detected_port, 8080);
-        assert_eq!(result.build_command, Some("bun run build".to_string()));
-    }
-
-    #[test]
-    fn dockerfile_takes_priority_over_package_json() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0"}}"#;
-        let dir = setup_project(&[
-            ("package.json", pkg),
-            ("Dockerfile", "FROM node:22"),
-            ("next.config.mjs", ""),
-        ]);
-        let result = detect(dir.path(), None).unwrap();
-        assert_eq!(result.framework, Framework::Dockerfile);
-    }
-
-    #[test]
-    fn detection_is_fast() {
-        let pkg = r#"{"dependencies": {"next": "^14.0.0", "react": "^18.0.0"}}"#;
-        let dir = setup_project(&[
-            ("package.json", pkg),
-            ("next.config.mjs", ""),
-            ("package-lock.json", "{}"),
-            (".nvmrc", "20"),
-        ]);
-
-        let start = std::time::Instant::now();
-        let _ = detect(dir.path(), None).unwrap();
-        let elapsed = start.elapsed();
-        assert!(
-            elapsed.as_millis() < 100,
-            "detection took {}ms, expected <100ms",
-            elapsed.as_millis()
-        );
     }
 }

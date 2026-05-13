@@ -54,6 +54,15 @@ bollard = { workspace = true }
 # Compile-time formatting
 const_format = "0.2"
 
+# Build context
+tar = { workspace = true }
+flate2 = { workspace = true }
+bytes = { workspace = true }
+tempfile = { workspace = true }
+
+# Streaming
+tokio-stream = { workspace = true }
+
 # Utilities
 chrono = { workspace = true }
 uuid = { workspace = true }

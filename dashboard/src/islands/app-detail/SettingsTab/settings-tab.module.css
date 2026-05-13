@@ -331,3 +331,105 @@
   height: 16px;
   cursor: pointer;
 }
+
+/* Server placement */
+.serverPlacement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.currentServer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.serverLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.serverValue {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.serverValue:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.serverValue:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.migrateRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.migrateRow > :first-child {
+  flex: 1;
+}
+
+/* Migration dialog */
+.migrateDialogBackdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.migrateDialog {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  max-width: 480px;
+  width: 90vw;
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.2);
+}
+
+.migrateDialogTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
+}
+
+.migrateDialogDesc {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+  line-height: var(--leading-normal);
+}
+
+.migrateCheckbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  margin-bottom: var(--space-5);
+}
+
+.migrateCheckbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.migrateDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

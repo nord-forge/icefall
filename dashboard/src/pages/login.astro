@@ -7,7 +7,7 @@ import '../styles/global.css';
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign in — Icefall</title>
+    <title>Sign in | Icefall</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -243,6 +243,14 @@ import '../styles/global.css';
 
   <script is:inline>
     let pendingUserId = null;
+
+    // Redirect to onboarding if setup is incomplete
+    fetch('/api/v1/onboarding/status', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(ob) {
+        if (!ob.is_complete) window.location.href = '/onboarding';
+      })
+      .catch(function() {});
 
     // Check for OAuth error in URL
     const urlParams = new URLSearchParams(window.location.search);

@@ -1,4 +1,4 @@
-import type { App, DeployStatus } from '@lib/types';
+import type { App, DeployStatus, Server } from '@lib/types';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import Button from '@islands/shared/Button/Button';
 import { api } from '@lib/api';
@@ -11,9 +11,11 @@ type Props = {
   app: App;
   status?: DeployStatus | 'online';
   onStatusChange?: () => void;
+  serverName?: string;
+  serverCount?: number;
 }
 
-export default function AppHeader({ app, status, onStatusChange }: Props) {
+export default function AppHeader({ app, status, onStatusChange, serverName, serverCount = 1 }: Props) {
   const [deploying, setDeploying] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -99,6 +101,11 @@ export default function AppHeader({ app, status, onStatusChange }: Props) {
           <h1 class={styles.title}>{app.name}</h1>
           <StatusDot status={displayStatus || 'online'} />
         </div>
+        {serverCount > 1 && serverName && (
+          <span class={styles.serverIndicator}>
+            on <a href={`/servers/${app.server_id}`} class={styles.serverLink}>{serverName}</a>
+          </span>
+        )}
         <div class={styles.meta}>
           {app.compose_content ? (
             <span class={styles.branchInfo}>

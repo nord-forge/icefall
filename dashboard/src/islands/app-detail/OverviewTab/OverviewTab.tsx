@@ -205,14 +205,14 @@ export default function OverviewTab({ app }: Props) {
                   ) : isImageApp ? (
                     <td class={styles.deploysCell}>
                       <a href={`/apps/${app.id}/deploys/${d.id}`} class={styles.commitLink}>
-                        {d.image_ref || app.image_ref || '—'}
+                        {d.image_ref || app.image_ref || '-'}
                       </a>
                     </td>
                   ) : (
                     <>
                       <td class={styles.deploysCell}>
                         <a href={`/apps/${app.id}/deploys/${d.id}`} class={styles.commitLink}>
-                          {d.git_sha ? shortSha(d.git_sha) : '—'}
+                          {d.git_sha ? shortSha(d.git_sha) : '-'}
                         </a>
                       </td>
                       <td class={`${styles.deploysCell} ${styles.branchCell}`}>

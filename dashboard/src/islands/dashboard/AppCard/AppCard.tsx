@@ -12,9 +12,10 @@ type Props = {
   app: App;
   latestDeployStatus?: string;
   latestDeployTime?: string;
+  serverName?: string;
 }
 
-export default function AppCard({ app, latestDeployStatus, latestDeployTime }: Props) {
+export default function AppCard({ app, latestDeployStatus, latestDeployTime, serverName }: Props) {
   const [deploying, setDeploying] = useState(false);
   const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
   const status = optimisticStatus || latestDeployStatus || 'stopped';
@@ -48,6 +49,18 @@ export default function AppCard({ app, latestDeployStatus, latestDeployTime }: P
           <StatusDot status={isOnline ? 'online' : status} />
         </div>
 
+        <div class={styles.badges}>
+          {app.deploy_mode === 'native' && (
+            <span class={styles.modeBadge}>Static</span>
+          )}
+          {app.image_ref && !app.compose_content && (
+            <span class={styles.modeBadge}>Image</span>
+          )}
+          {app.compose_content && (
+            <span class={styles.modeBadge}>Compose</span>
+          )}
+        </div>
+
         {app.git_repo && (
           <span class={styles.repo}>
             {app.git_repo.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
@@ -66,6 +79,10 @@ export default function AppCard({ app, latestDeployStatus, latestDeployTime }: P
               <span key={tag} class={styles.tag}>{tag}</span>
             ))}
           </div>
+        )}
+
+        {serverName && (
+          <span class={styles.serverLabel}>{serverName}</span>
         )}
       </a>
 

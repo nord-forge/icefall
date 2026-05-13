@@ -252,6 +252,7 @@ async fn trigger_deploy(
                     state.db.clone(),
                     state.config.clone(),
                     state.event_bus.clone(),
+                    Some(state.agent_registry.clone()),
                 );
 
                 let current_deploy = match state.db.get_deploy(&deploy_id).await {
@@ -308,6 +309,7 @@ async fn handle_branch_delete(state: &AppState, app: &crate::db::models::App, br
         state.db.clone(),
         state.config.clone(),
         state.event_bus.clone(),
+        Some(state.agent_registry.clone()),
     );
 
     if let Err(e) = manager.teardown(app, &env, "").await {

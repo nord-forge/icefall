@@ -5,6 +5,7 @@ import CommandPalette from '@islands/shared/CommandPalette/CommandPalette';
 import KeyboardShortcuts from '@islands/shared/KeyboardShortcuts/KeyboardShortcuts';
 import Toast from '@islands/shared/Toast/Toast';
 import ReconnectOverlay from '@islands/update/ReconnectOverlay/ReconnectOverlay';
+import OfflineServerBanner from '@islands/shared/OfflineServerBanner/OfflineServerBanner';
 import sidebarStyles from '@styles/sidebar.module.css';
 import layoutStyles from '@styles/layout.module.css';
 import '../styles/global.css';
@@ -21,7 +22,7 @@ const { title } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} — Icefall</title>
+    <title>{title} | Icefall</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -49,11 +50,12 @@ const { title } = Astro.props;
     <script is:inline>
       fetch('/api/v1/users/me', { credentials: 'same-origin' }).then(function(r) {
         if (r.status === 401 || r.status === 400) {
-          r.json().then(function(b) {
-            if (b.error === 'Not authenticated' || r.status === 401) {
-              window.location.href = '/login';
-            }
-          }).catch(function() { window.location.href = '/login'; });
+          fetch('/api/v1/onboarding/status', { credentials: 'same-origin' })
+            .then(function(or) { return or.json(); })
+            .then(function(ob) {
+              window.location.href = ob.is_complete ? '/login' : '/onboarding';
+            })
+            .catch(function() { window.location.href = '/login'; });
         }
       }).catch(function() {});
     </script>
@@ -83,6 +85,7 @@ const { title } = Astro.props;
       <div id="sidebar-panel" transition:persist>
         <Sidebar />
       </div>
+      <OfflineServerBanner client:only="preact" transition:persist />
       <main id="main-content" tabindex="-1" class={`ice-main ${layoutStyles.main}`} transition:animate="fade">
         <div class={layoutStyles.content}>
           <slot />
@@ -176,11 +179,32 @@ const { title } = Astro.props;
         document.head.appendChild(style);
       }
 
+      function scrollToHash() {
+        const hash = window.location.hash;
+        if (!hash) return;
+        const el = document.querySelector(hash);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+        // Element may not exist yet (client:only islands). Watch for it.
+        const observer = new MutationObserver(() => {
+          const target = document.querySelector(hash);
+          if (target) {
+            observer.disconnect();
+            target.scrollIntoView({ behavior: 'smooth' });
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => observer.disconnect(), 5000);
+      }
+
       injectDrawerStyles();
       initMobileDrawer();
       document.addEventListener('astro:after-swap', () => {
         injectDrawerStyles();
         initMobileDrawer();
+        scrollToHash();
       });
     </script>
   </body>

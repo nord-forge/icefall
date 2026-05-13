@@ -1,0 +1,27 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-warning-subtle, oklch(0.92 0.08 75));
+  border-bottom: 1px solid var(--color-warning, oklch(0.58 0.14 75));
+  color: var(--color-warning-text, oklch(0.30 0.08 75));
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  opacity: 0.8;
+}

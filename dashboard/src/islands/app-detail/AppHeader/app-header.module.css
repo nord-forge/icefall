@@ -40,6 +40,28 @@
   }
 }
 
+.serverIndicator {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.serverLink {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.serverLink:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.serverLink:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 .meta {
   display: flex;
   align-items: center;

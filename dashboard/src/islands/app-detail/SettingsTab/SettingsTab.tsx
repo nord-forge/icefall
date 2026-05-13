@@ -1,14 +1,24 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
-import type { App, Project, DeployMode } from '@lib/types';
+import type { App, Project, Server, DeployMode } from '@lib/types';
 import { api } from '@lib/api';
+import { addToast } from '@stores/toast';
 import Button from '@islands/shared/Button/Button';
-import { Save, AlertTriangle, Square, Play, RotateCw, Trash2, Webhook, Copy, Check, X, Plus, HardDrive, FolderOpen, Cloud, Search, Zap } from 'lucide-preact';
+import { Save } from 'lucide-preact';
 import VolumeBrowser from '@islands/app-detail/VolumeBrowser/VolumeBrowser';
+import GeneralSettingsCard from './components/GeneralSettingsCard';
+import DeployModeCard from './components/DeployModeCard';
+import TagsCard from './components/TagsCard';
+import ResourceLimitsCard from './components/ResourceLimitsCard';
+import AutoDeployCard from './components/AutoDeployCard';
+import PreviewDeploymentsCard from './components/PreviewDeploymentsCard';
+import PersistentStorageCard from './components/PersistentStorageCard';
+import ServerPlacementCard from './components/ServerPlacementCard';
+import DangerZoneCard from './components/DangerZoneCard';
 import styles from './settings-tab.module.css';
-import formStyles from '@styles/form.module.css';
 
 type Props = {
   app: App;
+  servers?: Server[];
 }
 
 const TAG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -78,7 +88,7 @@ function parseResourceLimits(raw: string | null): { memoryMb: string; cpuShares:
   } catch { return { memoryMb: '', cpuShares: '' }; }
 }
 
-export default function SettingsTab({ app }: Props) {
+export default function SettingsTab({ app, servers = [] }: Props) {
   const [form, setForm] = useState(() => {
     let buildCommand = '';
     try {
@@ -116,7 +126,15 @@ export default function SettingsTab({ app }: Props) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(app.project_id || '');
   const [browsingVolume, setBrowsingVolume] = useState<number | null>(null);
+  const [migrateTarget, setMigrateTarget] = useState('');
+  const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+  const [migrateAck, setMigrateAck] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const copiedTimeoutRef = useRef<number>();
+
+  const multiServer = servers.length >= 2;
+  const currentServer = servers.find((s) => s.id === app.server_id);
+  const availableTargets = servers.filter((s) => s.id !== app.server_id && s.status === 'online');
 
   useEffect(() => {
     api.listProjects().then(({ data }) => setProjects(data)).catch(() => {});
@@ -166,6 +184,20 @@ export default function SettingsTab({ app }: Props) {
     } catch {
       setDeleting(false);
     }
+  }
+
+  async function handleMigrate() {
+    if (!migrateTarget || !migrateAck) return;
+    setMigrating(true);
+    try {
+      await api.migrateApp(app.id, migrateTarget, migrateAck);
+      addToast('success', `Migration to ${availableTargets.find(s => s.id === migrateTarget)?.name || 'server'} started`);
+      setShowMigrateDialog(false);
+      window.location.href = `/apps/${app.id}/deploys`;
+    } catch (err: any) {
+      addToast('error', err.message || 'Migration failed');
+    }
+    setMigrating(false);
   }
 
   function copyToClipboard(text: string, label: string) {
@@ -283,429 +315,68 @@ export default function SettingsTab({ app }: Props) {
 
   return (
     <div class={styles.container}>
-      {/* General Settings */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>General Settings</h2>
-        <div class={formStyles.fieldRow}>
-          <div>
-            <label htmlFor="settings-app-name" class={formStyles.label}>App Name</label>
-            <input id="settings-app-name" class={formStyles.input} value={form.name} onInput={(e) => setForm({ ...form, name: (e.target as HTMLInputElement).value })} />
-          </div>
-          <div>
-            <label htmlFor="settings-git-repo" class={formStyles.label}>Git Repository</label>
-            <input id="settings-git-repo" class={formStyles.inputMono} value={form.git_repo} onInput={(e) => setForm({ ...form, git_repo: (e.target as HTMLInputElement).value })} />
-          </div>
-          <div>
-            <label htmlFor="settings-branch" class={formStyles.label}>Branch</label>
-            <input id="settings-branch" class={formStyles.inputMono} value={form.git_branch} onInput={(e) => setForm({ ...form, git_branch: (e.target as HTMLInputElement).value })} />
-          </div>
-          <div>
-            <label htmlFor="settings-build-cmd" class={formStyles.label}>Build Command</label>
-            <input id="settings-build-cmd" class={formStyles.inputMono} value={form.build_command} onInput={(e) => setForm({ ...form, build_command: (e.target as HTMLInputElement).value })} placeholder="bun run build" />
-          </div>
-          <div>
-            <label htmlFor="settings-project" class={formStyles.label}>
-              <FolderOpen size={14} style={{ verticalAlign: 'text-bottom', marginRight: '4px' }} />
-              Project
-            </label>
-            {/* a11y [WCAG 4.1.2]: select has associated label via htmlFor/id */}
-            <select
-              id="settings-project"
-              class={formStyles.select}
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId((e.target as HTMLSelectElement).value)}
-            >
-              <option value="">Unassigned</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <span class={styles.fieldHint}>Group this app with others in a project.</span>
-          </div>
-        </div>
-      </div>
+      <GeneralSettingsCard
+        name={form.name}
+        gitRepo={form.git_repo}
+        gitBranch={form.git_branch}
+        buildCommand={form.build_command}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onNameChange={(v) => setForm({ ...form, name: v })}
+        onGitRepoChange={(v) => setForm({ ...form, git_repo: v })}
+        onGitBranchChange={(v) => setForm({ ...form, git_branch: v })}
+        onBuildCommandChange={(v) => setForm({ ...form, build_command: v })}
+        onProjectChange={setSelectedProjectId}
+      />
 
-      {/* Deploy Mode */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>
-          <Zap size={18} /> Deploy Mode
-        </h2>
-        <p class={styles.settingsDescription}>
-          Controls how this app is built and served. Native mode builds on the host and serves static files directly through Caddy — no container overhead. Container mode uses Docker for apps that need a running server.
-        </p>
-        <div class={formStyles.fieldRow}>
-          <div>
-            {/* a11y [WCAG 4.1.2]: select has associated label via htmlFor/id */}
-            <label htmlFor="settings-deploy-mode" class={formStyles.label}>Deploy Mode</label>
-            <select
-              id="settings-deploy-mode"
-              class={formStyles.select}
-              value={deployMode}
-              onChange={(e) => setDeployMode((e.target as HTMLSelectElement).value as DeployMode)}
-            >
-              <option value="auto">Auto (recommended)</option>
-              <option value="native">Native (static)</option>
-              <option value="container">Container</option>
-            </select>
-            <span class={styles.fieldHint}>
-              {deployMode === 'auto' && 'Icefall detects whether your app is static or needs a server, then picks the fastest deploy method.'}
-              {deployMode === 'native' && 'Build output is served directly by Caddy. Best for static sites (React, Vue, Astro static, plain HTML). No container overhead.'}
-              {deployMode === 'container' && 'App runs in a Docker container. Required for SSR frameworks (Next.js, Nuxt, Astro SSR) and Node.js servers.'}
-            </span>
-          </div>
-        </div>
-        <p class={styles.settingsNote}>Changes take effect on next deployment.</p>
-      </div>
+      <DeployModeCard
+        deployMode={deployMode}
+        onDeployModeChange={setDeployMode}
+      />
 
-      {/* Tags */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>Tags</h2>
-        <p class={styles.settingsDescription}>
-          Organize apps with freeform tags. Tags are lowercase, alphanumeric with hyphens, max {TAG_MAX_LENGTH} characters.
-        </p>
-        <div class={styles.tagInputWrap}>
-          {tags.map((tag) => (
-            <span key={tag} class={styles.tagChip}>
-              {tag}
-              {/* a11y [WCAG 4.1.2]: button has accessible name via aria-label */}
-              <button
-                type="button"
-                class={styles.tagRemove}
-                onClick={() => removeTag(tag)}
-                aria-label={`Remove tag ${tag}`}
-              >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-          <input
-            id="settings-tags"
-            class={styles.tagInputField}
-            type="text"
-            value={tagInput}
-            onInput={(e) => {
-              const val = (e.target as HTMLInputElement).value;
-              if (val.includes(',')) {
-                addTag(val.replace(',', ''));
-              } else {
-                setTagInput(val);
-              }
-            }}
-            onKeyDown={handleTagKeyDown}
-            placeholder={tags.length === 0 ? 'Add a tag...' : ''}
-            aria-label="Add tag"
-            maxLength={TAG_MAX_LENGTH}
-          />
-        </div>
-        {tagError && (
-          <p class={styles.tagError} role="alert">{tagError}</p>
-        )}
-        <span class={styles.fieldHint}>Press Enter or comma to add a tag.</span>
-      </div>
+      <TagsCard
+        tags={tags}
+        tagInput={tagInput}
+        tagError={tagError}
+        tagMaxLength={TAG_MAX_LENGTH}
+        onTagInputChange={setTagInput}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
+        onTagKeyDown={handleTagKeyDown}
+      />
 
-      {/* Resource Limits */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>Resource Limits</h2>
-        {!form.memory_mb && !form.cpu_shares && (
-          <div class={styles.warningBanner} role="alert">
-            No resource limits configured. A runaway process could consume all server resources.
-          </div>
-        )}
-        <div class={formStyles.fieldRow}>
-          <div>
-            <label htmlFor="settings-memory" class={formStyles.label}>Memory Limit (MB)</label>
-            <input
-              id="settings-memory"
-              class={formStyles.input}
-              type="number"
-              min="64"
-              placeholder="No limit"
-              value={form.memory_mb}
-              onInput={(e) => setForm({ ...form, memory_mb: (e.target as HTMLInputElement).value })}
-            />
-            <span class={styles.fieldHint}>Minimum 64 MB. Leave empty for no limit.</span>
-          </div>
-          <div>
-            <label htmlFor="settings-cpu" class={formStyles.label}>CPU Shares</label>
-            <input
-              id="settings-cpu"
-              class={formStyles.input}
-              type="number"
-              min="1"
-              placeholder="1024 (default)"
-              value={form.cpu_shares}
-              onInput={(e) => setForm({ ...form, cpu_shares: (e.target as HTMLInputElement).value })}
-            />
-            <span class={styles.fieldHint}>Relative weight. Default is 1024. Higher = more CPU time.</span>
-          </div>
-        </div>
-        <p class={styles.settingsNote}>Changes take effect on next deployment.</p>
-      </div>
+      <ResourceLimitsCard
+        memoryMb={form.memory_mb}
+        cpuShares={form.cpu_shares}
+        onMemoryMbChange={(v) => setForm({ ...form, memory_mb: v })}
+        onCpuSharesChange={(v) => setForm({ ...form, cpu_shares: v })}
+      />
 
-      {/* Auto-Deploy */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>
-          <Webhook size={18} /> Auto-Deploy
-        </h2>
-        <p class={styles.settingsDescription}>
-          Automatically deploy when you push to the configured branch. Configure the webhook URL in your Git provider.
-        </p>
+      <AutoDeployCard
+        webhookBaseUrl={webhookBaseUrl}
+        webhookSecret={app.webhook_secret}
+        hasWebhookSecret={hasWebhookSecret}
+        gitBranch={app.git_branch}
+        copied={copied}
+        onCopy={copyToClipboard}
+      />
 
-        {hasWebhookSecret ? (
-          <div class={styles.webhookInfo}>
-            <div class={styles.webhookRow}>
-              <label class={formStyles.label}>GitHub Webhook URL</label>
-              <div class={styles.copyRow}>
-                <code class={styles.codeBlock}>{webhookBaseUrl}/github</code>
-                <button type="button" class={styles.copyButton} onClick={() => copyToClipboard(webhookBaseUrl + '/github', 'github')} aria-label="Copy GitHub webhook URL">
-                  {copied === 'github' ? <Check size={14} /> : <Copy size={14} />}
-                </button>
-              </div>
-            </div>
-            <div class={styles.webhookRow}>
-              <label class={formStyles.label}>GitLab Webhook URL</label>
-              <div class={styles.copyRow}>
-                <code class={styles.codeBlock}>{webhookBaseUrl}/gitlab</code>
-                <button type="button" class={styles.copyButton} onClick={() => copyToClipboard(webhookBaseUrl + '/gitlab', 'gitlab')} aria-label="Copy GitLab webhook URL">
-                  {copied === 'gitlab' ? <Check size={14} /> : <Copy size={14} />}
-                </button>
-              </div>
-            </div>
-            <div class={styles.webhookRow}>
-              <label class={formStyles.label}>Webhook Secret</label>
-              <div class={styles.copyRow}>
-                <code class={styles.codeBlock}>{app.webhook_secret}</code>
-                <button type="button" class={styles.copyButton} onClick={() => copyToClipboard(app.webhook_secret || '', 'secret')} aria-label="Copy webhook secret">
-                  {copied === 'secret' ? <Check size={14} /> : <Copy size={14} />}
-                </button>
-              </div>
-            </div>
-            <p class={styles.fieldHint}>
-              Deploys on push to: <code>{app.git_branch}</code>
-            </p>
-          </div>
-        ) : (
-          <p class={styles.settingsNote}>
-            Auto-deploy is not configured. A webhook secret will be generated when the app is deployed for the first time.
-          </p>
-        )}
-      </div>
+      <PreviewDeploymentsCard
+        previewEnabled={form.preview_enabled}
+        previewBranchPattern={form.preview_branch_pattern}
+        onPreviewEnabledChange={(v) => setForm({ ...form, preview_enabled: v })}
+        onPreviewBranchPatternChange={(v) => setForm({ ...form, preview_branch_pattern: v })}
+      />
 
-      {/* Preview Deployments */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>Preview Deployments</h2>
-        <p class={styles.settingsDescription}>
-          Automatically deploy branches matching a pattern and assign a preview subdomain. Previews are cleaned up when the branch is deleted.
-        </p>
-        <div class={styles.toggleRow}>
-          <label class={styles.toggleLabel}>
-            <input
-              type="checkbox"
-              class={formStyles.checkbox}
-              checked={form.preview_enabled}
-              onChange={(e) => setForm({ ...form, preview_enabled: (e.target as HTMLInputElement).checked })}
-            />
-            Enable preview deployments
-          </label>
-        </div>
-        {form.preview_enabled && (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <label htmlFor="settings-preview-pattern" class={formStyles.label}>Branch Pattern</label>
-            <input
-              id="settings-preview-pattern"
-              class={formStyles.inputMono}
-              value={form.preview_branch_pattern}
-              onInput={(e) => setForm({ ...form, preview_branch_pattern: (e.target as HTMLInputElement).value })}
-              placeholder="feature/*"
-            />
-            <span class={styles.fieldHint}>Glob pattern. Use * to match all branches except the main deploy branch.</span>
-          </div>
-        )}
-      </div>
-
-      {/* Persistent Storage */}
-      <div class={styles.card}>
-        <h2 class={styles.sectionTitle}>
-          <HardDrive size={18} /> Persistent Storage
-        </h2>
-        <p class={styles.settingsDescription}>
-          Mount named volumes, host paths, or S3-compatible object storage into your container. Data in these mounts persists across deployments.
-        </p>
-
-        {volumes.length > 0 && (
-          <div class={styles.volumeList} role="list" aria-label="Volume mounts">
-            {volumes.map((vol, index) => (
-              <div key={index} class={styles.volumeRow} role="listitem">
-                <div class={styles.volumeFields}>
-                  {/* a11y [WCAG 4.1.2]: select has associated label via htmlFor/id */}
-                  <div class={styles.volumeTypeRow}>
-                    <label htmlFor={`vol-type-${index}`} class={formStyles.label}>Type</label>
-                    <select
-                      id={`vol-type-${index}`}
-                      class={formStyles.select}
-                      value={vol.type}
-                      onChange={(e) => switchVolumeType(index, (e.target as HTMLSelectElement).value as 'local' | 's3')}
-                    >
-                      <option value="local">Local Volume</option>
-                      <option value="s3">S3 Mount</option>
-                    </select>
-                  </div>
-
-                  {vol.type === 'local' ? (
-                    <>
-                      <div>
-                        <label htmlFor={`vol-source-${index}`} class={formStyles.label}>Source</label>
-                        <input
-                          id={`vol-source-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.source}
-                          onInput={(e) => updateVolume(index, 'source', (e.target as HTMLInputElement).value)}
-                          placeholder="myapp-data"
-                        />
-                        <span class={styles.fieldHint}>Volume name or host path</span>
-                      </div>
-                      <div>
-                        <label htmlFor={`vol-target-${index}`} class={formStyles.label}>Container Path</label>
-                        <input
-                          id={`vol-target-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.target}
-                          onInput={(e) => updateVolume(index, 'target', (e.target as HTMLInputElement).value)}
-                          placeholder="/app/data"
-                          aria-invalid={!!volumeErrors[index]}
-                          aria-describedby={volumeErrors[index] ? `vol-error-${index}` : undefined}
-                        />
-                        {volumeErrors[index] ? (
-                          <span id={`vol-error-${index}`} class={styles.volumeError} role="alert">{volumeErrors[index]}</span>
-                        ) : (
-                          <span class={styles.fieldHint}>Must start with /</span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <label htmlFor={`vol-bucket-${index}`} class={formStyles.label}>
-                          <Cloud size={14} style={{ verticalAlign: 'text-bottom', marginRight: '4px' }} />
-                          Bucket Name
-                        </label>
-                        <input
-                          id={`vol-bucket-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.bucket}
-                          onInput={(e) => updateVolume(index, 'bucket', (e.target as HTMLInputElement).value)}
-                          placeholder="my-bucket"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor={`vol-endpoint-${index}`} class={formStyles.label}>Endpoint URL</label>
-                        <input
-                          id={`vol-endpoint-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.endpoint}
-                          onInput={(e) => updateVolume(index, 'endpoint', (e.target as HTMLInputElement).value)}
-                          placeholder="https://s3.amazonaws.com"
-                        />
-                        <span class={styles.fieldHint}>S3-compatible endpoint (R2, MinIO, etc.)</span>
-                      </div>
-                      <div>
-                        <label htmlFor={`vol-accesskey-${index}`} class={formStyles.label}>Access Key</label>
-                        <input
-                          id={`vol-accesskey-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.access_key}
-                          onInput={(e) => updateVolume(index, 'access_key', (e.target as HTMLInputElement).value)}
-                          placeholder="AKIA..."
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor={`vol-secretkey-${index}`} class={formStyles.label}>Secret Key</label>
-                        <input
-                          id={`vol-secretkey-${index}`}
-                          class={formStyles.inputMono}
-                          type="password"
-                          value={vol.secret_key}
-                          onInput={(e) => updateVolume(index, 'secret_key', (e.target as HTMLInputElement).value)}
-                          placeholder="Secret key"
-                          autocomplete="off"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor={`vol-region-${index}`} class={formStyles.label}>Region</label>
-                        <input
-                          id={`vol-region-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.region}
-                          onInput={(e) => updateVolume(index, 'region', (e.target as HTMLInputElement).value)}
-                          placeholder="auto"
-                        />
-                        <span class={styles.fieldHint}>Use "auto" for most S3-compatible providers.</span>
-                      </div>
-                      <div>
-                        <label htmlFor={`vol-target-${index}`} class={formStyles.label}>Container Path</label>
-                        <input
-                          id={`vol-target-${index}`}
-                          class={formStyles.inputMono}
-                          value={vol.target}
-                          onInput={(e) => updateVolume(index, 'target', (e.target as HTMLInputElement).value)}
-                          placeholder="/app/s3"
-                          aria-invalid={!!volumeErrors[index]}
-                          aria-describedby={volumeErrors[index] ? `vol-error-${index}` : undefined}
-                        />
-                        {volumeErrors[index] ? (
-                          <span id={`vol-error-${index}`} class={styles.volumeError} role="alert">{volumeErrors[index]}</span>
-                        ) : (
-                          <span class={styles.fieldHint}>Must start with /</span>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div class={styles.volumeActions}>
-                  <label class={styles.toggleLabel}>
-                    <input
-                      type="checkbox"
-                      class={formStyles.checkbox}
-                      checked={vol.read_only}
-                      onChange={(e) => updateVolume(index, 'read_only', (e.target as HTMLInputElement).checked)}
-                    />
-                    Read-only
-                  </label>
-                  {vol.type !== 's3' && vol.target && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setBrowsingVolume(index)}
-                      aria-label={`Browse volume ${vol.type === 'local' ? vol.source : ''} mounted at ${vol.target}`}
-                    >
-                      <Search size={14} /> Browse
-                    </Button>
-                  )}
-                  {/* a11y [WCAG 4.1.2]: button has accessible name via aria-label */}
-                  <button
-                    type="button"
-                    class={styles.volumeRemove}
-                    onClick={() => removeVolume(index)}
-                    aria-label={`Remove volume mount ${vol.type === 'local' ? (vol.source || 'unnamed') : (vol.bucket || 'unnamed bucket')} to ${vol.target || 'unset'}`}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div class={styles.volumeAddRow} style={{ marginTop: volumes.length > 0 ? 'var(--space-3)' : '0' }}>
-          <Button variant="secondary" onClick={() => addVolume('local')}>
-            <Plus size={14} /> Add Volume
-          </Button>
-          <Button variant="secondary" onClick={() => addVolume('s3')}>
-            <Cloud size={14} /> Add S3 Mount
-          </Button>
-        </div>
-        <p class={styles.settingsNote}>Changes take effect on next deployment. S3 mounts use an rclone sidecar container with FUSE.</p>
-      </div>
+      <PersistentStorageCard
+        volumes={volumes}
+        volumeErrors={volumeErrors}
+        onAddVolume={addVolume}
+        onRemoveVolume={removeVolume}
+        onUpdateVolume={updateVolume}
+        onSwitchVolumeType={switchVolumeType}
+        onBrowseVolume={setBrowsingVolume}
+      />
 
       {/* Save Button */}
       <div class={styles.saveRow}>
@@ -716,49 +387,37 @@ export default function SettingsTab({ app }: Props) {
         <span role="status" aria-live="polite">{saveMessage}</span>
       </div>
 
-      {/* Danger Zone */}
-      <div class={styles.dangerCard}>
-        <h2 class={styles.dangerTitle}>
-          <AlertTriangle size={18} /> Danger Zone
-        </h2>
+      {/* Server Placement — only in multi-server mode */}
+      {multiServer && (
+        <ServerPlacementCard
+          appName={app.name}
+          serverId={app.server_id}
+          currentServer={currentServer}
+          availableTargets={availableTargets}
+          migrateTarget={migrateTarget}
+          showMigrateDialog={showMigrateDialog}
+          migrateAck={migrateAck}
+          migrating={migrating}
+          onMigrateTargetChange={setMigrateTarget}
+          onShowMigrateDialog={() => setShowMigrateDialog(true)}
+          onCloseMigrateDialog={() => setShowMigrateDialog(false)}
+          onMigrateAckChange={setMigrateAck}
+          onMigrate={handleMigrate}
+        />
+      )}
 
-        <div class={styles.dangerRowBorder}>
-          <div>
-            <p class={styles.dangerLabel}>Application Controls</p>
-            <p class={styles.dangerDescription}>Start, stop, or restart all containers for this application.</p>
-          </div>
-          <div class={styles.confirmActions}>
-            <Button variant="secondary" onClick={async () => { setStarting(true); try { await api.startApp(app.id); } catch {} setStarting(false); }} loading={starting}>
-              <Play size={14} /> Start
-            </Button>
-            <Button variant="secondary" onClick={async () => { setRestarting(true); try { await api.restartApp(app.id); } catch {} setRestarting(false); }} loading={restarting}>
-              <RotateCw size={14} /> Restart
-            </Button>
-            <Button variant="danger" onClick={async () => { setStopping(true); try { await api.stopApp(app.id); } catch {} setStopping(false); }} loading={stopping}>
-              <Square size={14} /> Stop
-            </Button>
-          </div>
-        </div>
-
-        <div class={styles.dangerRow}>
-          <div>
-            <p class={styles.dangerLabel}>Delete Application</p>
-            <p class={styles.dangerDescription}>Deleting this app will remove all deploys, domains, and environment variables. This action cannot be undone.</p>
-          </div>
-          {confirmDelete ? (
-            <div class={styles.confirmActions}>
-              <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-              <Button variant="danger" onClick={handleDelete} loading={deleting}>
-                <Trash2 size={14} /> Confirm Delete
-              </Button>
-            </div>
-          ) : (
-            <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={14} /> Delete App
-            </Button>
-          )}
-        </div>
-      </div>
+      <DangerZoneCard
+        confirmDelete={confirmDelete}
+        deleting={deleting}
+        stopping={stopping}
+        starting={starting}
+        restarting={restarting}
+        onStart={async () => { setStarting(true); try { await api.startApp(app.id); } catch {} setStarting(false); }}
+        onRestart={async () => { setRestarting(true); try { await api.restartApp(app.id); } catch {} setRestarting(false); }}
+        onStop={async () => { setStopping(true); try { await api.stopApp(app.id); } catch {} setStopping(false); }}
+        onDelete={handleDelete}
+        onConfirmDeleteToggle={setConfirmDelete}
+      />
 
       {/* Volume Browser Drawer */}
       {browsingVolume !== null && volumes[browsingVolume] && volumes[browsingVolume].type !== 's3' && (

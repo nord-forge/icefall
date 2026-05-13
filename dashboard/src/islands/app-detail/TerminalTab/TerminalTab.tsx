@@ -215,7 +215,7 @@ export default function TerminalTab({ appId }: Props) {
         <div class={styles.emptyState}>
           <p class={styles.emptyStateTitle}>Terminal</p>
           <p class={styles.emptyStateHint}>
-            Open a shell session into your running container. The app must have at least one running container.
+            Open a shell session into your running container. The app must have at least one <a href={`/apps/${appId}/deploys`} data-astro-prefetch="hover">running deploy</a>.
           </p>
           <button
             type="button"

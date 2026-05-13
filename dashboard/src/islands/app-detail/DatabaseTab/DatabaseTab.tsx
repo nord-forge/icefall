@@ -130,7 +130,7 @@ export default function DatabaseTab({ appId }: Props) {
         <div class={styles.linkCard}>
           <h4 class={styles.linkTitle}>Link an existing database</h4>
           {unlinked.length === 0 ? (
-            <p class={styles.emptyHint}>No unlinked databases available. Create one on the Databases page first.</p>
+            <p class={styles.emptyHint}>No unlinked databases available. Create one on the <a href="/databases" data-astro-prefetch="hover">Databases page</a> first.</p>
           ) : (
             <div class={styles.linkGrid}>
               {unlinked.map(db => (
@@ -159,7 +159,7 @@ export default function DatabaseTab({ appId }: Props) {
         <div class={styles.emptyState}>
           <Database size={40} class={styles.emptyIcon} aria-hidden="true" />
           <p class={styles.emptyTitle}>No databases linked</p>
-          <p class={styles.emptyHint}>Link a database to inject its connection string as an environment variable.</p>
+          <p class={styles.emptyHint}>Link a database to inject its connection string as an <a href={`/apps/${appId}/env`} data-astro-prefetch="hover">environment variable</a>.</p>
         </div>
       ) : (
         <div class={styles.dbGrid}>

@@ -101,7 +101,7 @@ mod tests {
                 "https://github.com/example/icefall/releases/tag/v0.2.0".to_string(),
             ),
             artifacts,
-            signed_by: "sha256:placeholder".to_string(),
+            signed_by: "sha256:cd5a5845d0ccce1f".to_string(),
             signature_timestamp: "2026-05-10T14:30:00Z".to_string(),
         }
     }

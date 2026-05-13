@@ -34,10 +34,15 @@
   outline-offset: 2px;
 }
 
+/* a11y [WCAG 1.4.1]: weight + underline + icon distinguish active state beyond color */
 .tagChipActive {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-primary-text);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
 }
 
 .tagChipActive:hover {

@@ -1,0 +1,155 @@
+.description {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 641px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.card:hover:not(.cardDisabled) {
+  border-color: var(--color-primary);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.cardSelected {
+  border-color: var(--color-primary);
+  background: oklch(0.97 0.01 260);
+}
+
+:root[data-theme="dark"] .cardSelected {
+  background: oklch(0.20 0.02 260);
+}
+
+.cardDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.name {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.cardBadges {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.recommendedBadge {
+  padding: 1px var(--space-2);
+  border-radius: 9999px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  background: oklch(0.90 0.06 155);
+  border: 1px solid oklch(0.75 0.10 155);
+  color: oklch(0.35 0.12 155);
+}
+
+:root[data-theme="dark"] .recommendedBadge {
+  background: oklch(0.25 0.04 155);
+  border-color: oklch(0.40 0.08 155);
+  color: oklch(0.75 0.10 155);
+}
+
+.offlineBadge {
+  padding: 1px var(--space-2);
+  border-radius: 9999px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.host {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.roleCp,
+.roleWorker {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.appCount {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.radioIndicator {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary-text);
+}
+
+.cardSelected .radioIndicator {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

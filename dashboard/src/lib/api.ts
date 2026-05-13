@@ -1,4 +1,4 @@
-import type { App, Deploy, Domain, EnvVar, Project, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult } from './types';
+import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -78,6 +78,7 @@ export const api = {
     compose_content?: string;
     port?: number;
     deploy_mode?: string;
+    server_id?: string;
   }) => request<{ data: App }>('/apps', { method: 'POST', body: JSON.stringify(body) }),
 
   updateApp: (id: string, body: Partial<App>) =>
@@ -443,6 +444,59 @@ export const api = {
       `/users/${userId}`,
       { method: 'DELETE' },
     ),
+
+  // Servers
+  listServers: () =>
+    request<{ data: Server[] }>('/servers'),
+
+  getServer: (id: string) =>
+    request<{ data: Server }>(`/servers/${id}`),
+
+  createServer: (body: { name: string; host: string }) =>
+    request<{ data: Server & { enrollment_token: string } }>('/servers', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateServer: (id: string, body: { name?: string; labels?: string }) =>
+    request<{ data: Server }>(`/servers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteServer: (id: string, force = false) =>
+    request<{ message: string }>(`/servers/${id}${force ? '?force=true' : ''}`, {
+      method: 'DELETE',
+    }),
+
+  regenerateServerToken: (id: string) =>
+    request<{ data: { enrollment_token: string } }>(`/servers/${id}/token`, {
+      method: 'POST',
+    }),
+
+  updateAgent: (id: string) =>
+    request<{ data: { status: string; target_version?: string } }>(`/servers/${id}/update`, {
+      method: 'POST',
+    }),
+
+  updateAllAgents: () =>
+    request<{ data: { updated: number; skipped: number } }>('/servers/update-all', {
+      method: 'POST',
+    }),
+
+  getServerMetrics: (id: string, range?: string) =>
+    request<{ data: ServerMetricsSnapshot[] }>(
+      `/servers/${id}/metrics${range ? `?range=${range}` : ''}`
+    ),
+
+  migrateApp: (appId: string, targetServerId: string, acknowledgeVolumeLoss: boolean) =>
+    request<{ data: Deploy }>(`/apps/${appId}/migrate`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        target_server_id: targetServerId,
+        acknowledge_volume_loss: acknowledgeVolumeLoss,
+      }),
+    }),
 
   // Self-update
   checkForUpdate: () =>

@@ -1,0 +1,10 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import ServerDetail from '@islands/servers/ServerDetail/ServerDetail';
+
+export const prerender = false;
+---
+
+<DashboardLayout title="Server Detail">
+  <ServerDetail client:only="preact" />
+</DashboardLayout>

@@ -3,20 +3,23 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use icefall_common::protocol::AgentMessage;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::AgentConfig;
+use crate::context::HandlerContext;
+use crate::handlers;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 const PONG_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_BACKOFF: Duration = Duration::from_secs(300);
 
 pub async fn run_connection_loop(
-    config: &AgentConfig,
+    ctx: HandlerContext,
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
     let mut backoff = Duration::from_secs(1);
@@ -27,11 +30,11 @@ pub async fn run_connection_loop(
             break;
         }
 
-        match connect(config).await {
+        match connect(&ctx.config).await {
             Ok(ws) => {
                 info!("Connected to control plane");
                 backoff = Duration::from_secs(1);
-                run_session(ws, &mut shutdown).await;
+                run_session(ws, ctx.clone(), &mut shutdown).await;
 
                 if *shutdown.borrow() {
                     break;
@@ -80,19 +83,35 @@ async fn connect(
 
 async fn run_session(
     ws: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    mut ctx: HandlerContext,
     shutdown: &mut tokio::sync::watch::Receiver<bool>,
 ) {
-    let (mut sink, mut stream) = ws.split();
+    let (mut ws_sink, mut ws_stream) = ws.split();
+
+    let (outbound_tx, mut outbound_rx) = mpsc::unbounded_channel::<AgentMessage>();
+    ctx.event_tx = outbound_tx.clone();
+
+    let send_handle = tokio::spawn(async move {
+        while let Some(msg) = outbound_rx.recv().await {
+            if let Ok(json) = serde_json::to_string(&msg) {
+                if ws_sink.send(Message::Text(json.into())).await.is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = ws_sink.send(Message::Close(None)).await;
+    });
+
     let mut heartbeat_interval = tokio::time::interval(HEARTBEAT_INTERVAL);
     let mut waiting_pong = false;
     let mut pong_deadline: Option<tokio::time::Instant> = None;
 
     loop {
         tokio::select! {
-            msg = stream.next() => {
+            msg = ws_stream.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        handle_text_message(&text, &mut sink).await;
+                        handle_incoming(&text, &ctx, &outbound_tx);
                     }
                     Some(Ok(Message::Pong(_))) => {
                         waiting_pong = false;
@@ -118,14 +137,15 @@ async fn run_session(
                     if let Some(deadline) = pong_deadline {
                         if tokio::time::Instant::now() >= deadline {
                             warn!("Pong timeout, closing connection");
-                            let _ = sink.send(Message::Close(None)).await;
                             break;
                         }
                     }
                 } else {
-                    if sink.send(Message::Ping(vec![].into())).await.is_err() {
-                        break;
-                    }
+                    let ping = AgentMessage::Event {
+                        event_type: "ping".to_string(),
+                        data: serde_json::json!({ "timestamp": chrono::Utc::now().to_rfc3339() }),
+                    };
+                    let _ = outbound_tx.send(ping);
                     waiting_pong = true;
                     pong_deadline = Some(tokio::time::Instant::now() + PONG_TIMEOUT);
                 }
@@ -134,41 +154,34 @@ async fn run_session(
             _ = shutdown.changed() => {
                 if *shutdown.borrow() {
                     info!("Shutdown signal, closing WebSocket");
-                    let _ = sink.send(Message::Close(None)).await;
-                    // Give in-flight ops up to 5s
-                    tokio::time::sleep(Duration::from_secs(5)).await;
                     break;
                 }
             }
         }
     }
+
+    drop(outbound_tx);
+    let _ = send_handle.await;
 }
 
-async fn handle_text_message(
+fn handle_incoming(
     text: &str,
-    sink: &mut futures_util::stream::SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
+    ctx: &HandlerContext,
+    outbound_tx: &mpsc::UnboundedSender<AgentMessage>,
 ) {
     match serde_json::from_str::<AgentMessage>(text) {
-        Ok(AgentMessage::Request {
-            id,
-            method,
-            params: _,
-        }) => {
-            warn!("Unhandled method: {method}");
-            let response = AgentMessage::Response {
-                id,
-                result: None,
-                error: Some(format!("Not implemented: {method}")),
-            };
-            if let Ok(json) = serde_json::to_string(&response) {
-                let _ = sink.send(Message::Text(json.into())).await;
-            }
+        Ok(AgentMessage::Request { id, method, params }) => {
+            debug!("Received request: {method} (id={id})");
+            let ctx = ctx.clone();
+            let tx = outbound_tx.clone();
+            tokio::spawn(async move {
+                let response = handlers::dispatch(&ctx, id, &method, params).await;
+                let _ = tx.send(response);
+            });
         }
-        Ok(AgentMessage::Response { .. }) => {
-            // Agent doesn't expect responses from control plane
-        }
+        Ok(AgentMessage::Response { .. }) => {}
         Ok(AgentMessage::Event { event_type, .. }) => {
-            info!("Received event: {event_type}");
+            debug!("Received event from CP: {event_type}");
         }
         Err(e) => {
             warn!("Failed to parse message: {e}");

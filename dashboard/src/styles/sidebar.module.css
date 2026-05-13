@@ -19,11 +19,17 @@
   }
 }
 
+.logoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-4);
+}
+
 .logo {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-5) var(--space-4);
   font-weight: var(--weight-semibold);
   font-size: var(--text-lg);
   color: var(--color-text);
@@ -97,17 +103,18 @@
 }
 
 .footer {
-  padding: var(--space-3);
+  padding: var(--space-2);
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .footerStatus {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
@@ -115,8 +122,8 @@
 .footerActions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
   justify-content: space-between;
+  padding: var(--space-1);
 }
 
 .statusDotGreen {

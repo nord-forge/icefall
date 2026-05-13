@@ -37,6 +37,11 @@
   --color-primary-subtle: oklch(0.94 0.04 260);
   --color-primary-text: oklch(1.0 0 0);
 
+  /* Ice accent — cool glacial blue for interactive controls */
+  --color-ice: oklch(0.55 0.14 220);
+  --color-ice-hover: oklch(0.48 0.15 220);
+  --color-ice-subtle: oklch(0.93 0.04 220);
+
   /* Sidebar */
   --color-sidebar-bg: oklch(0.97 0.005 250);
   --color-sidebar-active: oklch(0.94 0.04 260);
@@ -119,6 +124,10 @@
   --color-primary-hover: oklch(0.55 0.19 260);
   --color-primary-subtle: oklch(0.22 0.06 260);
   --color-primary-text: oklch(1.0 0 0);
+
+  --color-ice: oklch(0.62 0.12 220);
+  --color-ice-hover: oklch(0.55 0.14 220);
+  --color-ice-subtle: oklch(0.22 0.05 220);
 
   --color-sidebar-bg: oklch(0.14 0.015 250);
   --color-sidebar-active: oklch(0.22 0.06 260);

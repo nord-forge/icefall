@@ -9,6 +9,24 @@ pub struct AgentConfig {
     pub server_id: String,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    #[serde(default = "default_docker_socket")]
+    pub docker_socket: String,
+    #[serde(default = "default_caddy_admin_url")]
+    pub caddy_admin_url: String,
+    #[serde(default = "default_data_dir")]
+    pub data_dir: String,
+}
+
+fn default_docker_socket() -> String {
+    "/var/run/docker.sock".to_string()
+}
+
+fn default_caddy_admin_url() -> String {
+    "http://localhost:2019".to_string()
+}
+
+fn default_data_dir() -> String {
+    "/var/lib/icefall-agent".to_string()
 }
 
 fn default_log_level() -> String {

@@ -46,7 +46,7 @@ export default function DomainsPage() {
         <div class={styles.emptyState}>
           <Globe size={40} class={styles.emptyIcon} aria-hidden="true" />
           <p class={styles.emptyTitle}>No domains configured</p>
-          <p class={styles.emptyHint}>Add domains from each app's Domains tab.</p>
+          <p class={styles.emptyHint}>Add domains from each app's Domains tab. <a href="/" data-astro-prefetch="hover">Browse your apps</a> to get started.</p>
         </div>
       ) : (
         <div class={styles.tableCard}>

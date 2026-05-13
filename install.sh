@@ -2,10 +2,9 @@
 # Icefall Installation Script
 # Usage: curl -fsSL https://icefall.dev/install.sh | bash
 #
-# Uninstall:
-#   systemctl stop icefall && systemctl disable icefall
-#   rm /usr/local/bin/icefall /etc/systemd/system/icefall.service
-#   rm -rf /etc/icefall /var/lib/icefall
+# Environment variables:
+#   ICEFALL_VERSION   - Version to install (default: latest)
+#   NO_COLOR          - Disable colored output
 
 set -euo pipefail
 
@@ -14,12 +13,21 @@ ICEFALL_BIN="/usr/local/bin/icefall"
 ICEFALL_DATA="/var/lib/icefall"
 ICEFALL_CONFIG="/etc/icefall/config.toml"
 ICEFALL_SERVICE="/etc/systemd/system/icefall.service"
+ICEFALL_LOG="/var/log/icefall-install.log"
 NONINTERACTIVE="${1:-}"
 
-info()  { echo -e "\033[1;34m[icefall]\033[0m $*"; }
-warn()  { echo -e "\033[1;33m[warn]\033[0m $*"; }
-error() { echo -e "\033[1;31m[error]\033[0m $*"; exit 1; }
-ok()    { echo -e "\033[1;32m[ok]\033[0m $*"; }
+if [ -n "${NO_COLOR:-}" ]; then
+    BLUE="" GREEN="" YELLOW="" RED="" BOLD="" RESET=""
+else
+    BLUE="\033[1;34m" GREEN="\033[1;32m" YELLOW="\033[1;33m" RED="\033[1;31m" BOLD="\033[1m" RESET="\033[0m"
+fi
+
+info()  { echo -e "${BLUE}[icefall]${RESET} $*" | tee -a "$ICEFALL_LOG"; }
+warn()  { echo -e "${YELLOW}[warn]${RESET} $*" | tee -a "$ICEFALL_LOG"; }
+error() { echo -e "${RED}[error]${RESET} $*" | tee -a "$ICEFALL_LOG"; exit 1; }
+ok()    { echo -e "${GREEN}[ok]${RESET} $*" | tee -a "$ICEFALL_LOG"; }
+
+trap 'error "Install failed at line $LINENO (command: $BASH_COMMAND)"' ERR
 
 confirm() {
     if [ "$NONINTERACTIVE" = "--yes" ]; then return 0; fi
@@ -30,11 +38,20 @@ confirm() {
 detect_os() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
-        OS_ID="$ID"
-        OS_VERSION="$VERSION_ID"
+        OS_ID="${ID:-unknown}"
+        OS_VERSION="${VERSION_ID:-0}"
     else
-        error "Cannot detect OS. /etc/os-release not found."
+        error "Cannot detect OS. /etc/os-release not found. Supported: Ubuntu 20.04+, Debian 11+, CentOS/Rocky/Alma 8+, Fedora 38+, Alpine 3.16+"
     fi
+
+    case "$OS_ID" in
+        ubuntu|debian|centos|rhel|rocky|almalinux|fedora|alpine)
+            ok "Detected $OS_ID $OS_VERSION"
+            ;;
+        *)
+            warn "Unsupported OS: $OS_ID $OS_VERSION. Proceeding anyway — manual intervention may be needed."
+            ;;
+    esac
 }
 
 detect_arch() {
@@ -43,13 +60,15 @@ detect_arch() {
         x86_64)  ARCH="x86_64" ;;
         aarch64) ARCH="aarch64" ;;
         arm64)   ARCH="aarch64" ;;
-        *) error "Unsupported architecture: $ARCH" ;;
+        *) error "Unsupported architecture: $ARCH. Supported: x86_64, aarch64" ;;
     esac
 }
 
+is_alpine() { [ "$OS_ID" = "alpine" ]; }
+
 check_root() {
-    if [ "$EUID" -ne 0 ]; then
-        error "This script must be run as root (use sudo)"
+    if [ "$(id -u)" -ne 0 ]; then
+        error "This script must be run as root (use: sudo bash install.sh)"
     fi
 }
 
@@ -61,49 +80,104 @@ check_prereqs() {
     fi
     ok "curl/wget available"
 
-    if ! command -v systemctl &>/dev/null; then
-        error "systemd is required"
+    if ! is_alpine && ! command -v systemctl &>/dev/null; then
+        error "systemd is required (not found). Alpine uses OpenRC."
     fi
-    ok "systemd available"
 
-    if ! command -v docker &>/dev/null; then
-        warn "Docker is not installed"
-        if confirm "Install Docker via official script?"; then
-            info "Installing Docker..."
-            curl -fsSL https://get.docker.com | sh
-            systemctl enable docker
-            systemctl start docker
-            ok "Docker installed"
-        else
-            error "Docker is required for Icefall"
+    install_docker
+}
+
+install_docker() {
+    if command -v docker &>/dev/null; then
+        if docker info &>/dev/null; then
+            ok "Docker $(docker --version | cut -d' ' -f3 | tr -d ',') (running)"
+            return
         fi
-    else
-        ok "Docker $(docker --version | cut -d' ' -f3 | tr -d ',')"
+        warn "Docker is installed but not running"
+        if is_alpine; then
+            rc-service docker start 2>/dev/null || true
+        else
+            systemctl start docker 2>/dev/null || true
+        fi
+        if docker info &>/dev/null; then
+            ok "Docker started"
+            return
+        fi
+        error "Docker is installed but cannot start. Check: journalctl -u docker"
     fi
+
+    warn "Docker is not installed"
+    if ! confirm "Install Docker via official script?"; then
+        error "Docker is required for Icefall"
+    fi
+
+    info "Installing Docker..."
+    curl -fsSL https://get.docker.com | sh
+
+    if is_alpine; then
+        rc-update add docker default 2>/dev/null || true
+        rc-service docker start 2>/dev/null || true
+    else
+        systemctl enable docker
+        systemctl start docker
+    fi
+
+    if ! docker info &>/dev/null; then
+        error "Docker installed but failed to start"
+    fi
+
+    if ! docker ps &>/dev/null; then
+        error "Docker socket not accessible. Check /var/run/docker.sock permissions."
+    fi
+
+    ok "Docker installed and verified"
 }
 
 install_caddy() {
     if command -v caddy &>/dev/null; then
-        ok "Caddy $(caddy version | head -1)"
+        ok "Caddy $(caddy version 2>/dev/null | head -1 || echo '(version unknown)')"
+        if is_alpine; then
+            rc-service caddy status &>/dev/null || rc-service caddy start 2>/dev/null || true
+        else
+            systemctl is-active --quiet caddy || systemctl start caddy 2>/dev/null || true
+        fi
+
+        local caddy_ok=false
+        for _ in 1 2 3; do
+            if curl -sf http://localhost:2019/config/ &>/dev/null; then
+                caddy_ok=true; break
+            fi
+            sleep 1
+        done
+        if $caddy_ok; then
+            ok "Caddy admin API reachable"
+        else
+            warn "Caddy admin API not yet reachable at localhost:2019 — may need manual config"
+        fi
         return
     fi
 
     info "Installing Caddy..."
     case "$OS_ID" in
         ubuntu|debian)
-            apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-            apt-get update
-            apt-get install -y caddy
+            apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl &>/dev/null
+            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null
+            curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+            apt-get update &>/dev/null
+            apt-get install -y caddy &>/dev/null
             ;;
-        fedora|centos|rhel|rocky|alma)
-            dnf install -y 'dnf-command(copr)'
-            dnf copr enable -y @caddy/caddy
-            dnf install -y caddy
+        fedora)
+            dnf install -y 'dnf-command(copr)' &>/dev/null
+            dnf copr enable -y @caddy/caddy &>/dev/null
+            dnf install -y caddy &>/dev/null
             ;;
-        arch|manjaro)
-            pacman -Sy --noconfirm caddy
+        centos|rhel|rocky|almalinux)
+            dnf install -y 'dnf-command(copr)' &>/dev/null || yum install -y yum-plugin-copr &>/dev/null
+            dnf copr enable -y @caddy/caddy &>/dev/null || true
+            dnf install -y caddy &>/dev/null || yum install -y caddy &>/dev/null
+            ;;
+        alpine)
+            apk add --no-cache caddy &>/dev/null
             ;;
         *)
             warn "Cannot auto-install Caddy for $OS_ID. Install manually: https://caddyserver.com/docs/install"
@@ -111,12 +185,27 @@ install_caddy() {
             ;;
     esac
 
-    systemctl enable caddy
-    systemctl start caddy
+    if is_alpine; then
+        rc-update add caddy default 2>/dev/null || true
+        rc-service caddy start 2>/dev/null || true
+    else
+        systemctl enable caddy
+        systemctl start caddy
+    fi
     ok "Caddy installed"
 }
 
 install_icefall() {
+    if [ -f "$ICEFALL_BIN" ]; then
+        local current_version
+        current_version=$("$ICEFALL_BIN" --version 2>/dev/null | awk '{print $2}' || echo "unknown")
+        if [ "$ICEFALL_VERSION" != "latest" ] && [ "$current_version" = "${ICEFALL_VERSION#v}" ]; then
+            ok "Icefall $current_version already installed (matches requested version)"
+            return
+        fi
+        info "Upgrading Icefall from $current_version..."
+    fi
+
     info "Installing Icefall ($ARCH)..."
 
     local download_url
@@ -127,18 +216,19 @@ install_icefall() {
     fi
 
     if command -v curl &>/dev/null; then
-        curl -fsSL "$download_url" -o "$ICEFALL_BIN"
+        curl -fsSL "$download_url" -o "${ICEFALL_BIN}.tmp"
     else
-        wget -qO "$ICEFALL_BIN" "$download_url"
+        wget -qO "${ICEFALL_BIN}.tmp" "$download_url"
     fi
 
-    chmod +x "$ICEFALL_BIN"
+    chmod 755 "${ICEFALL_BIN}.tmp"
+    mv "${ICEFALL_BIN}.tmp" "$ICEFALL_BIN"
     ok "Binary installed to $ICEFALL_BIN"
 }
 
 setup_config() {
     if [ -f "$ICEFALL_CONFIG" ]; then
-        ok "Config already exists at $ICEFALL_CONFIG"
+        ok "Config already exists at $ICEFALL_CONFIG (not overwriting)"
         return
     fi
 
@@ -166,26 +256,34 @@ EOF
     ok "Config written to $ICEFALL_CONFIG"
 }
 
-setup_systemd() {
-    if [ -f "$ICEFALL_SERVICE" ]; then
-        ok "Service file already exists"
-        systemctl daemon-reload
-        return
+setup_service() {
+    if is_alpine; then
+        setup_openrc
+    else
+        setup_systemd
     fi
+}
 
-    info "Creating systemd service..."
+setup_systemd() {
+    info "Configuring systemd service..."
 
     cat > "$ICEFALL_SERVICE" << 'EOF'
 [Unit]
-Description=Icefall PaaS Daemon
+Description=Icefall Deployment Platform
 After=network.target docker.service caddy.service
 Requires=docker.service
 
 [Service]
-Type=simple
+Type=notify
 ExecStart=/usr/local/bin/icefall daemon start
-Restart=always
-RestartSec=5
+ExecStopPost=-/var/lib/icefall/updates/icefall.rollback rollback --check
+Restart=on-failure
+RestartSec=2
+StartLimitBurst=3
+StartLimitIntervalSec=300
+WatchdogSec=60
+KillMode=mixed
+TimeoutStopSec=30
 Environment=ICEFALL_CONFIG=/etc/icefall/config.toml
 
 [Install]
@@ -194,24 +292,49 @@ EOF
 
     systemctl daemon-reload
     systemctl enable icefall
-    ok "Systemd service created"
+    ok "Systemd service configured"
+}
+
+setup_openrc() {
+    info "Configuring OpenRC service..."
+    local init_script="/etc/init.d/icefall"
+
+    cat > "$init_script" << 'EOF'
+#!/sbin/openrc-run
+name="icefall"
+description="Icefall Deployment Platform"
+command="/usr/local/bin/icefall"
+command_args="daemon start"
+command_background="yes"
+pidfile="/var/run/icefall.pid"
+depend() {
+    need net docker
+    after caddy
+}
+EOF
+
+    chmod 755 "$init_script"
+    rc-update add icefall default 2>/dev/null || true
+    ok "OpenRC service configured"
 }
 
 start_services() {
     info "Starting services..."
 
-    if ! systemctl is-active --quiet caddy; then
-        systemctl start caddy
+    if is_alpine; then
+        rc-service caddy status &>/dev/null || rc-service caddy start 2>/dev/null || true
+        rc-service icefall start 2>/dev/null || true
+    else
+        systemctl is-active --quiet caddy || systemctl start caddy 2>/dev/null || true
+        systemctl start icefall
     fi
-    ok "Caddy running"
 
-    systemctl start icefall
     ok "Icefall daemon running"
 }
 
 print_success() {
     local server_ip
-    server_ip=$(curl -s https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+    server_ip=$(curl -s https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 
     echo ""
     echo "============================================"
@@ -221,7 +344,12 @@ print_success() {
     echo "  Dashboard: http://${server_ip}:3000"
     echo "  Config:    $ICEFALL_CONFIG"
     echo "  Data:      $ICEFALL_DATA"
-    echo "  Logs:      journalctl -u icefall -f"
+    if is_alpine; then
+        echo "  Logs:      cat /var/log/icefall.log"
+    else
+        echo "  Logs:      journalctl -u icefall -f"
+    fi
+    echo "  Install:   $ICEFALL_LOG"
     echo ""
     echo "  Next: Open the dashboard to create your admin account."
     echo ""
@@ -229,6 +357,8 @@ print_success() {
 }
 
 main() {
+    mkdir -p "$(dirname "$ICEFALL_LOG")"
+    echo "--- Icefall install started $(date -u) ---" >> "$ICEFALL_LOG"
     echo ""
     info "Icefall Installer"
     echo ""
@@ -240,7 +370,7 @@ main() {
     install_caddy
     install_icefall
     setup_config
-    setup_systemd
+    setup_service
     start_services
     print_success
 }

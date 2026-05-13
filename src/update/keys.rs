@@ -14,17 +14,11 @@ pub struct TrustedKey {
     pub not_after: Option<&'static str>,
 }
 
-// Placeholder key — replaced when the first real release signing key is generated.
-// To generate a real key pair:
-//   openssl genpkey -algorithm ED25519 -out icefall-release.pem
-//   openssl pkey -in icefall-release.pem -pubout -out icefall-release.pub
-//
-// Then embed the public key here and store the private key as a GitHub Actions secret.
 pub static TRUSTED_RELEASE_KEYS: &[TrustedKey] = &[
     TrustedKey {
-        id: "icefall-release-2026-placeholder",
-        fingerprint: "sha256:placeholder",
-        public_key_pem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n-----END PUBLIC KEY-----",
+        id: "icefall-release-2026",
+        fingerprint: "sha256:cd5a5845d0ccce1f",
+        public_key_pem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAfCkP0lt7L+lHtICXaxkTNb9FAhYXBDampBTNpf0giNM=\n-----END PUBLIC KEY-----",
         not_before: "2026-01-01T00:00:00Z",
         not_after: None,
     },
@@ -44,12 +38,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn placeholder_key_is_present() {
+    fn release_key_is_present() {
         assert!(!TRUSTED_RELEASE_KEYS.is_empty());
-        assert_eq!(
-            TRUSTED_RELEASE_KEYS[0].id,
-            "icefall-release-2026-placeholder"
-        );
+        assert_eq!(TRUSTED_RELEASE_KEYS[0].id, "icefall-release-2026");
     }
 
     #[test]

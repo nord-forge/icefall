@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::agent::registry::AgentRegistry;
 use crate::caddy::CaddyClient;
 use crate::config::IcefallConfig;
-use crate::db::models::{App, Deploy, Environment};
+use crate::db::models::{App, Deploy, Environment, CONTROL_PLANE_SERVER_ID};
 use crate::db::Database;
 use crate::deploy::health::wait_for_healthy;
+use crate::deploy::remote::RemoteExecutor;
 use crate::deploy::s3_mount;
-use crate::deploy::DeployError;
+use crate::deploy::{DeployError, DeployTarget};
 use crate::docker::containers::{ContainerConfig, PortMapping, VolumeMount};
 use crate::docker::DockerClient;
 use crate::events::{EventBus, EventType};
@@ -18,6 +20,7 @@ pub struct DeployManager {
     db: Arc<dyn Database>,
     config: Arc<IcefallConfig>,
     event_bus: Arc<EventBus>,
+    agent_registry: Option<Arc<AgentRegistry>>,
 }
 
 impl DeployManager {
@@ -27,6 +30,7 @@ impl DeployManager {
         db: Arc<dyn Database>,
         config: Arc<IcefallConfig>,
         event_bus: Arc<EventBus>,
+        agent_registry: Option<Arc<AgentRegistry>>,
     ) -> Self {
         Self {
             docker,
@@ -34,7 +38,49 @@ impl DeployManager {
             db,
             config,
             event_bus,
+            agent_registry,
         }
+    }
+
+    pub fn resolve_target(&self, app: &App) -> DeployTarget {
+        match app.server_id.as_deref() {
+            None | Some(CONTROL_PLANE_SERVER_ID) => DeployTarget::Local,
+            Some(id) => DeployTarget::Remote {
+                server_id: id.to_string(),
+            },
+        }
+    }
+
+    pub async fn make_remote_executor(
+        &self,
+        server_id: &str,
+    ) -> Result<RemoteExecutor, DeployError> {
+        let registry = self
+            .agent_registry
+            .as_ref()
+            .ok_or_else(|| DeployError::AgentOffline("agent registry not available".to_string()))?
+            .clone();
+
+        let server = self
+            .db
+            .get_server(server_id)
+            .await
+            .map_err(|e| DeployError::RemoteOp(e.to_string()))?
+            .ok_or_else(|| DeployError::AgentOffline(format!("server {server_id} not found")))?;
+
+        if server.status != "online" {
+            return Err(DeployError::AgentOffline(format!(
+                "server '{}' is {} (expected online)",
+                server.name, server.status
+            )));
+        }
+
+        Ok(RemoteExecutor::new(
+            registry,
+            server_id.to_string(),
+            server.host,
+            server.public_key,
+        ))
     }
 
     pub async fn deploy(
@@ -71,9 +117,24 @@ impl DeployManager {
     ) -> Result<(), DeployError> {
         self.emit_status(app, deploy, "deploying");
 
+        let target = self.resolve_target(app);
+        let remote = match target {
+            DeployTarget::Remote { ref server_id } => {
+                Some(self.make_remote_executor(server_id).await?)
+            }
+            DeployTarget::Local => None,
+        };
+
         let network_name = format!("icefall-{}", app.name);
-        if let Err(e) = self.docker.create_network(&network_name).await {
-            tracing::debug!("Network {network_name} may already exist: {e}");
+        match &remote {
+            Some(exec) => {
+                let _ = exec.create_network(&network_name).await;
+            }
+            None => {
+                if let Err(e) = self.docker.create_network(&network_name).await {
+                    tracing::debug!("Network {network_name} may already exist: {e}");
+                }
+            }
         }
 
         let env_vars = match env_override {
@@ -101,64 +162,92 @@ impl DeployManager {
 
         let snapshot = serde_json::to_string(&env_vars).unwrap_or_default();
 
-        // Parse volume configuration, separating local and S3 volumes.
-        let volume_entries = s3_mount::parse_volume_entries(app.volumes.as_deref());
-        let (local_volumes, s3_configs) = s3_mount::split_volumes(&volume_entries);
+        // Container creation: local vs remote
+        let container_id = match &remote {
+            Some(exec) => {
+                let env_payload: serde_json::Value = if let Some(ref pub_key) =
+                    exec.server_public_key
+                {
+                    let envelope = crate::deploy::envelope::encrypt_env_vars(&env_vars, pub_key)?;
+                    serde_json::to_value(&envelope).unwrap_or_default()
+                } else {
+                    serde_json::json!(env_vars)
+                };
 
-        // Start S3 sidecar containers before the app container so the FUSE
-        // mounts are ready. Each sidecar shares a named Docker volume with
-        // the app container.
-        let mut app_volumes: Vec<VolumeMount> = local_volumes;
-        for (i, s3_cfg) in s3_configs.iter().enumerate() {
-            match s3_mount::create_s3_sidecar(&self.docker, &app.id, &app.name, i, s3_cfg).await {
-                Ok(sidecar_id) => {
-                    tracing::info!(
-                        "S3 sidecar {sidecar_id} started for bucket {}",
-                        s3_cfg.bucket
-                    );
-                    // Add the shared volume so the app container can access
-                    // the FUSE-mounted bucket.
-                    app_volumes.push(VolumeMount {
-                        source: s3_mount::s3_volume_name(&app.name, i),
-                        target: s3_cfg.target.clone(),
-                        read_only: s3_cfg.read_only,
-                    });
-                }
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to start S3 sidecar for bucket {}: {e}",
-                        s3_cfg.bucket
-                    );
-                    // Non-fatal: the deploy continues but without this mount.
-                }
+                let params = serde_json::json!({
+                    "name": container_name,
+                    "image": image_ref,
+                    "env": env_payload,
+                    "env_encrypted": exec.server_public_key.is_some(),
+                    "labels": labels,
+                    "ports": [{ "container_port": detected_port, "protocol": "tcp" }],
+                    "restart_policy": "unless-stopped",
+                    "network": network_name,
+                    "memory_bytes": resource_limits.as_ref().and_then(|r| r.memory_bytes),
+                    "cpu_shares": resource_limits.as_ref().and_then(|r| r.cpu_shares),
+                });
+                exec.create_container(params).await?
             }
-        }
+            None => {
+                let volume_entries = s3_mount::parse_volume_entries(app.volumes.as_deref());
+                let (local_volumes, s3_configs) = s3_mount::split_volumes(&volume_entries);
 
-        let container_config = ContainerConfig {
-            name: container_name,
-            image: image_ref.to_string(),
-            env: env_vars,
-            cmd: None,
-            ports: vec![PortMapping {
-                container_port: detected_port,
-                host_port: None,
-                protocol: "tcp".to_string(),
-            }],
-            volumes: app_volumes,
-            memory_bytes: resource_limits.as_ref().and_then(|r| r.memory_bytes),
-            cpu_shares: resource_limits.as_ref().and_then(|r| r.cpu_shares),
-            restart_policy: Some("unless-stopped".to_string()),
-            labels,
-            network: Some(network_name),
+                let mut app_volumes: Vec<VolumeMount> = local_volumes;
+                for (i, s3_cfg) in s3_configs.iter().enumerate() {
+                    match s3_mount::create_s3_sidecar(&self.docker, &app.id, &app.name, i, s3_cfg)
+                        .await
+                    {
+                        Ok(sidecar_id) => {
+                            tracing::info!(
+                                "S3 sidecar {sidecar_id} started for bucket {}",
+                                s3_cfg.bucket
+                            );
+                            app_volumes.push(VolumeMount {
+                                source: s3_mount::s3_volume_name(&app.name, i),
+                                target: s3_cfg.target.clone(),
+                                read_only: s3_cfg.read_only,
+                            });
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to start S3 sidecar for bucket {}: {e}",
+                                s3_cfg.bucket
+                            );
+                        }
+                    }
+                }
+
+                let container_config = ContainerConfig {
+                    name: container_name,
+                    image: image_ref.to_string(),
+                    env: env_vars,
+                    cmd: None,
+                    ports: vec![PortMapping {
+                        container_port: detected_port,
+                        host_port: None,
+                        protocol: "tcp".to_string(),
+                    }],
+                    volumes: app_volumes,
+                    memory_bytes: resource_limits.as_ref().and_then(|r| r.memory_bytes),
+                    cpu_shares: resource_limits.as_ref().and_then(|r| r.cpu_shares),
+                    restart_policy: Some("unless-stopped".to_string()),
+                    labels,
+                    network: Some(network_name),
+                };
+
+                self.docker
+                    .create_container(&container_config)
+                    .await
+                    .map_err(|e| DeployError::ContainerCreate(e.to_string()))?
+            }
         };
 
-        let container_id = self
-            .docker
-            .create_container(&container_config)
-            .await
-            .map_err(|e| DeployError::ContainerCreate(e.to_string()))?;
+        // Start container
+        match &remote {
+            Some(exec) => exec.start_container(&container_id).await?,
+            None => self.docker.start_container(&container_id).await?,
+        }
 
-        self.docker.start_container(&container_id).await?;
         self.db
             .update_deploy_container_id(&deploy.id, &container_id)
             .await?;
@@ -172,20 +261,40 @@ impl DeployManager {
 
         self.emit_status(app, deploy, "starting");
 
-        let host_port = self.get_host_port(&container_id, detected_port).await?;
-
-        let health_result = wait_for_healthy(
-            host_port,
-            self.config.health_check_attempts,
-            self.config.health_check_interval_ms,
-        )
-        .await;
+        // Health check: local vs remote
+        let health_result = match &remote {
+            Some(exec) => {
+                exec.health_check(
+                    detected_port,
+                    self.config.health_check_attempts,
+                    self.config.health_check_interval_ms,
+                )
+                .await
+            }
+            None => {
+                let host_port = self.get_host_port(&container_id, detected_port).await?;
+                wait_for_healthy(
+                    host_port,
+                    self.config.health_check_attempts,
+                    self.config.health_check_interval_ms,
+                )
+                .await
+            }
+        };
 
         if let Err(e) = health_result {
             tracing::error!("Health check failed for deploy {}: {e}", deploy.id);
             self.emit_status(app, deploy, "failed");
-            let _ = self.docker.stop_container(&container_id, Some(5)).await;
-            let _ = self.docker.remove_container(&container_id, true).await;
+            match &remote {
+                Some(exec) => {
+                    let _ = exec.stop_container(&container_id, 5).await;
+                    let _ = exec.remove_container(&container_id).await;
+                }
+                None => {
+                    let _ = self.docker.stop_container(&container_id, Some(5)).await;
+                    let _ = self.docker.remove_container(&container_id, true).await;
+                }
+            }
             self.db
                 .update_deploy_status(&deploy.id, "failed", Some("Health check failed"))
                 .await?;
@@ -242,15 +351,63 @@ impl DeployManager {
             return Err(e);
         }
 
-        let upstream = format!("localhost:{host_port}");
         let domains = self.resolve_domains(app, env).await?;
 
-        for (domain, path) in &domains {
-            if self.caddy.update_route(domain, &upstream).await.is_err() {
-                self.caddy
-                    .add_route_with_path(domain, path.as_deref(), &upstream)
-                    .await
-                    .map_err(|e| DeployError::RouteUpdate(e.to_string()))?;
+        match &remote {
+            Some(exec) => {
+                // Remote Caddy routing: two modes
+                // - Wildcard (*.base_domain): CP Caddy proxies to worker_host:host_port
+                // - Direct (custom domain): worker Caddy handles TLS + routing
+                let host_port = self
+                    .get_remote_host_port(exec, &container_id, detected_port)
+                    .await?;
+                let worker_upstream = format!("{}:{}", exec.server_host, host_port);
+
+                for (domain, _path) in &domains {
+                    let is_wildcard = self
+                        .config
+                        .base_domain
+                        .as_ref()
+                        .is_some_and(|bd| domain.ends_with(bd));
+
+                    if is_wildcard {
+                        if self
+                            .caddy
+                            .update_route(domain, &worker_upstream)
+                            .await
+                            .is_err()
+                        {
+                            self.caddy
+                                .add_route(domain, &worker_upstream)
+                                .await
+                                .map_err(|e| DeployError::RouteUpdate(e.to_string()))?;
+                        }
+                    } else {
+                        let local_upstream = format!("localhost:{host_port}");
+                        if exec
+                            .update_caddy_route(domain, &local_upstream)
+                            .await
+                            .is_err()
+                        {
+                            exec.add_caddy_route(domain, &local_upstream)
+                                .await
+                                .map_err(|e| DeployError::RouteUpdate(e.to_string()))?;
+                        }
+                    }
+                }
+            }
+            None => {
+                let host_port = self.get_host_port(&container_id, detected_port).await?;
+                let upstream = format!("localhost:{host_port}");
+
+                for (domain, path) in &domains {
+                    if self.caddy.update_route(domain, &upstream).await.is_err() {
+                        self.caddy
+                            .add_route_with_path(domain, path.as_deref(), &upstream)
+                            .await
+                            .map_err(|e| DeployError::RouteUpdate(e.to_string()))?;
+                    }
+                }
             }
         }
 
@@ -259,7 +416,15 @@ impl DeployManager {
             .await?;
         self.emit_status(app, deploy, "running");
 
-        self.stop_old_containers(app, env, &deploy.id).await;
+        // Stop old containers
+        match &remote {
+            Some(exec) => {
+                self.stop_old_containers_remote(exec, app, &deploy.id).await;
+            }
+            None => {
+                self.stop_old_containers(app, env, &deploy.id).await;
+            }
+        }
 
         Ok(())
     }
@@ -421,6 +586,78 @@ impl DeployManager {
                 .stop_container(&container.id, Some(self.config.deploy_stop_timeout_secs))
                 .await;
             let _ = self.docker.remove_container(&container.id, false).await;
+        }
+    }
+
+    async fn get_remote_host_port(
+        &self,
+        exec: &RemoteExecutor,
+        container_id: &str,
+        container_port: u16,
+    ) -> Result<u16, DeployError> {
+        let info = exec.inspect_container(container_id).await?;
+        let port_key = format!("{container_port}/tcp");
+
+        info["network_settings"]["ports"][&port_key]
+            .as_array()
+            .and_then(|bindings| bindings.first())
+            .and_then(|b| b["host_port"].as_str())
+            .and_then(|p| p.parse::<u16>().ok())
+            .ok_or_else(|| {
+                DeployError::ContainerCreate(format!(
+                    "could not determine host port for remote container {container_id}"
+                ))
+            })
+    }
+
+    async fn stop_old_containers_remote(
+        &self,
+        exec: &RemoteExecutor,
+        app: &App,
+        current_deploy_id: &str,
+    ) {
+        let containers = match exec
+            .list_containers_by_label(&format!("icefall.app={}", app.id))
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("Failed to list remote containers: {e}");
+                return;
+            }
+        };
+
+        for c in containers {
+            let c_id = match c["id"].as_str() {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
+
+            let is_current = c["labels"]["icefall.deploy-id"]
+                .as_str()
+                .is_some_and(|id| id == current_deploy_id);
+
+            if is_current {
+                continue;
+            }
+
+            let belongs_to_app = c["labels"]["icefall.app"]
+                .as_str()
+                .is_some_and(|id| id == app.id);
+
+            if !belongs_to_app {
+                continue;
+            }
+
+            tracing::info!(
+                "Stopping old remote container {} for app {}",
+                c_id,
+                app.name
+            );
+            let _ = exec
+                .stop_container(&c_id, self.config.deploy_stop_timeout_secs)
+                .await;
+            let _ = exec.remove_container(&c_id).await;
         }
     }
 

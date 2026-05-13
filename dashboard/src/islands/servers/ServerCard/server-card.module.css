@@ -1,0 +1,106 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: inherit;
+  gap: var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.card:hover {
+  border-color: var(--color-border-focus);
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+}
+
+.cardLink:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.name {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-lg);
+  color: var(--color-text);
+}
+
+.host {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.badgeControlPlane,
+.badgeWorker,
+.badgeApps {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border-radius: 9999px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.badgeControlPlane {
+  background: oklch(0.93 0.03 260);
+  border: 1px solid oklch(0.80 0.06 260);
+  color: oklch(0.40 0.10 260);
+}
+
+:root[data-theme="dark"] .badgeControlPlane {
+  background: oklch(0.25 0.04 260);
+  border-color: oklch(0.40 0.08 260);
+  color: oklch(0.75 0.10 260);
+}
+
+.badgeWorker {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.badgeApps {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.noMetrics {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

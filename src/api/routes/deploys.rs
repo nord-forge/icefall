@@ -132,6 +132,7 @@ async fn create_deploy(
                 state.db.clone(),
                 state.config.clone(),
                 state.event_bus.clone(),
+                Some(state.agent_registry.clone()),
             );
 
             let updated_deploy = match state.db.get_deploy(&deploy_id).await {
@@ -262,40 +263,105 @@ async fn create_deploy(
             }
 
             // Container path: build Docker image + deploy container
-            let orchestrator = BuildOrchestrator::new(
+            let manager = DeployManager::new(
                 state.docker.clone(),
+                state.caddy.clone(),
                 state.db.clone(),
                 state.config.clone(),
+                state.event_bus.clone(),
+                Some(state.agent_registry.clone()),
             );
 
-            match orchestrator
-                .build(&deploy_id, &app_clone, build_config)
-                .await
-            {
-                Ok(result) => {
-                    let manager = DeployManager::new(
-                        state.docker.clone(),
-                        state.caddy.clone(),
-                        state.db.clone(),
-                        state.config.clone(),
-                        state.event_bus.clone(),
-                    );
+            let target = manager.resolve_target(&app_clone);
 
-                    let updated_deploy = match state.db.get_deploy(&deploy_id).await {
-                        Ok(Some(d)) => d,
-                        _ => return,
+            let image_ref = match target {
+                crate::deploy::DeployTarget::Remote { ref server_id } => {
+                    // Remote build: delegate to agent
+                    let executor = match manager.make_remote_executor(server_id).await {
+                        Ok(e) => e,
+                        Err(e) => {
+                            tracing::error!("Cannot reach server for deploy {deploy_id}: {e}");
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
+                            return;
+                        }
                     };
 
-                    if let Err(e) = manager
-                        .deploy(&updated_deploy, &app_clone, &env_clone, &result.image_ref)
+                    let git_repo = match app_clone.git_repo.as_deref() {
+                        Some(r) => r,
+                        None => {
+                            tracing::error!("Remote deploy failed: no git_repo");
+                            return;
+                        }
+                    };
+
+                    let timeout = std::time::Duration::from_secs(
+                        build_config
+                            .as_ref()
+                            .and_then(|c| c.build_timeout_secs)
+                            .unwrap_or(state.config.build_timeout_secs),
+                    );
+
+                    let config_json = build_config
+                        .as_ref()
+                        .and_then(|c| serde_json::to_value(c).ok());
+
+                    match executor
+                        .run_build(
+                            git_repo,
+                            &app_clone.git_branch,
+                            &deploy_id,
+                            &app_clone.name,
+                            &[],
+                            config_json.as_ref(),
+                            timeout,
+                        )
                         .await
                     {
-                        tracing::error!("Deploy failed for {deploy_id}: {e}");
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            tracing::error!("Remote build failed for {deploy_id}: {e}");
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
+                            return;
+                        }
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Build failed for deploy {deploy_id}: {e}");
+                crate::deploy::DeployTarget::Local => {
+                    // Local build: use BuildOrchestrator
+                    let orchestrator = BuildOrchestrator::new(
+                        state.docker.clone(),
+                        state.db.clone(),
+                        state.config.clone(),
+                    );
+
+                    match orchestrator
+                        .build(&deploy_id, &app_clone, build_config)
+                        .await
+                    {
+                        Ok(result) => result.image_ref,
+                        Err(e) => {
+                            tracing::error!("Build failed for deploy {deploy_id}: {e}");
+                            return;
+                        }
+                    }
                 }
+            };
+
+            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
+                Ok(Some(d)) => d,
+                _ => return,
+            };
+
+            if let Err(e) = manager
+                .deploy(&updated_deploy, &app_clone, &env_clone, &image_ref)
+                .await
+            {
+                tracing::error!("Deploy failed for {deploy_id}: {e}");
             }
         });
     }
@@ -357,6 +423,7 @@ async fn rollback_deploy(
             state.db.clone(),
             state.config.clone(),
             state.event_bus.clone(),
+            Some(state.agent_registry.clone()),
         );
 
         let deploy = match state.db.get_deploy(&rollback_id).await {

@@ -77,12 +77,12 @@ export default function DeploysTab({ appId }: Props) {
                   </a>
                 </td>
                 <td class={`${styles.cell} ${styles.commitSha}`}>
-                  {d.git_sha ? shortSha(d.git_sha) : '—'}
+                  {d.git_sha ? shortSha(d.git_sha) : '-'}
                 </td>
                 <td class={`${styles.cell} ${styles.mono}`}>main</td>
                 <td class={styles.cell}><StatusDot status={d.status} /></td>
                 <td class={`${styles.cell} ${styles.duration}`}>
-                  {duration ? formatDuration(duration) : '—'}
+                  {duration ? formatDuration(duration) : '-'}
                 </td>
                 <td class={`${styles.cell} ${styles.time}`}>
                   {formatRelativeTime(d.created_at)}

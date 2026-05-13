@@ -14,6 +14,7 @@ export type App = {
   image_ref: string | null;
   compose_content: string | null;
   project_id: string | null;
+  server_id: string | null;
   deploy_mode: string;
   created_at: string;
   updated_at: string;
@@ -82,6 +83,33 @@ export type ServerStatus = {
   memory_total_bytes: number;
   disk_used_bytes: number;
   disk_total_bytes: number;
+}
+
+export type Server = {
+  id: string;
+  name: string;
+  host: string;
+  role: 'control-plane' | 'worker';
+  status: 'online' | 'offline' | 'enrolling' | 'draining';
+  agent_version: string | null;
+  resources: string | null;
+  labels: string | null;
+  last_heartbeat_at: string | null;
+  created_at: string;
+  updated_at: string;
+  app_count?: number;
+  recommendation_score?: number;
+  recommended?: boolean;
+}
+
+export type ServerResources = {
+  cpu_percent: number;
+  cpu_cores: number;
+  ram_used_bytes: number;
+  ram_total_bytes: number;
+  disk_used_bytes: number;
+  disk_total_bytes: number;
+  load_average: number[];
 }
 
 export type BuildStep = {

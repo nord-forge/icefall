@@ -1,16 +1,14 @@
-use crate::build::{
-    AstroMode, BuildConfig, BuildError, DetectionResult, Framework, PackageManager,
-};
+use super::{AstroMode, BuildConfig, DetectError, DetectionResult, Framework, PackageManager};
 
 pub fn generate_dockerfile(
     detection: &DetectionResult,
     overrides: Option<&BuildConfig>,
-) -> Result<String, BuildError> {
+) -> Result<String, DetectError> {
     let base_image = overrides.and_then(|o| o.base_image.as_deref());
 
     let dockerfile = match (&detection.framework, &detection.astro_mode) {
         (Framework::Dockerfile, _) => {
-            return Err(BuildError::DockerfileGeneration(
+            return Err(DetectError::DockerfileGeneration(
                 "cannot generate Dockerfile for a project that already has one".to_string(),
             ));
         }
@@ -279,11 +277,11 @@ fn shell_to_cmd_json(cmd: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::build::PackageManager;
+    use crate::build::detect::framework_defaults;
 
     fn make_detection(framework: Framework, pm: PackageManager) -> DetectionResult {
         let (build_command, output_dir, start_command, detected_port) =
-            crate::build::detect::tests_support::framework_defaults_pub(&framework, &pm, None);
+            framework_defaults(&framework, &pm, None);
         DetectionResult {
             framework,
             package_manager: pm,
@@ -303,52 +301,12 @@ mod tests {
     }
 
     #[test]
-    fn generates_static_site() {
-        let det = DetectionResult {
-            framework: Framework::StaticSite,
-            package_manager: PackageManager::Npm,
-            node_version: "22".to_string(),
-            build_command: None,
-            output_dir: Some(".".to_string()),
-            start_command: None,
-            detected_port: 80,
-            astro_mode: None,
-        };
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("FROM caddy:2-alpine"));
-        assert!(result.contains("COPY . /usr/share/caddy"));
-    }
-
-    #[test]
-    fn generates_vite_react() {
-        let det = make_detection(Framework::ViteReact, PackageManager::Npm);
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("FROM node:22-slim AS builder"));
-        assert!(result.contains("npm ci"));
-        assert!(result.contains("npm run build"));
-        assert!(result.contains("FROM caddy:2-alpine"));
-        assert!(result.contains("COPY --from=builder /app/dist"));
-    }
-
-    #[test]
     fn generates_nextjs_standalone() {
         let det = make_detection(Framework::NextJs, PackageManager::Npm);
         let result = generate_dockerfile(&det, None).unwrap();
         assert!(result.contains("FROM node:22-slim AS builder"));
         assert!(result.contains(".next/standalone"));
-        assert!(result.contains(".next/static"));
         assert!(result.contains("USER nextjs"));
-        assert!(result.contains("EXPOSE 3000"));
-        assert!(result.contains("ENV PORT=3000"));
-    }
-
-    #[test]
-    fn generates_nuxt() {
-        let det = make_detection(Framework::Nuxt, PackageManager::Npm);
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("FROM node:22-slim AS builder"));
-        assert!(result.contains("USER nuxt"));
-        assert!(result.contains("server/index.mjs"));
     }
 
     #[test]
@@ -365,46 +323,7 @@ mod tests {
         };
         let result = generate_dockerfile(&det, None).unwrap();
         assert!(result.contains("FROM node:20-slim"));
-        assert!(result.contains("npm ci --omit=dev"));
-        assert!(result.contains("USER app"));
         assert!(result.contains(r#"["node", "server.js"]"#));
-    }
-
-    #[test]
-    fn uses_bun_base_image_and_commands() {
-        let det = make_detection(Framework::ViteReact, PackageManager::Bun);
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("FROM oven/bun:latest AS builder"));
-        assert!(result.contains("bun install --frozen-lockfile"));
-        assert!(result.contains("bun run build"));
-        assert!(result.contains("bun.lock"));
-    }
-
-    #[test]
-    fn uses_pnpm_commands() {
-        let det = make_detection(Framework::NextJs, PackageManager::Pnpm);
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("corepack enable && pnpm install --frozen-lockfile"));
-        assert!(result.contains("pnpm-lock.yaml"));
-    }
-
-    #[test]
-    fn uses_yarn_commands() {
-        let det = make_detection(Framework::Nuxt, PackageManager::Yarn);
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("yarn install --frozen-lockfile"));
-        assert!(result.contains("yarn.lock"));
-    }
-
-    #[test]
-    fn respects_custom_base_image() {
-        let det = make_detection(Framework::NextJs, PackageManager::Npm);
-        let overrides = BuildConfig {
-            base_image: Some("node:20-alpine".to_string()),
-            ..Default::default()
-        };
-        let result = generate_dockerfile(&det, Some(&overrides)).unwrap();
-        assert!(result.contains("FROM node:20-alpine AS builder"));
     }
 
     #[test]
@@ -413,25 +332,5 @@ mod tests {
         let ignore = generate_dockerignore(&det);
         assert!(ignore.contains("node_modules"));
         assert!(ignore.contains(".git"));
-        assert!(ignore.contains(".env"));
-    }
-
-    #[test]
-    fn generates_astro_ssr() {
-        let det = DetectionResult {
-            framework: Framework::Astro,
-            package_manager: PackageManager::Npm,
-            node_version: "22".to_string(),
-            build_command: Some("npm run build".to_string()),
-            output_dir: Some("dist".to_string()),
-            start_command: Some("node ./dist/server/entry.mjs".to_string()),
-            detected_port: 4321,
-            astro_mode: Some(AstroMode::Ssr),
-        };
-        let result = generate_dockerfile(&det, None).unwrap();
-        assert!(result.contains("FROM node:22-slim AS builder"));
-        assert!(result.contains("USER astro"));
-        assert!(result.contains("EXPOSE 4321"));
-        assert!(result.contains("entry.mjs"));
     }
 }

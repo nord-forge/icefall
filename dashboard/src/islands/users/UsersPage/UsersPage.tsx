@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $users, $tokens, $usersLoaded } from '@stores/users';
 import { api } from '@lib/api';
 import type { User, ApiToken, RegistrationSettings } from '@lib/types';
-import { formatRelativeTime } from '@lib/format';
-import Button from '@islands/shared/Button/Button';
-import StatusDot from '@islands/shared/StatusDot/StatusDot';
-import { UserPlus, Key, Trash2, Copy, ShieldCheck, ShieldOff, RotateCcw, KeyRound } from 'lucide-preact';
 import { SkeletonTable } from '@islands/shared/Skeleton/Skeleton';
+import RegistrationSettingsSection from './components/RegistrationSettings';
+import TeamMembersSection from './components/TeamMembersSection';
+import ResetPasswordModal from './components/ResetPasswordModal';
+import Reset2faModal from './components/Reset2faModal';
+import ApiTokensSection from './components/ApiTokensSection';
 import styles from './users-page.module.css';
-import formStyles from '@styles/form.module.css';
 
 export default function UsersPage() {
   const cachedUsers = useStore($users);
@@ -18,15 +18,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>(cachedUsers);
   const [tokens, setTokens] = useState<ApiToken[]>(cachedTokens);
   const [loading, setLoading] = useState(!wasLoaded);
-  const [showInvite, setShowInvite] = useState(false);
-  const [showCreateToken, setShowCreateToken] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('deployer');
-  const [tokenName, setTokenName] = useState('');
   const [newTokenValue, setNewTokenValue] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
-  // Registration settings
   const [regSettings, setRegSettings] = useState<RegistrationSettings>({
     allow_registration: false,
     allowed_domains: null,
@@ -36,7 +29,6 @@ export default function UsersPage() {
   const [regSaving, setRegSaving] = useState(false);
   const [domainsInput, setDomainsInput] = useState('');
 
-  // Password reset modal
   const [resetPasswordModal, setResetPasswordModal] = useState<{
     userId: string;
     email: string;
@@ -44,55 +36,11 @@ export default function UsersPage() {
   } | null>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
 
-  // 2FA reset confirm
   const [reset2faConfirm, setReset2faConfirm] = useState<{
     userId: string;
     email: string;
   } | null>(null);
   const [resetting2fa, setResetting2fa] = useState(false);
-
-  const passwordModalRef = useRef<HTMLDivElement>(null);
-  const twoFaModalRef = useRef<HTMLDivElement>(null);
-
-  // a11y [WCAG 2.4.3]: focus trap for password reset modal
-  useEffect(() => {
-    if (!resetPasswordModal) return;
-    const dialog = passwordModalRef.current;
-    if (!dialog) return;
-    const focusable = dialog.querySelectorAll<HTMLElement>(
-      'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
-    );
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    function handleTab(e: KeyboardEvent) {
-      if (e.key !== 'Tab') return;
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-    }
-    dialog.addEventListener('keydown', handleTab);
-    first?.focus();
-    return () => dialog.removeEventListener('keydown', handleTab);
-  }, [resetPasswordModal]);
-
-  // a11y [WCAG 2.4.3]: focus trap for 2FA reset modal
-  useEffect(() => {
-    if (!reset2faConfirm) return;
-    const dialog = twoFaModalRef.current;
-    if (!dialog) return;
-    const focusable = dialog.querySelectorAll<HTMLElement>(
-      'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
-    );
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    function handleTab(e: KeyboardEvent) {
-      if (e.key !== 'Tab') return;
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-    }
-    dialog.addEventListener('keydown', handleTab);
-    first?.focus();
-    return () => dialog.removeEventListener('keydown', handleTab);
-  }, [reset2faConfirm]);
 
   useEffect(() => {
     Promise.all([
@@ -109,17 +57,12 @@ export default function UsersPage() {
     });
   }, []);
 
-  async function handleInvite() {
-    if (!inviteEmail.trim()) return;
-    setSubmitting(true);
+  async function handleInvite(email: string, role: string) {
     try {
-      await api.inviteUser(inviteEmail.trim(), inviteRole);
+      await api.inviteUser(email, role);
       const { data } = await api.listUsers();
       setUsers(data);
-      setInviteEmail('');
-      setShowInvite(false);
     } catch {}
-    setSubmitting(false);
   }
 
   async function handleChangeRole(userId: string, role: string) {
@@ -178,18 +121,13 @@ export default function UsersPage() {
     setRegSaving(false);
   }
 
-  async function handleCreateToken() {
-    if (!tokenName.trim()) return;
-    setSubmitting(true);
+  async function handleCreateToken(name: string) {
     try {
-      const { data } = await api.createToken(tokenName.trim());
+      const { data } = await api.createToken(name);
       setNewTokenValue(data.token);
       const { data: refreshed } = await api.listTokens();
       setTokens(refreshed);
-      setTokenName('');
-      setShowCreateToken(false);
     } catch {}
-    setSubmitting(false);
   }
 
   async function handleRevokeToken(tokenId: string) {
@@ -209,361 +147,52 @@ export default function UsersPage() {
         <SkeletonTable rows={5} columns={6} />
       ) : (
         <>
-          {/* Registration Settings */}
-          <section class={styles.section}>
-            <div class={styles.sectionHeader}>
-              <h2 class={styles.sectionTitle}>Registration Settings</h2>
-            </div>
+          <RegistrationSettingsSection
+            settings={regSettings}
+            domainsInput={domainsInput}
+            loading={regLoading}
+            saving={regSaving}
+            onSettingsChange={setRegSettings}
+            onDomainsChange={setDomainsInput}
+            onSave={handleSaveRegSettings}
+          />
 
-            {regLoading ? (
-              <p class={styles.loadingText}>Loading settings...</p>
-            ) : (
-              <div class={styles.card}>
-                <div class={styles.settingsGrid}>
-                  <div class={styles.settingRow}>
-                    <label htmlFor="allow-registration" class={formStyles.label}>
-                      Allow public registration
-                    </label>
-                    <button
-                      id="allow-registration"
-                      type="button"
-                      role="switch"
-                      aria-checked={regSettings.allow_registration}
-                      class={`${styles.toggle} ${regSettings.allow_registration ? styles.toggleOn : ''}`}
-                      onClick={() =>
-                        setRegSettings(prev => ({
-                          ...prev,
-                          allow_registration: !prev.allow_registration,
-                        }))
-                      }
-                    >
-                      <span class={styles.toggleThumb} />
-                    </button>
-                  </div>
+          <TeamMembersSection
+            users={users}
+            onChangeRole={handleChangeRole}
+            onDeactivate={handleDeactivate}
+            onResetPassword={(userId, email) => setResetPasswordModal({ userId, email })}
+            onReset2fa={(userId, email) => setReset2faConfirm({ userId, email })}
+            onInvite={handleInvite}
+          />
 
-                  {regSettings.allow_registration && (
-                    <div class={styles.settingRow}>
-                      <label htmlFor="allowed-domains" class={formStyles.label}>
-                        Allowed email domains
-                      </label>
-                      <input
-                        id="allowed-domains"
-                        class={formStyles.input}
-                        type="text"
-                        value={domainsInput}
-                        onInput={e =>
-                          setDomainsInput((e.target as HTMLInputElement).value)
-                        }
-                        placeholder="company.com, example.org"
-                      />
-                      <p class={styles.settingHint}>
-                        Comma-separated list. Leave empty to allow any domain.
-                      </p>
-                    </div>
-                  )}
-
-                  <div class={styles.settingRow}>
-                    <label htmlFor="default-role" class={formStyles.label}>
-                      Default role for new users
-                    </label>
-                    <select
-                      id="default-role"
-                      class={formStyles.select}
-                      value={regSettings.default_role}
-                      onChange={e =>
-                        setRegSettings(prev => ({
-                          ...prev,
-                          default_role: (e.target as HTMLSelectElement).value,
-                        }))
-                      }
-                    >
-                      <option value="viewer">Viewer</option>
-                      <option value="deployer">Deployer</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class={styles.cardActions}>
-                  <Button
-                    variant="primary"
-                    onClick={handleSaveRegSettings}
-                    loading={regSaving}
-                  >
-                    Save Settings
-                  </Button>
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* Team Members */}
-          <section class={styles.section}>
-            <div class={styles.sectionHeader}>
-              <h2 class={styles.sectionTitle}>Team Members</h2>
-              <Button variant="primary" onClick={() => setShowInvite(true)}>
-                <UserPlus size={14} aria-hidden="true" /> Invite
-              </Button>
-            </div>
-
-            {showInvite && (
-              <div class={styles.card}>
-                <div class={formStyles.fieldRow}>
-                  <div>
-                    <label htmlFor="invite-email" class={formStyles.label}>Email</label>
-                    <input id="invite-email" class={formStyles.input} type="email" autoComplete="email" value={inviteEmail} onInput={e => setInviteEmail((e.target as HTMLInputElement).value)} placeholder="colleague@example.com" />
-                  </div>
-                  <div>
-                    <label htmlFor="invite-role" class={formStyles.label}>Role</label>
-                    <select id="invite-role" class={formStyles.select} value={inviteRole} onChange={e => setInviteRole((e.target as HTMLSelectElement).value)}>
-                      <option value="admin">Admin</option>
-                      <option value="deployer">Deployer</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                  </div>
-                </div>
-                <div class={styles.cardActions}>
-                  <Button variant="ghost" onClick={() => setShowInvite(false)}>Cancel</Button>
-                  <Button variant="primary" onClick={handleInvite} loading={submitting} disabled={!inviteEmail.trim()}>Send Invite</Button>
-                </div>
-              </div>
-            )}
-
-            <div class={styles.tableCard}>
-              <table class={styles.table}>
-                <thead>
-                  <tr class={styles.tableRow}>
-                    <th class={styles.th}>Email</th>
-                    <th class={styles.th}>Role</th>
-                    <th class={styles.th}>2FA</th>
-                    <th class={styles.th}>Status</th>
-                    <th class={styles.th}>Last Login</th>
-                    <th class={styles.th}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.id} class={styles.tableRow}>
-                      <td class={styles.td}>{u.email}</td>
-                      <td class={styles.td}>
-                        <select
-                          class={styles.roleSelect}
-                          value={u.role}
-                          onChange={e => handleChangeRole(u.id, (e.target as HTMLSelectElement).value)}
-                          aria-label={`Role for ${u.email}`}
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="deployer">Deployer</option>
-                          <option value="viewer">Viewer</option>
-                        </select>
-                      </td>
-                      <td class={styles.td}>
-                        {/* a11y [1.1.1]: non-text content has accessible name via aria-label */}
-                        {u.totp_enabled ? (
-                          <span class={styles.badge2faOn} aria-label="2FA enabled" title="2FA enabled">
-                            <ShieldCheck size={14} aria-hidden="true" /> On
-                          </span>
-                        ) : (
-                          <span class={styles.badge2faOff} aria-label="2FA disabled" title="2FA disabled">
-                            <ShieldOff size={14} aria-hidden="true" /> Off
-                          </span>
-                        )}
-                      </td>
-                      <td class={styles.td}>
-                        <StatusDot status={u.is_active ? 'online' : 'stopped'} />
-                      </td>
-                      <td class={styles.tdMuted}>{u.last_login_at ? formatRelativeTime(u.last_login_at) : 'Never'}</td>
-                      <td class={styles.td}>
-                        <div class={styles.actionRow}>
-                          <button
-                            type="button"
-                            onClick={() => setResetPasswordModal({ userId: u.id, email: u.email })}
-                            class={styles.iconButton}
-                            aria-label={`Reset password for ${u.email}`}
-                            title="Reset password"
-                          >
-                            <KeyRound size={14} aria-hidden="true" />
-                          </button>
-                          {u.totp_enabled && (
-                            <button
-                              type="button"
-                              onClick={() => setReset2faConfirm({ userId: u.id, email: u.email })}
-                              class={styles.iconButton}
-                              aria-label={`Reset 2FA for ${u.email}`}
-                              title="Reset 2FA"
-                            >
-                              <RotateCcw size={14} aria-hidden="true" />
-                            </button>
-                          )}
-                          {u.is_active && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeactivate(u.id)}
-                              class={styles.iconButton}
-                              aria-label={`Deactivate ${u.email}`}
-                              title="Deactivate user"
-                            >
-                              <Trash2 size={14} aria-hidden="true" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && (
-                    <tr>
-                      <td class={styles.emptyRow} colSpan={6}>No users yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Password Reset Modal */}
           {resetPasswordModal && (
-            <div ref={passwordModalRef} class={styles.overlay} role="dialog" aria-modal="true" aria-label="Reset password">
-              <div class={styles.modal}>
-                <h3 class={styles.modalTitle}>Reset Password</h3>
-                {resetPasswordModal.tempPassword ? (
-                  <>
-                    <p class={styles.modalText}>
-                      A temporary password has been generated for <strong>{resetPasswordModal.email}</strong>.
-                      Share it securely -- it will not be shown again.
-                    </p>
-                    <div class={styles.tokenRow}>
-                      <code class={styles.tokenValue}>{resetPasswordModal.tempPassword}</code>
-                      <button
-                        type="button"
-                        class={styles.iconButton}
-                        onClick={() => navigator.clipboard.writeText(resetPasswordModal.tempPassword!)}
-                        aria-label="Copy temporary password"
-                      >
-                        <Copy size={14} aria-hidden="true" />
-                      </button>
-                    </div>
-                    <div class={styles.cardActions}>
-                      <Button variant="ghost" onClick={() => setResetPasswordModal(null)}>
-                        Close
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p class={styles.modalText}>
-                      This will generate a new temporary password for <strong>{resetPasswordModal.email}</strong> and
-                      invalidate all their existing sessions.
-                    </p>
-                    <div class={styles.cardActions}>
-                      <Button variant="ghost" onClick={() => setResetPasswordModal(null)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="primary"
-                        onClick={handleResetPassword}
-                        loading={resettingPassword}
-                      >
-                        Generate Temporary Password
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+            <ResetPasswordModal
+              userId={resetPasswordModal.userId}
+              email={resetPasswordModal.email}
+              tempPassword={resetPasswordModal.tempPassword}
+              resetting={resettingPassword}
+              onConfirm={handleResetPassword}
+              onClose={() => setResetPasswordModal(null)}
+            />
           )}
 
-          {/* 2FA Reset Confirm */}
           {reset2faConfirm && (
-            <div ref={twoFaModalRef} class={styles.overlay} role="dialog" aria-modal="true" aria-label="Reset two-factor authentication">
-              <div class={styles.modal}>
-                <h3 class={styles.modalTitle}>Reset 2FA</h3>
-                <p class={styles.modalText}>
-                  This will disable two-factor authentication for <strong>{reset2faConfirm.email}</strong> and
-                  invalidate all their sessions. They will need to set up 2FA again on their next login.
-                </p>
-                <div class={styles.cardActions}>
-                  <Button variant="ghost" onClick={() => setReset2faConfirm(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleReset2fa}
-                    loading={resetting2fa}
-                  >
-                    Reset 2FA
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <Reset2faModal
+              email={reset2faConfirm.email}
+              resetting={resetting2fa}
+              onConfirm={handleReset2fa}
+              onClose={() => setReset2faConfirm(null)}
+            />
           )}
 
-          {/* API Tokens */}
-          <section class={styles.section}>
-            <div class={styles.sectionHeader}>
-              <h2 class={styles.sectionTitle}>API Tokens</h2>
-              <Button variant="primary" onClick={() => setShowCreateToken(true)}>
-                <Key size={14} aria-hidden="true" /> Create Token
-              </Button>
-            </div>
-
-            {newTokenValue && (
-              <div class={styles.tokenBanner} role="alert">
-                <p class={styles.tokenBannerLabel}>Copy your new token -- it won't be shown again:</p>
-                <div class={styles.tokenRow}>
-                  <code class={styles.tokenValue}>{newTokenValue}</code>
-                  <button type="button" class={styles.iconButton} onClick={() => { navigator.clipboard.writeText(newTokenValue); }} aria-label="Copy token">
-                    <Copy size={14} aria-hidden="true" />
-                  </button>
-                </div>
-                <Button variant="ghost" onClick={() => setNewTokenValue('')}>Dismiss</Button>
-              </div>
-            )}
-
-            {showCreateToken && (
-              <div class={styles.card}>
-                <label htmlFor="token-name" class={formStyles.label}>Token Name</label>
-                <input id="token-name" class={formStyles.input} value={tokenName} onInput={e => setTokenName((e.target as HTMLInputElement).value)} placeholder="CI/CD pipeline" />
-                <div class={styles.cardActions}>
-                  <Button variant="ghost" onClick={() => setShowCreateToken(false)}>Cancel</Button>
-                  <Button variant="primary" onClick={handleCreateToken} loading={submitting} disabled={!tokenName.trim()}>Create</Button>
-                </div>
-              </div>
-            )}
-
-            <div class={styles.tableCard}>
-              <table class={styles.table}>
-                <thead>
-                  <tr class={styles.tableRow}>
-                    <th class={styles.th}>Name</th>
-                    <th class={styles.th}>Prefix</th>
-                    <th class={styles.th}>Last Used</th>
-                    <th class={styles.th}>Expires</th>
-                    <th class={styles.th}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tokens.map(t => (
-                    <tr key={t.id} class={styles.tableRow}>
-                      <td class={styles.td}>{t.name}</td>
-                      <td class={styles.tdMono}>{t.prefix}...</td>
-                      <td class={styles.tdMuted}>{t.last_used_at ? formatRelativeTime(t.last_used_at) : 'Never'}</td>
-                      <td class={styles.tdMuted}>{t.expires_at ? new Date(t.expires_at).toLocaleDateString() : 'Never'}</td>
-                      <td class={styles.td}>
-                        <button type="button" onClick={() => handleRevokeToken(t.id)} class={styles.iconButton} aria-label={`Revoke ${t.name}`}>
-                          <Trash2 size={14} aria-hidden="true" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {tokens.length === 0 && (
-                    <tr>
-                      <td class={styles.emptyRow} colSpan={5}>No API tokens yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <ApiTokensSection
+            tokens={tokens}
+            newTokenValue={newTokenValue}
+            onCreateToken={handleCreateToken}
+            onRevokeToken={handleRevokeToken}
+            onDismissNewToken={() => setNewTokenValue('')}
+          />
         </>
       )}
     </div>

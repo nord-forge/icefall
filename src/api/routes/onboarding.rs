@@ -16,7 +16,7 @@ const STEPS: &[&str] = &[
     "first_deploy",
 ];
 
-const OPTIONAL_STEPS: &[&str] = &["base_domain", "git_provider"];
+const OPTIONAL_STEPS: &[&str] = &["base_domain", "git_provider", "first_app", "first_deploy"];
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -155,7 +155,7 @@ async fn run_server_check(
     checks.push(serde_json::json!({
         "id": "caddy", "name": "Caddy",
         "status": if caddy_ok { "pass" } else { "warn" },
-        "message": if caddy_ok { "Running" } else { "Not reachable — HTTPS won't work" },
+        "message": if caddy_ok { "Running" } else { "Not reachable. HTTPS won't work" },
     }));
 
     let metrics = state.server_metrics.read().await;
@@ -255,6 +255,7 @@ async fn create_first_app(
             image_ref: None,
             compose_content: None,
             deploy_mode: None,
+            server_id: None,
         })
         .await?;
 

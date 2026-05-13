@@ -98,14 +98,14 @@ export default function UptimeTimeline({ appId }: Props) {
             key={i}
             onMouseEnter={() => setHoveredIdx(i)}
             class={`${styles.segment} ${SEGMENT_STYLES[status] || styles.segmentNone}`}
-            title={`${new Date(now - rangeMs + i * segmentMs).toLocaleString()} — ${status}`}
+            title={`${new Date(now - rangeMs + i * segmentMs).toLocaleString()} - ${status}`}
           />
         ))}
       </div>
 
       {hoveredIdx !== null && (
         <div class={styles.tooltip}>
-          {new Date(now - rangeMs + hoveredIdx * segmentMs).toLocaleString()} — {segments[hoveredIdx]}
+          {new Date(now - rangeMs + hoveredIdx * segmentMs).toLocaleString()} - {segments[hoveredIdx]}
         </div>
       )}
     </div>

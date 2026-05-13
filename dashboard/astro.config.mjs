@@ -1,4 +1,3 @@
-// @ts-check
 import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
 import node from '@astrojs/node';
@@ -36,8 +35,8 @@ export default defineConfig({
           target: 'http://localhost:3001',
           changeOrigin: true,
           ws: true,
-          configure: (proxy) => {
-            proxy.on('proxyRes', (proxyRes) => {
+          configure: (/** @type {any} */ proxy) => {
+            proxy.on('proxyRes', (/** @type {any} */ proxyRes) => {
               if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
                 proxyRes.headers['cache-control'] = 'no-cache';
                 proxyRes.headers['x-accel-buffering'] = 'no';

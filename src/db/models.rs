@@ -58,8 +58,10 @@ pub struct NewApp {
     pub image_ref: Option<String>,
     pub compose_content: Option<String>,
     pub deploy_mode: Option<String>,
+    pub server_id: Option<String>,
 }
 
+#[derive(Default)]
 pub struct UpdateApp {
     pub name: Option<String>,
     pub git_repo: Option<String>,
@@ -412,7 +414,7 @@ pub struct UpdateHistoryEntry {
 
 // --- Servers ---
 
-pub const CONTROL_PLANE_SERVER_ID: &str = "00000000-0000-0000-0000-000000000001";
+pub const CONTROL_PLANE_SERVER_ID: &str = "cp_ctrl_0000000001";
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Server {
@@ -478,10 +480,36 @@ pub struct NewServerMetricsRecord {
     pub load_average: Option<String>,
 }
 
+// --- Audit Log ---
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AuditLogEntry {
+    pub id: String,
+    pub server_id: Option<String>,
+    pub user_id: Option<String>,
+    pub action: String,
+    pub details: String,
+    pub ip_address: Option<String>,
+    pub created_at: String,
+}
+
+pub struct NewAuditLogEntry {
+    pub server_id: Option<String>,
+    pub user_id: Option<String>,
+    pub action: String,
+    pub details: serde_json::Value,
+    pub ip_address: Option<String>,
+}
+
 pub fn now_iso8601() -> String {
     Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
 pub fn new_id() -> String {
-    uuid::Uuid::now_v7().to_string()
+    use rand::Rng;
+    let mut rng = rand::rng();
+    let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    (0..20)
+        .map(|_| chars[rng.random_range(0..chars.len())] as char)
+        .collect()
 }

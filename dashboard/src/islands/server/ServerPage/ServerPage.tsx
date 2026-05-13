@@ -131,7 +131,7 @@ export default function ServerPage() {
       {!loading && !status && (
         <div class={styles.emptyState}>
           <p class={styles.emptyTitle}>Unable to reach server</p>
-          <p class={styles.emptyHint}>Make sure the Icefall daemon is running.</p>
+          <p class={styles.emptyHint}>Make sure the Icefall daemon is running. Check <a href="/servers" data-astro-prefetch="hover">server status</a> for details.</p>
         </div>
       )}
 

@@ -207,12 +207,179 @@
   margin-top: var(--space-5);
 }
 
+.navigationEnd {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+}
+
 .cancelLink {
   text-decoration: none;
 }
 
+/* One-click services */
+.oneClickSection {
+  margin-top: var(--space-6);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.dividerLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.searchWrapper {
+  position: relative;
+  margin-bottom: var(--space-4);
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.searchInput:focus {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.serviceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.serviceCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: inherit;
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+
+.serviceCard:hover {
+  border-color: var(--color-primary);
+}
+
+.serviceCard:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.serviceCard:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.serviceName {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.serviceIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 2px;
+}
+
+.serviceIcon svg {
+  display: block;
+}
+
+.serviceDescription {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.deployingDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  animation: pulse 1s var(--ease-out) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.noResults {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-4);
+}
+
 @media (max-width: 640px) {
   .sourceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .serviceGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .serviceGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -224,5 +391,13 @@
 
   .sourceCard {
     transition: none;
+  }
+
+  .serviceCard {
+    transition: none;
+  }
+
+  .deployingDot {
+    animation: none;
   }
 }
