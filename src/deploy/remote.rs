@@ -103,6 +103,7 @@ impl RemoteExecutor {
 
     // --- Build ---
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_build(
         &self,
         repo_url: &str,

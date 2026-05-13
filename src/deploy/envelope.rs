@@ -54,7 +54,7 @@ pub fn encrypt_env_vars(
         .map_err(|e| DeployError::EnvelopeEncrypt(format!("AES encryption failed: {e}")))?;
 
     let key_fingerprint = {
-        let hash = Sha256::digest(&server_pub_bytes);
+        let hash = Sha256::digest(server_pub_bytes);
         format!("sha256:{}", hex::encode(&hash[..8]))
     };
 
