@@ -299,4 +299,202 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         let config = IcefallConfig::default();
         assert!(config.validate().is_err());
     }
+
+    // --- ContainerRuntime::from_socket() ---
+
+    #[test]
+    fn from_socket_podman_path_returns_podman() {
+        let runtime = ContainerRuntime::from_socket("/run/podman/podman.sock");
+        assert_eq!(runtime, ContainerRuntime::Podman);
+    }
+
+    #[test]
+    fn from_socket_docker_path_returns_docker() {
+        let runtime = ContainerRuntime::from_socket("/var/run/docker.sock");
+        assert_eq!(runtime, ContainerRuntime::Docker);
+    }
+
+    #[test]
+    fn from_socket_unknown_path_defaults_to_docker() {
+        let runtime = ContainerRuntime::from_socket("/some/random/path.sock");
+        assert_eq!(runtime, ContainerRuntime::Docker);
+    }
+
+    #[test]
+    fn from_socket_podman_in_alternate_location() {
+        let runtime = ContainerRuntime::from_socket("/var/run/podman/podman.sock");
+        assert_eq!(runtime, ContainerRuntime::Podman);
+    }
+
+    // --- ContainerRuntime::default_socket() ---
+
+    #[test]
+    fn docker_default_socket() {
+        assert_eq!(
+            ContainerRuntime::Docker.default_socket(),
+            "/var/run/docker.sock"
+        );
+    }
+
+    #[test]
+    fn podman_default_socket() {
+        assert_eq!(
+            ContainerRuntime::Podman.default_socket(),
+            "/run/podman/podman.sock"
+        );
+    }
+
+    // --- ContainerRuntime::compose_command() ---
+
+    #[test]
+    fn docker_compose_command() {
+        assert_eq!(ContainerRuntime::Docker.compose_command(), "docker compose");
+    }
+
+    #[test]
+    fn podman_compose_command() {
+        assert_eq!(ContainerRuntime::Podman.compose_command(), "podman compose");
+    }
+
+    // --- ContainerRuntime Display ---
+
+    #[test]
+    fn docker_display() {
+        assert_eq!(format!("{}", ContainerRuntime::Docker), "docker");
+    }
+
+    #[test]
+    fn podman_display() {
+        assert_eq!(format!("{}", ContainerRuntime::Podman), "podman");
+    }
+
+    // --- ContainerRuntime Default ---
+
+    #[test]
+    fn default_runtime_is_docker() {
+        assert_eq!(ContainerRuntime::default(), ContainerRuntime::Docker);
+    }
+
+    // --- apply_env_overrides() ---
+
+    /// Helper to clean up env vars that apply_env_overrides reads, preventing
+    /// cross-test interference when tests run in parallel.
+    fn clear_icefall_env_vars() {
+        for var in &[
+            "ICEFALL_LISTEN_ADDR",
+            "ICEFALL_PORT",
+            "ICEFALL_DATA_DIR",
+            "ICEFALL_SQLITE_PATH",
+            "ICEFALL_CONTAINER_SOCKET",
+            "ICEFALL_DOCKER_SOCKET",
+            "ICEFALL_RUNTIME",
+            "ICEFALL_CADDY_URL",
+            "ICEFALL_BASE_DOMAIN",
+            "ICEFALL_ENCRYPTION_KEY",
+            "ICEFALL_LOG_LEVEL",
+            "ICEFALL_PID_FILE",
+        ] {
+            std::env::remove_var(var);
+        }
+    }
+
+    #[test]
+    fn env_override_runtime_podman() {
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+
+        std::env::set_var("ICEFALL_RUNTIME", "podman");
+        config.apply_env_overrides();
+        std::env::remove_var("ICEFALL_RUNTIME");
+
+        assert_eq!(config.runtime, ContainerRuntime::Podman);
+        assert_eq!(config.container_socket, "/run/podman/podman.sock");
+    }
+
+    #[test]
+    fn env_override_runtime_docker() {
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+        // First set to podman so we can verify docker override works
+        config.runtime = ContainerRuntime::Podman;
+        config.container_socket = defaults::container_socket();
+
+        std::env::set_var("ICEFALL_RUNTIME", "docker");
+        config.apply_env_overrides();
+        std::env::remove_var("ICEFALL_RUNTIME");
+
+        assert_eq!(config.runtime, ContainerRuntime::Docker);
+    }
+
+    #[test]
+    fn env_override_container_socket() {
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+        let custom_socket = "/custom/podman.sock";
+
+        std::env::set_var("ICEFALL_CONTAINER_SOCKET", custom_socket);
+        config.apply_env_overrides();
+        std::env::remove_var("ICEFALL_CONTAINER_SOCKET");
+
+        assert_eq!(config.container_socket, custom_socket);
+        // The socket contains "podman", so runtime should be Podman
+        assert_eq!(config.runtime, ContainerRuntime::Podman);
+    }
+
+    #[test]
+    fn env_override_port() {
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+
+        std::env::set_var("ICEFALL_PORT", "9090");
+        config.apply_env_overrides();
+        std::env::remove_var("ICEFALL_PORT");
+
+        assert_eq!(config.listen_port, 9090);
+    }
+
+    #[test]
+    fn env_override_port_invalid_ignored() {
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+        let original_port = config.listen_port;
+
+        std::env::set_var("ICEFALL_PORT", "not-a-number");
+        config.apply_env_overrides();
+        std::env::remove_var("ICEFALL_PORT");
+
+        assert_eq!(config.listen_port, original_port);
+    }
+
+    #[test]
+    fn env_override_data_dir() {
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+
+        std::env::set_var("ICEFALL_DATA_DIR", "/tmp/icefall-test");
+        config.apply_env_overrides();
+        std::env::remove_var("ICEFALL_DATA_DIR");
+
+        assert_eq!(config.data_dir, PathBuf::from("/tmp/icefall-test"));
+    }
+
+    // --- ContainerRuntime serde ---
+
+    #[test]
+    fn runtime_serializes_as_lowercase() {
+        let docker_json = serde_json::to_string(&ContainerRuntime::Docker).unwrap();
+        assert_eq!(docker_json, "\"docker\"");
+
+        let podman_json = serde_json::to_string(&ContainerRuntime::Podman).unwrap();
+        assert_eq!(podman_json, "\"podman\"");
+    }
+
+    #[test]
+    fn runtime_deserializes_from_lowercase() {
+        let docker: ContainerRuntime = serde_json::from_str("\"docker\"").unwrap();
+        assert_eq!(docker, ContainerRuntime::Docker);
+
+        let podman: ContainerRuntime = serde_json::from_str("\"podman\"").unwrap();
+        assert_eq!(podman, ContainerRuntime::Podman);
+    }
 }
