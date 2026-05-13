@@ -44,11 +44,15 @@ pub async fn run_build(ctx: &HandlerContext, params: Value) -> Result<Value, Han
     match result {
         Ok(image_tag) => {
             let duration = start.elapsed().as_secs_f64();
-            send_event(ctx, "build.complete", serde_json::json!({
-                "deploy_id": p.deploy_id,
-                "image_tag": image_tag,
-                "duration_secs": duration,
-            }));
+            send_event(
+                ctx,
+                "build.complete",
+                serde_json::json!({
+                    "deploy_id": p.deploy_id,
+                    "image_tag": image_tag,
+                    "duration_secs": duration,
+                }),
+            );
             info!(deploy = %p.deploy_id, tag = %image_tag, duration = %format!("{duration:.1}s"), "build complete");
             Ok(serde_json::json!({
                 "image_tag": image_tag,
@@ -56,10 +60,14 @@ pub async fn run_build(ctx: &HandlerContext, params: Value) -> Result<Value, Han
             }))
         }
         Err(e) => {
-            send_event(ctx, "build.failed", serde_json::json!({
-                "deploy_id": p.deploy_id,
-                "error": e.to_string(),
-            }));
+            send_event(
+                ctx,
+                "build.failed",
+                serde_json::json!({
+                    "deploy_id": p.deploy_id,
+                    "error": e.to_string(),
+                }),
+            );
             Err(e)
         }
     }
@@ -72,7 +80,14 @@ async fn execute_build(
 ) -> Result<String, HandlerError> {
     // Step 1: Clone
     send_step(ctx, &p.deploy_id, "cloning", "running");
-    clone_repo(&p.repo_url, p.branch.as_deref(), p.sha.as_deref(), p.token.as_deref(), build_dir).await?;
+    clone_repo(
+        &p.repo_url,
+        p.branch.as_deref(),
+        p.sha.as_deref(),
+        p.token.as_deref(),
+        build_dir,
+    )
+    .await?;
     send_step(ctx, &p.deploy_id, "cloning", "done");
 
     // Step 2: Detect
@@ -80,14 +95,18 @@ async fn execute_build(
     let detection = detect(build_dir, p.config.as_ref())
         .map_err(|e| HandlerError::Other(format!("detection failed: {e}")))?;
 
-    send_event(ctx, "build.step", serde_json::json!({
-        "deploy_id": p.deploy_id,
-        "step": "detecting",
-        "status": "done",
-        "framework": detection.framework.to_string(),
-        "package_manager": detection.package_manager.to_string(),
-        "node_version": detection.node_version,
-    }));
+    send_event(
+        ctx,
+        "build.step",
+        serde_json::json!({
+            "deploy_id": p.deploy_id,
+            "step": "detecting",
+            "status": "done",
+            "framework": detection.framework.to_string(),
+            "package_manager": detection.package_manager.to_string(),
+            "node_version": detection.node_version,
+        }),
+    );
 
     // Step 3: Generate Dockerfile
     send_step(ctx, &p.deploy_id, "generating", "running");
@@ -126,10 +145,14 @@ async fn execute_build(
         if let Some(ref stream_text) = info.stream {
             let trimmed = stream_text.trim();
             if !trimmed.is_empty() {
-                send_event(ctx, "build.output", serde_json::json!({
-                    "deploy_id": p.deploy_id,
-                    "line": trimmed,
-                }));
+                send_event(
+                    ctx,
+                    "build.output",
+                    serde_json::json!({
+                        "deploy_id": p.deploy_id,
+                        "line": trimmed,
+                    }),
+                );
             }
         }
 
@@ -188,7 +211,10 @@ async fn clone_repo(
     let output = cmd.output().await?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(HandlerError::Other(format!("git clone failed: {}", stderr.trim())));
+        return Err(HandlerError::Other(format!(
+            "git clone failed: {}",
+            stderr.trim()
+        )));
     }
 
     if let Some(sha) = sha {
@@ -200,7 +226,10 @@ async fn clone_repo(
 
         if !fetch.status.success() {
             let stderr = String::from_utf8_lossy(&fetch.stderr);
-            return Err(HandlerError::Other(format!("git fetch failed: {}", stderr.trim())));
+            return Err(HandlerError::Other(format!(
+                "git fetch failed: {}",
+                stderr.trim()
+            )));
         }
 
         let checkout = tokio::process::Command::new("git")
@@ -211,7 +240,10 @@ async fn clone_repo(
 
         if !checkout.status.success() {
             let stderr = String::from_utf8_lossy(&checkout.stderr);
-            return Err(HandlerError::Other(format!("git checkout failed: {}", stderr.trim())));
+            return Err(HandlerError::Other(format!(
+                "git checkout failed: {}",
+                stderr.trim()
+            )));
         }
     }
 
@@ -219,8 +251,16 @@ async fn clone_repo(
 }
 
 const IGNORE_DIRS: &[&str] = &[
-    "node_modules", ".git", ".next", ".nuxt", ".output",
-    "target", ".turbo", ".cache", "coverage", "dist",
+    "node_modules",
+    ".git",
+    ".next",
+    ".nuxt",
+    ".output",
+    "target",
+    ".turbo",
+    ".cache",
+    "coverage",
+    "dist",
 ];
 
 fn create_build_context(project_dir: &Path) -> Result<Bytes, HandlerError> {

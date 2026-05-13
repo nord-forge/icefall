@@ -105,8 +105,8 @@ pub fn decrypt_env_vars(
         .decrypt(nonce, ciphertext.as_ref())
         .map_err(|_| "unable to decrypt environment variables".to_string())?;
 
-    let env_vars: Vec<String> = serde_json::from_slice(&plaintext)
-        .map_err(|e| format!("invalid env var format: {e}"))?;
+    let env_vars: Vec<String> =
+        serde_json::from_slice(&plaintext).map_err(|e| format!("invalid env var format: {e}"))?;
 
     Ok(env_vars)
 }

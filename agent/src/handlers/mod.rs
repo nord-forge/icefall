@@ -28,7 +28,12 @@ pub enum HandlerError {
     Other(String),
 }
 
-pub async fn dispatch(ctx: &HandlerContext, id: String, method: &str, params: Value) -> AgentMessage {
+pub async fn dispatch(
+    ctx: &HandlerContext,
+    id: String,
+    method: &str,
+    params: Value,
+) -> AgentMessage {
     let result = match method {
         "container.create" => docker::container_create(ctx, params).await,
         "container.start" => docker::container_start(ctx, params).await,

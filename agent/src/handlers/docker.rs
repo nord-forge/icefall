@@ -100,18 +100,18 @@ pub async fn container_create(ctx: &HandlerContext, params: Value) -> Result<Val
         })
         .collect();
 
-    let restart_policy =
-        p.restart_policy
-            .as_deref()
-            .map(|policy| bollard::models::RestartPolicy {
-                name: Some(match policy {
-                    "always" => bollard::models::RestartPolicyNameEnum::ALWAYS,
-                    "unless-stopped" => bollard::models::RestartPolicyNameEnum::UNLESS_STOPPED,
-                    "on-failure" => bollard::models::RestartPolicyNameEnum::ON_FAILURE,
-                    _ => bollard::models::RestartPolicyNameEnum::NO,
-                }),
-                maximum_retry_count: None,
-            });
+    let restart_policy = p
+        .restart_policy
+        .as_deref()
+        .map(|policy| bollard::models::RestartPolicy {
+            name: Some(match policy {
+                "always" => bollard::models::RestartPolicyNameEnum::ALWAYS,
+                "unless-stopped" => bollard::models::RestartPolicyNameEnum::UNLESS_STOPPED,
+                "on-failure" => bollard::models::RestartPolicyNameEnum::ON_FAILURE,
+                _ => bollard::models::RestartPolicyNameEnum::NO,
+            }),
+            maximum_retry_count: None,
+        });
 
     let host_config = HostConfig {
         port_bindings: Some(port_bindings),
@@ -291,19 +291,23 @@ pub async fn image_build(ctx: &HandlerContext, params: Value) -> Result<Value, H
         options.dockerfile = df.clone();
     }
 
-    let mut stream = ctx
-        .docker
-        .build_image(options, None, Some(bollard::body_full(context_bytes.into())));
+    let mut stream = ctx.docker.build_image(
+        options,
+        None,
+        Some(bollard::body_full(context_bytes.into())),
+    );
 
     while let Some(result) = stream.next().await {
         let info = result?;
         if let Some(ref stream_text) = info.stream {
             let trimmed = stream_text.trim();
             if !trimmed.is_empty() {
-                let _ = ctx.event_tx.send(icefall_common::protocol::AgentMessage::Event {
-                    event_type: "build.output".to_string(),
-                    data: serde_json::json!({ "line": trimmed }),
-                });
+                let _ = ctx
+                    .event_tx
+                    .send(icefall_common::protocol::AgentMessage::Event {
+                        event_type: "build.output".to_string(),
+                        data: serde_json::json!({ "line": trimmed }),
+                    });
             }
         }
     }
@@ -337,14 +341,22 @@ pub async fn volume_remove(ctx: &HandlerContext, params: Value) -> Result<Value,
     let p: VolumeNameParams =
         serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
 
-    ctx.docker.remove_volume(&p.name, None::<bollard::query_parameters::RemoveVolumeOptions>).await?;
+    ctx.docker
+        .remove_volume(
+            &p.name,
+            None::<bollard::query_parameters::RemoveVolumeOptions>,
+        )
+        .await?;
 
     info!(name = %p.name, "volume removed");
     Ok(serde_json::json!({ "ok": true }))
 }
 
 pub async fn volume_list(ctx: &HandlerContext, _params: Value) -> Result<Value, HandlerError> {
-    let volumes = ctx.docker.list_volumes(None::<bollard::query_parameters::ListVolumesOptions>).await?;
+    let volumes = ctx
+        .docker
+        .list_volumes(None::<bollard::query_parameters::ListVolumesOptions>)
+        .await?;
 
     let result: Vec<Value> = volumes
         .volumes

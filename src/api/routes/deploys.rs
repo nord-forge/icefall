@@ -281,7 +281,10 @@ async fn create_deploy(
                         Ok(e) => e,
                         Err(e) => {
                             tracing::error!("Cannot reach server for deploy {deploy_id}: {e}");
-                            let _ = state.db.update_deploy_status(&deploy_id, "failed", Some(&e.to_string())).await;
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
                             return;
                         }
                     };
@@ -295,24 +298,35 @@ async fn create_deploy(
                     };
 
                     let timeout = std::time::Duration::from_secs(
-                        build_config.as_ref().and_then(|c| c.build_timeout_secs).unwrap_or(state.config.build_timeout_secs),
+                        build_config
+                            .as_ref()
+                            .and_then(|c| c.build_timeout_secs)
+                            .unwrap_or(state.config.build_timeout_secs),
                     );
 
-                    let config_json = build_config.as_ref().and_then(|c| serde_json::to_value(c).ok());
+                    let config_json = build_config
+                        .as_ref()
+                        .and_then(|c| serde_json::to_value(c).ok());
 
-                    match executor.run_build(
-                        git_repo,
-                        &app_clone.git_branch,
-                        &deploy_id,
-                        &app_clone.name,
-                        &[],
-                        config_json.as_ref(),
-                        timeout,
-                    ).await {
+                    match executor
+                        .run_build(
+                            git_repo,
+                            &app_clone.git_branch,
+                            &deploy_id,
+                            &app_clone.name,
+                            &[],
+                            config_json.as_ref(),
+                            timeout,
+                        )
+                        .await
+                    {
                         Ok(tag) => tag,
                         Err(e) => {
                             tracing::error!("Remote build failed for {deploy_id}: {e}");
-                            let _ = state.db.update_deploy_status(&deploy_id, "failed", Some(&e.to_string())).await;
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
                             return;
                         }
                     }
@@ -325,7 +339,10 @@ async fn create_deploy(
                         state.config.clone(),
                     );
 
-                    match orchestrator.build(&deploy_id, &app_clone, build_config).await {
+                    match orchestrator
+                        .build(&deploy_id, &app_clone, build_config)
+                        .await
+                    {
                         Ok(result) => result.image_ref,
                         Err(e) => {
                             tracing::error!("Build failed for deploy {deploy_id}: {e}");

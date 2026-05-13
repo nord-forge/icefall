@@ -114,8 +114,8 @@ fn find_route_index(routes: &[CaddyRoute], domain: &str) -> Option<usize> {
 }
 
 pub async fn add_route(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: AddRouteParams = serde_json::from_value(params)
-        .map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
+    let p: AddRouteParams =
+        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
 
     let route = reverse_proxy_route(&p.domain, p.path.as_deref(), &p.upstream);
     let url = routes_url(&ctx.caddy_url);
@@ -123,7 +123,9 @@ pub async fn add_route(ctx: &HandlerContext, params: Value) -> Result<Value, Han
     let response = ctx.http.post(&url).json(&route).send().await?;
     if !response.status().is_success() {
         let body = response.text().await.unwrap_or_default();
-        return Err(HandlerError::Other(format!("caddy add_route failed: {body}")));
+        return Err(HandlerError::Other(format!(
+            "caddy add_route failed: {body}"
+        )));
     }
 
     info!(domain = %p.domain, upstream = %p.upstream, "caddy route added");
@@ -131,8 +133,8 @@ pub async fn add_route(ctx: &HandlerContext, params: Value) -> Result<Value, Han
 }
 
 pub async fn update_route(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: UpdateRouteParams = serde_json::from_value(params)
-        .map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
+    let p: UpdateRouteParams =
+        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
 
     let routes = get_routes(ctx).await?;
     let index = find_route_index(&routes, &p.domain)
@@ -144,7 +146,9 @@ pub async fn update_route(ctx: &HandlerContext, params: Value) -> Result<Value, 
     let response = ctx.http.put(&url).json(&route).send().await?;
     if !response.status().is_success() {
         let body = response.text().await.unwrap_or_default();
-        return Err(HandlerError::Other(format!("caddy update_route failed: {body}")));
+        return Err(HandlerError::Other(format!(
+            "caddy update_route failed: {body}"
+        )));
     }
 
     info!(domain = %p.domain, upstream = %p.upstream, "caddy route updated");
@@ -152,8 +156,8 @@ pub async fn update_route(ctx: &HandlerContext, params: Value) -> Result<Value, 
 }
 
 pub async fn remove_route(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: RemoveRouteParams = serde_json::from_value(params)
-        .map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
+    let p: RemoveRouteParams =
+        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
 
     let routes = get_routes(ctx).await?;
     let index = find_route_index(&routes, &p.domain)
@@ -164,7 +168,9 @@ pub async fn remove_route(ctx: &HandlerContext, params: Value) -> Result<Value, 
     let response = ctx.http.delete(&url).send().await?;
     if !response.status().is_success() {
         let body = response.text().await.unwrap_or_default();
-        return Err(HandlerError::Other(format!("caddy remove_route failed: {body}")));
+        return Err(HandlerError::Other(format!(
+            "caddy remove_route failed: {body}"
+        )));
     }
 
     info!(domain = %p.domain, "caddy route removed");

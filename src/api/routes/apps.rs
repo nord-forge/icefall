@@ -339,10 +339,7 @@ async fn migrate_app(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
 
-    let current_server_id = app
-        .server_id
-        .as_deref()
-        .unwrap_or(CONTROL_PLANE_SERVER_ID);
+    let current_server_id = app.server_id.as_deref().unwrap_or(CONTROL_PLANE_SERVER_ID);
 
     if body.target_server_id == current_server_id {
         return Err(ApiError::BadRequest(
@@ -395,7 +392,10 @@ async fn migrate_app(
 
     let mut warnings = Vec::new();
     if app.volumes.as_ref().is_some_and(|v| !v.is_empty()) {
-        warnings.push("Volumes are not migrated. Data on the source server's volumes will remain there.".to_string());
+        warnings.push(
+            "Volumes are not migrated. Data on the source server's volumes will remain there."
+                .to_string(),
+        );
     }
 
     tokio::spawn(async move {
@@ -457,19 +457,54 @@ async fn migrate_app(
                     Ok(e) => e,
                     Err(e) => {
                         tracing::error!("Migration build failed: {e}");
-                        let _ = state.db.update_deploy_status(&deploy_id, "failed", Some(&e.to_string())).await;
-                        let _ = state.db.update_app(&app.id, &UpdateApp { server_id: Some(Some(source_server_id)), ..Default::default() }).await;
+                        let _ = state
+                            .db
+                            .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                            .await;
+                        let _ = state
+                            .db
+                            .update_app(
+                                &app.id,
+                                &UpdateApp {
+                                    server_id: Some(Some(source_server_id)),
+                                    ..Default::default()
+                                },
+                            )
+                            .await;
                         return;
                     }
                 };
 
                 let timeout = std::time::Duration::from_secs(state.config.build_timeout_secs);
-                match executor.run_build(&git_repo, &target_app.git_branch, &deploy_id, &target_app.name, &[], None, timeout).await {
+                match executor
+                    .run_build(
+                        &git_repo,
+                        &target_app.git_branch,
+                        &deploy_id,
+                        &target_app.name,
+                        &[],
+                        None,
+                        timeout,
+                    )
+                    .await
+                {
                     Ok(tag) => tag,
                     Err(e) => {
                         tracing::error!("Migration build failed: {e}");
-                        let _ = state.db.update_deploy_status(&deploy_id, "failed", Some(&e.to_string())).await;
-                        let _ = state.db.update_app(&app.id, &UpdateApp { server_id: Some(Some(source_server_id)), ..Default::default() }).await;
+                        let _ = state
+                            .db
+                            .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                            .await;
+                        let _ = state
+                            .db
+                            .update_app(
+                                &app.id,
+                                &UpdateApp {
+                                    server_id: Some(Some(source_server_id)),
+                                    ..Default::default()
+                                },
+                            )
+                            .await;
                         return;
                     }
                 }
@@ -484,8 +519,20 @@ async fn migrate_app(
                     Ok(result) => result.image_ref,
                     Err(e) => {
                         tracing::error!("Migration build failed: {e}");
-                        let _ = state.db.update_deploy_status(&deploy_id, "failed", Some(&e.to_string())).await;
-                        let _ = state.db.update_app(&app.id, &UpdateApp { server_id: Some(Some(source_server_id)), ..Default::default() }).await;
+                        let _ = state
+                            .db
+                            .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                            .await;
+                        let _ = state
+                            .db
+                            .update_app(
+                                &app.id,
+                                &UpdateApp {
+                                    server_id: Some(Some(source_server_id)),
+                                    ..Default::default()
+                                },
+                            )
+                            .await;
                         return;
                     }
                 }
@@ -499,18 +546,39 @@ async fn migrate_app(
         };
 
         let env_clone = env.clone();
-        if let Err(e) = manager.deploy(&updated_deploy, &target_app, &env_clone, &image_ref).await {
+        if let Err(e) = manager
+            .deploy(&updated_deploy, &target_app, &env_clone, &image_ref)
+            .await
+        {
             tracing::error!("Migration deploy failed: {e}");
-            let _ = state.db.update_deploy_status(&deploy_id, "failed", Some(&e.to_string())).await;
+            let _ = state
+                .db
+                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                .await;
             // Revert server_id on failure
-            let _ = state.db.update_app(&app.id, &UpdateApp { server_id: Some(Some(source_server_id)), ..Default::default() }).await;
+            let _ = state
+                .db
+                .update_app(
+                    &app.id,
+                    &UpdateApp {
+                        server_id: Some(Some(source_server_id)),
+                        ..Default::default()
+                    },
+                )
+                .await;
             return;
         }
 
         // Success — stop containers on source server
         if source_server_id != CONTROL_PLANE_SERVER_ID {
             if let Ok(source_exec) = manager.make_remote_executor(&source_server_id).await {
-                let _ = source_exec.remove_caddy_route(&format!("{}.{}", app.name, state.config.base_domain.as_deref().unwrap_or(""))).await;
+                let _ = source_exec
+                    .remove_caddy_route(&format!(
+                        "{}.{}",
+                        app.name,
+                        state.config.base_domain.as_deref().unwrap_or("")
+                    ))
+                    .await;
             }
         }
 

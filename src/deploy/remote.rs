@@ -71,12 +71,7 @@ impl RemoteExecutor {
         debug!(server = %self.server_id, method, timeout_secs = timeout.as_secs(), "remote call (custom timeout)");
         let response = self
             .registry
-            .send_request_with_timeout(
-                &self.server_id,
-                method.to_string(),
-                params,
-                timeout,
-            )
+            .send_request_with_timeout(&self.server_id, method.to_string(), params, timeout)
             .await
             .map_err(|e| {
                 if e.contains("not connected") {
@@ -133,14 +128,13 @@ impl RemoteExecutor {
     // --- Container operations ---
 
     pub async fn create_network(&self, name: &str) -> Result<(), DeployError> {
-        let _ = self.call("network.create", serde_json::json!({ "name": name })).await;
+        let _ = self
+            .call("network.create", serde_json::json!({ "name": name }))
+            .await;
         Ok(())
     }
 
-    pub async fn create_container(
-        &self,
-        params: serde_json::Value,
-    ) -> Result<String, DeployError> {
+    pub async fn create_container(&self, params: serde_json::Value) -> Result<String, DeployError> {
         let result = self.call("container.create", params).await?;
         result["id"]
             .as_str()
@@ -178,13 +172,8 @@ impl RemoteExecutor {
         &self,
         _label: &str,
     ) -> Result<Vec<serde_json::Value>, DeployError> {
-        let result = self
-            .call("container.list", serde_json::json!({}))
-            .await?;
-        let containers = result["containers"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let result = self.call("container.list", serde_json::json!({})).await?;
+        let containers = result["containers"].as_array().cloned().unwrap_or_default();
         Ok(containers)
     }
 
@@ -210,11 +199,7 @@ impl RemoteExecutor {
 
     // --- Caddy routes ---
 
-    pub async fn add_caddy_route(
-        &self,
-        domain: &str,
-        upstream: &str,
-    ) -> Result<(), DeployError> {
+    pub async fn add_caddy_route(&self, domain: &str, upstream: &str) -> Result<(), DeployError> {
         self.call(
             "caddy.add_route",
             serde_json::json!({ "domain": domain, "upstream": upstream }),

@@ -106,12 +106,8 @@ async fn collect_and_send(ctx: &HandlerContext, sys: &mut System) {
                         .and_then(|u| u.total_usage)
                         .unwrap_or(0) as f64;
 
-                let system_delta = cpu_stats
-                    .and_then(|c| c.system_cpu_usage)
-                    .unwrap_or(0) as f64
-                    - precpu_stats
-                        .and_then(|c| c.system_cpu_usage)
-                        .unwrap_or(0) as f64;
+                let system_delta = cpu_stats.and_then(|c| c.system_cpu_usage).unwrap_or(0) as f64
+                    - precpu_stats.and_then(|c| c.system_cpu_usage).unwrap_or(0) as f64;
 
                 let num_cpus = cpu_stats.and_then(|c| c.online_cpus).unwrap_or(1);
 

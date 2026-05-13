@@ -141,10 +141,7 @@ async fn run_http_check(check: &HealthCheck) -> bool {
         .unwrap_or_default();
 
     let port = config.get("port").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
-    let path = config
-        .get("path")
-        .and_then(|v| v.as_str())
-        .unwrap_or("/");
+    let path = config.get("path").and_then(|v| v.as_str()).unwrap_or("/");
 
     let url = format!("http://127.0.0.1:{port}{path}");
     let client = reqwest::Client::builder()

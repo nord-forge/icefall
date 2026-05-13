@@ -20,7 +20,12 @@ pub async fn update(_ctx: &HandlerContext, params: Value) -> Result<Value, Handl
         return Ok(serde_json::json!({ "status": "up_to_date", "version": current }));
     }
 
-    info!(from = current, to = version, target, "agent update requested");
+    info!(
+        from = current,
+        to = version,
+        target,
+        "agent update requested"
+    );
 
     let download_url = params["download_url"].as_str();
     let sha256 = params["sha256"].as_str();
@@ -77,7 +82,10 @@ async fn download_and_apply(url: &str, expected_sha256: &str, version: &str) -> 
         ));
     }
 
-    info!(size = bytes.len(), version, "download verified, applying update");
+    info!(
+        size = bytes.len(),
+        version, "download verified, applying update"
+    );
 
     std::fs::write(&new_path, &bytes).map_err(|e| format!("writing new binary failed: {e}"))?;
 
@@ -92,8 +100,7 @@ async fn download_and_apply(url: &str, expected_sha256: &str, version: &str) -> 
         let _ = std::fs::copy(&binary_path, &prev_path);
     }
 
-    std::fs::rename(&new_path, &binary_path)
-        .map_err(|e| format!("atomic rename failed: {e}"))?;
+    std::fs::rename(&new_path, &binary_path).map_err(|e| format!("atomic rename failed: {e}"))?;
 
     info!("agent binary replaced, systemd will restart");
     Ok(())

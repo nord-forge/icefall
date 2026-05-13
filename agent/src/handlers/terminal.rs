@@ -89,7 +89,11 @@ pub async fn open(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerE
     let (stdin_tx, mut stdin_rx) = tokio::sync::mpsc::unbounded_channel::<bytes::Bytes>();
 
     let reader_handle = tokio::spawn(async move {
-        if let bollard::exec::StartExecResults::Attached { mut output, mut input } = start_result {
+        if let bollard::exec::StartExecResults::Attached {
+            mut output,
+            mut input,
+        } = start_result
+        {
             let mut shutdown_stdin = false;
 
             loop {

@@ -58,9 +58,7 @@ impl DeployManager {
         let registry = self
             .agent_registry
             .as_ref()
-            .ok_or_else(|| {
-                DeployError::AgentOffline("agent registry not available".to_string())
-            })?
+            .ok_or_else(|| DeployError::AgentOffline("agent registry not available".to_string()))?
             .clone();
 
         let server = self
@@ -68,9 +66,7 @@ impl DeployManager {
             .get_server(server_id)
             .await
             .map_err(|e| DeployError::RemoteOp(e.to_string()))?
-            .ok_or_else(|| {
-                DeployError::AgentOffline(format!("server {server_id} not found"))
-            })?;
+            .ok_or_else(|| DeployError::AgentOffline(format!("server {server_id} not found")))?;
 
         if server.status != "online" {
             return Err(DeployError::AgentOffline(format!(
@@ -131,7 +127,9 @@ impl DeployManager {
 
         let network_name = format!("icefall-{}", app.name);
         match &remote {
-            Some(exec) => { let _ = exec.create_network(&network_name).await; }
+            Some(exec) => {
+                let _ = exec.create_network(&network_name).await;
+            }
             None => {
                 if let Err(e) = self.docker.create_network(&network_name).await {
                     tracing::debug!("Network {network_name} may already exist: {e}");
@@ -167,7 +165,9 @@ impl DeployManager {
         // Container creation: local vs remote
         let container_id = match &remote {
             Some(exec) => {
-                let env_payload: serde_json::Value = if let Some(ref pub_key) = exec.server_public_key {
+                let env_payload: serde_json::Value = if let Some(ref pub_key) =
+                    exec.server_public_key
+                {
                     let envelope = crate::deploy::envelope::encrypt_env_vars(&env_vars, pub_key)?;
                     serde_json::to_value(&envelope).unwrap_or_default()
                 } else {
@@ -198,7 +198,10 @@ impl DeployManager {
                         .await
                     {
                         Ok(sidecar_id) => {
-                            tracing::info!("S3 sidecar {sidecar_id} started for bucket {}", s3_cfg.bucket);
+                            tracing::info!(
+                                "S3 sidecar {sidecar_id} started for bucket {}",
+                                s3_cfg.bucket
+                            );
                             app_volumes.push(VolumeMount {
                                 source: s3_mount::s3_volume_name(&app.name, i),
                                 target: s3_cfg.target.clone(),
@@ -206,7 +209,10 @@ impl DeployManager {
                             });
                         }
                         Err(e) => {
-                            tracing::error!("Failed to start S3 sidecar for bucket {}: {e}", s3_cfg.bucket);
+                            tracing::error!(
+                                "Failed to start S3 sidecar for bucket {}: {e}",
+                                s3_cfg.bucket
+                            );
                         }
                     }
                 }
@@ -257,13 +263,14 @@ impl DeployManager {
 
         // Health check: local vs remote
         let health_result = match &remote {
-            Some(exec) => exec
-                .health_check(
+            Some(exec) => {
+                exec.health_check(
                     detected_port,
                     self.config.health_check_attempts,
                     self.config.health_check_interval_ms,
                 )
-                .await,
+                .await
+            }
             None => {
                 let host_port = self.get_host_port(&container_id, detected_port).await?;
                 wait_for_healthy(
@@ -351,14 +358,25 @@ impl DeployManager {
                 // Remote Caddy routing: two modes
                 // - Wildcard (*.base_domain): CP Caddy proxies to worker_host:host_port
                 // - Direct (custom domain): worker Caddy handles TLS + routing
-                let host_port = self.get_remote_host_port(exec, &container_id, detected_port).await?;
+                let host_port = self
+                    .get_remote_host_port(exec, &container_id, detected_port)
+                    .await?;
                 let worker_upstream = format!("{}:{}", exec.server_host, host_port);
 
                 for (domain, _path) in &domains {
-                    let is_wildcard = self.config.base_domain.as_ref().is_some_and(|bd| domain.ends_with(bd));
+                    let is_wildcard = self
+                        .config
+                        .base_domain
+                        .as_ref()
+                        .is_some_and(|bd| domain.ends_with(bd));
 
                     if is_wildcard {
-                        if self.caddy.update_route(domain, &worker_upstream).await.is_err() {
+                        if self
+                            .caddy
+                            .update_route(domain, &worker_upstream)
+                            .await
+                            .is_err()
+                        {
                             self.caddy
                                 .add_route(domain, &worker_upstream)
                                 .await
@@ -366,7 +384,11 @@ impl DeployManager {
                         }
                     } else {
                         let local_upstream = format!("localhost:{host_port}");
-                        if exec.update_caddy_route(domain, &local_upstream).await.is_err() {
+                        if exec
+                            .update_caddy_route(domain, &local_upstream)
+                            .await
+                            .is_err()
+                        {
                             exec.add_caddy_route(domain, &local_upstream)
                                 .await
                                 .map_err(|e| DeployError::RouteUpdate(e.to_string()))?;
@@ -594,7 +616,10 @@ impl DeployManager {
         app: &App,
         current_deploy_id: &str,
     ) {
-        let containers = match exec.list_containers_by_label(&format!("icefall.app={}", app.id)).await {
+        let containers = match exec
+            .list_containers_by_label(&format!("icefall.app={}", app.id))
+            .await
+        {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!("Failed to list remote containers: {e}");
@@ -624,8 +649,14 @@ impl DeployManager {
                 continue;
             }
 
-            tracing::info!("Stopping old remote container {} for app {}", c_id, app.name);
-            let _ = exec.stop_container(&c_id, self.config.deploy_stop_timeout_secs).await;
+            tracing::info!(
+                "Stopping old remote container {} for app {}",
+                c_id,
+                app.name
+            );
+            let _ = exec
+                .stop_container(&c_id, self.config.deploy_stop_timeout_secs)
+                .await;
             let _ = exec.remove_container(&c_id).await;
         }
     }

@@ -600,10 +600,7 @@ async fn update_all_agents(
     let servers = state.db.list_servers().await?;
     let current = env!("CARGO_PKG_VERSION");
     let update_state = state.db.get_update_state().await?;
-    let latest = update_state
-        .available_version
-        .as_deref()
-        .unwrap_or(current);
+    let latest = update_state.available_version.as_deref().unwrap_or(current);
 
     let mut updated = 0u32;
     let mut skipped = 0u32;
@@ -697,8 +694,5 @@ fi
 echo ""
 echo "Icefall agent uninstalled. Docker and Caddy were not removed."
 "#;
-    (
-        [("content-type", "text/x-shellscript")],
-        script.to_string(),
-    )
+    ([("content-type", "text/x-shellscript")], script.to_string())
 }

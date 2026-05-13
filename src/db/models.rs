@@ -509,5 +509,7 @@ pub fn new_id() -> String {
     use rand::Rng;
     let mut rng = rand::rng();
     let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    (0..20).map(|_| chars[rng.random_range(0..chars.len())] as char).collect()
+    (0..20)
+        .map(|_| chars[rng.random_range(0..chars.len())] as char)
+        .collect()
 }
