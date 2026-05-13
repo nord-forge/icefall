@@ -28,10 +28,19 @@ async fn get_health(
     Query(params): Query<HealthQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let checks = state.db.get_health_checks(&id).await?;
+    let check_ids: Vec<String> = checks.iter().map(|c| c.id.clone()).collect();
+    let all_events = state
+        .db
+        .get_health_events_for_checks(&check_ids, params.limit)
+        .await?;
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(checks.len());
     for check in &checks {
-        let events = state.db.get_health_events(&check.id, params.limit).await?;
+        let events: Vec<_> = all_events
+            .iter()
+            .filter(|e| e.health_check_id == check.id)
+            .cloned()
+            .collect();
         let uptime = calculate_uptime(&events);
         let current_status = events.first().map_or("unknown", |e| e.status.as_str());
 
