@@ -371,9 +371,8 @@ async fn try_use_backup_code(
 ) -> Result<bool, ApiError> {
     use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
 
-    let backup_json = match user.totp_backup_codes.as_deref() {
-        Some(json) => json,
-        None => return Ok(false),
+    let Some(backup_json) = user.totp_backup_codes.as_deref() else {
+        return Ok(false);
     };
 
     let mut entries: Vec<serde_json::Value> =
@@ -382,19 +381,20 @@ async fn try_use_backup_code(
     let code_upper = code.to_uppercase();
 
     for entry in entries.iter_mut() {
-        let used = entry.get("used").and_then(|v| v.as_bool()).unwrap_or(true);
+        let used = entry
+            .get("used")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(true);
         if used {
             continue;
         }
 
-        let hash_str = match entry.get("hash").and_then(|v| v.as_str()) {
-            Some(h) => h,
-            None => continue,
+        let Some(hash_str) = entry.get("hash").and_then(|v| v.as_str()) else {
+            continue;
         };
 
-        let parsed = match PasswordHash::new(hash_str) {
-            Ok(h) => h,
-            Err(_) => continue,
+        let Ok(parsed) = PasswordHash::new(hash_str) else {
+            continue;
         };
 
         if Argon2::default()
@@ -445,6 +445,9 @@ async fn create_2fa_session(
         session.id
     );
     let mut headers = axum::http::HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).unwrap());
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     Ok((headers, Json(body)).into_response())
 }

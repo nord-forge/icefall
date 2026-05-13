@@ -102,8 +102,7 @@ async fn verify_domain(
         Ok(resolved_ips) => {
             let verified = server_ip
                 .as_ref()
-                .map(|ip| resolved_ips.iter().any(|r| &r.to_string() == ip))
-                .unwrap_or(false);
+                .is_some_and(|ip| resolved_ips.iter().any(|r| &r.to_string() == ip));
 
             if verified {
                 state
@@ -156,12 +155,12 @@ async fn verify_domain(
 
                 Ok(Json(serde_json::json!({
                     "verified": true,
-                    "resolved_ips": resolved_ips.iter().map(|ip| ip.to_string()).collect::<Vec<_>>(),
+                    "resolved_ips": resolved_ips.iter().map(std::string::ToString::to_string).collect::<Vec<_>>(),
                 })))
             } else {
                 Ok(Json(serde_json::json!({
                     "verified": false,
-                    "resolved_ips": resolved_ips.iter().map(|ip| ip.to_string()).collect::<Vec<_>>(),
+                    "resolved_ips": resolved_ips.iter().map(std::string::ToString::to_string).collect::<Vec<_>>(),
                     "expected_ip": server_ip,
                     "error": "DNS is not pointing to this server. Update your A record."
                 })))

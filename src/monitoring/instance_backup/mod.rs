@@ -68,9 +68,8 @@ pub fn spawn_instance_backup_scheduler(db: Arc<dyn Database>, handle: Arc<Instan
         loop {
             tokio::time::sleep(Duration::from_secs(CHECK_INTERVAL_SECS)).await;
 
-            let config = match db.get_instance_backup_config().await {
-                Ok(Some(c)) => c,
-                _ => continue,
+            let Ok(Some(config)) = db.get_instance_backup_config().await else {
+                continue;
             };
 
             if !config.enabled {

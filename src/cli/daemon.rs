@@ -26,23 +26,17 @@ pub async fn stop() {
     };
 
     let pid_file = &config.pid_file;
-    let pid_str = match std::fs::read_to_string(pid_file) {
-        Ok(s) => s,
-        Err(_) => {
-            eprintln!(
-                "No PID file found at {}. Is the daemon running?",
-                pid_file.display()
-            );
-            std::process::exit(1);
-        }
+    let Ok(pid_str) = std::fs::read_to_string(pid_file) else {
+        eprintln!(
+            "No PID file found at {}. Is the daemon running?",
+            pid_file.display()
+        );
+        std::process::exit(1);
     };
 
-    let pid: i32 = match pid_str.trim().parse() {
-        Ok(p) => p,
-        Err(_) => {
-            eprintln!("Invalid PID file contents");
-            std::process::exit(1);
-        }
+    let Ok(pid): Result<i32, _> = pid_str.trim().parse() else {
+        eprintln!("Invalid PID file contents");
+        std::process::exit(1);
     };
 
     let pid = nix::unistd::Pid::from_raw(pid);
@@ -65,20 +59,14 @@ pub async fn status() {
     };
 
     let pid_file = &config.pid_file;
-    let pid_str = match std::fs::read_to_string(pid_file) {
-        Ok(s) => s,
-        Err(_) => {
-            println!("Daemon is not running (no PID file)");
-            return;
-        }
+    let Ok(pid_str) = std::fs::read_to_string(pid_file) else {
+        println!("Daemon is not running (no PID file)");
+        return;
     };
 
-    let pid: i32 = match pid_str.trim().parse() {
-        Ok(p) => p,
-        Err(_) => {
-            println!("Daemon is not running (invalid PID file)");
-            return;
-        }
+    let Ok(pid): Result<i32, _> = pid_str.trim().parse() else {
+        println!("Daemon is not running (invalid PID file)");
+        return;
     };
 
     let pid = nix::unistd::Pid::from_raw(pid);

@@ -73,8 +73,8 @@ impl EventBus {
         let event = IcefallEvent {
             id: self.next_id.fetch_add(1, Ordering::Relaxed),
             timestamp: now_iso8601(),
-            app_id: app_id.map(|s| s.to_string()),
-            deploy_id: deploy_id.map(|s| s.to_string()),
+            app_id: app_id.map(std::string::ToString::to_string),
+            deploy_id: deploy_id.map(std::string::ToString::to_string),
             event_type,
             data,
         };

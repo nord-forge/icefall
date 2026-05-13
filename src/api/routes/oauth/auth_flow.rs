@@ -75,12 +75,10 @@ pub(super) async fn oauth_authorize(
     store_pkce(&state_token, &code_verifier).await;
 
     // Build the callback URL
-    let base = state
-        .config
-        .base_domain
-        .as_deref()
-        .map(|d| format!("https://{d}"))
-        .unwrap_or_else(|| "http://localhost:3000".to_string());
+    let base = state.config.base_domain.as_deref().map_or_else(
+        || "http://localhost:3000".to_string(),
+        |d| format!("https://{d}"),
+    );
     let redirect_uri = format!("{base}/api/v1/auth/oauth/{provider}/callback");
 
     // Build authorization URL
@@ -161,12 +159,10 @@ pub(super) async fn oauth_callback(
             ApiError::BadRequest(format!("OAuth provider '{provider}' is not configured"))
         })?;
 
-    let base = state
-        .config
-        .base_domain
-        .as_deref()
-        .map(|d| format!("https://{d}"))
-        .unwrap_or_else(|| "http://localhost:3000".to_string());
+    let base = state.config.base_domain.as_deref().map_or_else(
+        || "http://localhost:3000".to_string(),
+        |d| format!("https://{d}"),
+    );
     let redirect_uri = format!("{base}/api/v1/auth/oauth/{provider}/callback");
 
     // Exchange code for access token
@@ -302,7 +298,10 @@ pub(super) async fn oauth_callback(
         session.id
     );
     let mut headers = HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).unwrap());
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     headers.insert("location", HeaderValue::from_static("/"));
 
     Ok((axum::http::StatusCode::TEMPORARY_REDIRECT, headers).into_response())

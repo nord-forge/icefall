@@ -125,7 +125,7 @@ pub async fn export(output: &str, dry_run: bool) {
     });
     std::fs::write(
         staging.join(MANIFEST_FILE),
-        serde_json::to_string_pretty(&manifest).unwrap(),
+        serde_json::to_string_pretty(&manifest).unwrap_or_default(),
     )
     .ok();
 
@@ -142,14 +142,20 @@ pub async fn export(output: &str, dry_run: bool) {
         std::process::exit(1);
     });
 
-    let encoder = archive.into_inner().unwrap();
-    encoder.finish().unwrap();
+    let encoder = archive.into_inner().unwrap_or_else(|e| {
+        eprintln!("Failed to finalize archive: {e}");
+        std::process::exit(1);
+    });
+    encoder.finish().unwrap_or_else(|e| {
+        eprintln!("Failed to compress archive: {e}");
+        std::process::exit(1);
+    });
 
     let checksum = sha256_file(output_path);
     let checksum_path = format!("{local_output}.sha256");
     std::fs::write(&checksum_path, format!("{checksum}  {local_output}\n")).ok();
 
-    let size = std::fs::metadata(output_path).map(|m| m.len()).unwrap_or(0);
+    let size = std::fs::metadata(output_path).map_or(0, |m| m.len());
 
     if is_s3 {
         println!();

@@ -81,7 +81,10 @@ async fn setup_admin(
         session.id
     );
     let mut headers = HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).unwrap());
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     Ok((headers, Json(body)).into_response())
 }
 
@@ -121,7 +124,10 @@ async fn login(
         session.id
     );
     let mut headers = HeaderMap::new();
-    headers.insert("set-cookie", HeaderValue::from_str(&cookie).unwrap());
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(|e| ApiError::Internal(Box::new(e)))?,
+    );
     Ok((headers, Json(body)).into_response())
 }
 
@@ -185,9 +191,8 @@ fn hash_password(password: &str) -> Result<String, ApiError> {
 
 fn verify_password(password: &str, hash: &str) -> bool {
     use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
-    let parsed = match PasswordHash::new(hash) {
-        Ok(h) => h,
-        Err(_) => return false,
+    let Ok(parsed) = PasswordHash::new(hash) else {
+        return false;
     };
     Argon2::default()
         .verify_password(password.as_bytes(), &parsed)
@@ -238,14 +243,12 @@ pub async fn authenticate_from_headers(
         }
     }
 
-    let session_id = match extract_session_id(headers) {
-        Some(id) => id,
-        None => return Ok(None),
+    let Some(session_id) = extract_session_id(headers) else {
+        return Ok(None);
     };
 
-    let session = match state.db.get_session(&session_id).await? {
-        Some(s) => s,
-        None => return Ok(None),
+    let Some(session) = state.db.get_session(&session_id).await? else {
+        return Ok(None);
     };
 
     if session.expires_at < crate::db::models::now_iso8601() {

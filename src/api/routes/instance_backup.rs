@@ -45,16 +45,15 @@ async fn update_config(
     let current = state.db.get_instance_backup_config().await?;
     let enabled = body
         .enabled
-        .unwrap_or_else(|| current.as_ref().map(|c| c.enabled).unwrap_or(false));
+        .unwrap_or_else(|| current.as_ref().is_some_and(|c| c.enabled));
     let cron_schedule = body.cron_schedule.unwrap_or_else(|| {
         current
             .as_ref()
-            .map(|c| c.cron_schedule.clone())
-            .unwrap_or_else(|| "daily".to_string())
+            .map_or_else(|| "daily".to_string(), |c| c.cron_schedule.clone())
     });
     let retention_count = body
         .retention_count
-        .unwrap_or_else(|| current.as_ref().map(|c| c.retention_count).unwrap_or(7));
+        .unwrap_or_else(|| current.as_ref().map_or(7, |c| c.retention_count));
 
     // Validate schedule
     if !["daily", "weekly", "monthly"].contains(&cron_schedule.as_str()) {

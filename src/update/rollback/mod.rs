@@ -32,9 +32,8 @@ impl UpdateRollback {
 
     pub fn needs_rollback(&self) -> bool {
         let marker_path = self.data_dir.join("updates").join("pending_update");
-        let content = match std::fs::read_to_string(&marker_path) {
-            Ok(c) => c,
-            Err(_) => return false,
+        let Ok(content) = std::fs::read_to_string(&marker_path) else {
+            return false;
         };
 
         let marker: PendingUpdate = match serde_json::from_str(&content) {

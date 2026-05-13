@@ -115,9 +115,8 @@ pub fn spawn_metrics_collector(
             })
             .await;
 
-            let snapshot = match snapshot {
-                Ok(s) => s,
-                Err(_) => continue,
+            let Ok(snapshot) = snapshot else {
+                continue;
             };
 
             let snap = history.record(&snapshot).await;

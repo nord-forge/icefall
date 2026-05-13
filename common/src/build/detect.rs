@@ -63,14 +63,11 @@ fn detect_framework(dir: &Path) -> Framework {
         return Framework::Dockerfile;
     }
 
-    let pkg = match parse_package_json(dir) {
-        Some(pkg) => pkg,
-        None => {
-            if has_file(dir, "index.html") {
-                return Framework::StaticSite;
-            }
+    let Some(pkg) = parse_package_json(dir) else {
+        if has_file(dir, "index.html") {
             return Framework::StaticSite;
         }
+        return Framework::StaticSite;
     };
 
     if has_dependency(&pkg, "astro")

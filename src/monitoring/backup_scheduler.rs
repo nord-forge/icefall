@@ -94,7 +94,7 @@ impl BackupStore {
             .into_iter()
             .flatten()
             .flatten()
-            .filter(|e| e.path().extension().map(|ext| ext == "gz").unwrap_or(false))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "gz"))
             .collect();
 
         entries.sort_by_key(|b| std::cmp::Reverse(b.file_name()));
@@ -110,7 +110,7 @@ impl BackupStore {
             .into_iter()
             .flatten()
             .flatten()
-            .filter(|e| e.path().extension().map(|ext| ext == "gz").unwrap_or(false))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "gz"))
             .filter_map(|e| {
                 let meta = e.metadata().ok()?;
                 let name = e.file_name().to_string_lossy().to_string();
@@ -167,9 +167,8 @@ pub fn spawn_backup_scheduler(
         loop {
             tokio::time::sleep(Duration::from_secs(3600)).await;
 
-            let managed_dbs = match db.list_managed_dbs().await {
-                Ok(dbs) => dbs,
-                Err(_) => continue,
+            let Ok(managed_dbs) = db.list_managed_dbs().await else {
+                continue;
             };
 
             for mdb in &managed_dbs {

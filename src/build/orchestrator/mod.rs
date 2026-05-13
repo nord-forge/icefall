@@ -311,7 +311,12 @@ impl BuildOrchestrator {
     }
 
     async fn fail_deploy(&self, deploy_id: &str, output: &[String]) {
-        let tail: Vec<&str> = output.iter().rev().take(50).map(|s| s.as_str()).collect();
+        let tail: Vec<&str> = output
+            .iter()
+            .rev()
+            .take(50)
+            .map(std::string::String::as_str)
+            .collect();
         let log = tail.into_iter().rev().collect::<Vec<_>>().join("\n");
         let _ = self
             .db
@@ -320,9 +325,8 @@ impl BuildOrchestrator {
     }
 
     async fn collect_secrets(&self, deploy_id: &str) -> Vec<String> {
-        let deploy = match self.db.get_deploy(deploy_id).await {
-            Ok(Some(d)) => d,
-            _ => return Vec::new(),
+        let Ok(Some(deploy)) = self.db.get_deploy(deploy_id).await else {
+            return Vec::new();
         };
 
         match self.db.get_env_vars(&deploy.environment_id).await {

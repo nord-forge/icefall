@@ -48,7 +48,10 @@ pub async fn list(app: &str) {
             for d in &domains {
                 let domain = d.get("domain").and_then(|v| v.as_str()).unwrap_or("?");
                 let ssl = d.get("ssl_status").and_then(|v| v.as_str()).unwrap_or("-");
-                let verified = d.get("verified").and_then(|v| v.as_bool()).unwrap_or(false);
+                let verified = d
+                    .get("verified")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false);
                 println!(
                     "{:<30} {:<10} {}",
                     domain,

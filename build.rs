@@ -9,16 +9,20 @@ fn main() {
         .output()
         .ok()
         .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_else(|| "unknown".into());
+        .map_or_else(
+            || "unknown".into(),
+            |o| String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        );
 
     let build_date = Command::new("date")
         .args(["-u", "+%Y-%m-%d"])
         .output()
         .ok()
         .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_else(|| "unknown".into());
+        .map_or_else(
+            || "unknown".into(),
+            |o| String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        );
 
     println!("cargo:rustc-env=ICEFALL_GIT_COMMIT={commit}");
     println!("cargo:rustc-env=ICEFALL_BUILD_DATE={build_date}");

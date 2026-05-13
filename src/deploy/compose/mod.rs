@@ -104,20 +104,17 @@ impl ComposeDeployer {
         let mut results = Vec::new();
 
         for service_name in &order {
-            let service = match compose.services.get(service_name) {
-                Some(s) => s,
-                None => continue,
+            let Some(service) = compose.services.get(service_name) else {
+                continue;
             };
 
-            let image = match &service.image {
-                Some(img) => img.clone(),
-                None => {
-                    tracing::warn!(
-                        "Skipping service '{service_name}': no image specified (build directive not supported in compose MVP)"
-                    );
-                    continue;
-                }
+            let Some(image) = &service.image else {
+                tracing::warn!(
+                    "Skipping service '{service_name}': no image specified (build directive not supported in compose MVP)"
+                );
+                continue;
             };
+            let image = image.clone();
 
             // Pull the image
             let (img_name, img_tag) = parse_image_ref(&image);
@@ -166,8 +163,14 @@ impl ComposeDeployer {
             let app_label = format!("icefall.app={}", app.id);
             if let Ok(containers) = self.docker.list_containers(Some(&app_label)).await {
                 for c in containers {
-                    if c.labels.get("icefall.service").map(|s| s.as_str()) == Some(service_name)
-                        && c.labels.get("icefall.compose").map(|s| s.as_str()) == Some("true")
+                    if c.labels
+                        .get("icefall.service")
+                        .map(std::string::String::as_str)
+                        == Some(service_name)
+                        && c.labels
+                            .get("icefall.compose")
+                            .map(std::string::String::as_str)
+                            == Some("true")
                     {
                         let _ = self.docker.stop_container(&c.id, Some(5)).await;
                         let _ = self.docker.remove_container(&c.id, true).await;
@@ -238,7 +241,12 @@ impl ComposeDeployer {
         let containers = self.docker.list_containers(Some(&label)).await?;
 
         for container in containers {
-            if container.labels.get("icefall.compose").map(|s| s.as_str()) == Some("true") {
+            if container
+                .labels
+                .get("icefall.compose")
+                .map(std::string::String::as_str)
+                == Some("true")
+            {
                 let _ = self.docker.stop_container(&container.id, Some(10)).await;
                 let _ = self.docker.remove_container(&container.id, true).await;
             }

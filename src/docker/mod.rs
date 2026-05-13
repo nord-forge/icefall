@@ -66,8 +66,7 @@ impl DockerClient {
                 c.iter()
                     .find(|comp| comp.name.to_lowercase().contains("podman"))
             })
-            .map(|_| "podman".to_string())
-            .unwrap_or_else(|| "docker".to_string());
+            .map_or_else(|| "docker".to_string(), |_| "podman".to_string());
 
         Ok(RuntimeInfo {
             name: runtime_name,

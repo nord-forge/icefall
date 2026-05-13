@@ -75,25 +75,22 @@ pub fn spawn_metrics_collector(
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
 
-            let apps = match db.list_apps().await {
-                Ok(a) => a,
-                Err(_) => continue,
+            let Ok(apps) = db.list_apps().await else {
+                continue;
             };
 
             for app in &apps {
                 let label = format!("icefall.app={}", app.id);
-                let containers = match docker.list_containers(Some(&label)).await {
-                    Ok(c) => c,
-                    Err(_) => continue,
+                let Ok(containers) = docker.list_containers(Some(&label)).await else {
+                    continue;
                 };
 
                 let running: Vec<&ContainerInfo> =
                     containers.iter().filter(|c| c.state == "running").collect();
 
                 for container in running {
-                    let stats = match docker.get_stats(&container.id).await {
-                        Ok(s) => s,
-                        Err(_) => continue,
+                    let Ok(stats) = docker.get_stats(&container.id).await else {
+                        continue;
                     };
 
                     metrics_store.record(&app.id, stats.clone()).await;

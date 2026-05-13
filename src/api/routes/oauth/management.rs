@@ -112,12 +112,10 @@ pub(super) async fn get_oauth_settings(
 
     let settings = state.db.get_oauth_settings().await?;
 
-    let base = state
-        .config
-        .base_domain
-        .as_deref()
-        .map(|d| format!("https://{d}"))
-        .unwrap_or_else(|| "http://localhost:3000".to_string());
+    let base = state.config.base_domain.as_deref().map_or_else(
+        || "http://localhost:3000".to_string(),
+        |d| format!("https://{d}"),
+    );
 
     match settings {
         Some(s) => Ok(Json(serde_json::json!({
@@ -197,12 +195,10 @@ pub(super) async fn update_oauth_settings(
 
     state.db.upsert_oauth_settings(&updated).await?;
 
-    let base = state
-        .config
-        .base_domain
-        .as_deref()
-        .map(|d| format!("https://{d}"))
-        .unwrap_or_else(|| "http://localhost:3000".to_string());
+    let base = state.config.base_domain.as_deref().map_or_else(
+        || "http://localhost:3000".to_string(),
+        |d| format!("https://{d}"),
+    );
 
     Ok(Json(serde_json::json!({
         "data": {

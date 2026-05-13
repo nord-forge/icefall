@@ -121,7 +121,7 @@ impl RemoteExecutor {
         let result = self.call_with_timeout("build.run", params, timeout).await?;
         result["image_tag"]
             .as_str()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .ok_or_else(|| DeployError::RemoteBuild("no image_tag in response".to_string()))
     }
 
@@ -138,7 +138,7 @@ impl RemoteExecutor {
         let result = self.call("container.create", params).await?;
         result["id"]
             .as_str()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .ok_or_else(|| DeployError::ContainerCreate("no container id in response".to_string()))
     }
 

@@ -249,8 +249,7 @@ pub async fn stop_s3_sidecars(docker: &DockerClient, app_id: &str) {
         let is_sidecar = container
             .labels
             .get("icefall.s3-sidecar")
-            .map(|v| v == "true")
-            .unwrap_or(false);
+            .is_some_and(|v| v == "true");
 
         if !is_sidecar {
             continue;

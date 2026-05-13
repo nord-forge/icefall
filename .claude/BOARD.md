@@ -6,14 +6,14 @@
 
 ## Backlog — Priority Order
 
-**Now (Podman support):**
-1. IF-205 — Container runtime research (**DONE** — recommendation: Docker default + Podman opt-in)
-2. IF-206 — Podman runtime support (config, install detection, CI)
-3. IF-207 — Podman reference docs (commands, config, differences, setup, migration)
+**Now (Rust quality):**
+1. IF-156 — Rust code quality audit
+2. IF-207 — Podman reference docs (commands, config, differences, setup, migration)
 
-**Next (Rust quality — can run parallel with Podman docs):**
-4. IF-153 — Split sqlite.rs
-5. IF-156 — Rust code quality audit
+**Next (Rust quality continued):**
+3. IF-155 — Rust performance audit
+4. IF-157 — Error type consolidation
+5. IF-158 — Test coverage expansion
 
 **Then (Parity gaps):**
 6. IF-174 — GitHub App integration (largest, start early)
@@ -30,7 +30,7 @@
 
 | Ticket | Title | Assignee | Started |
 |--------|-------|----------|---------|
-| IF-206 | Podman runtime support | — | 2026-05-13 |
+| IF-156 | Rust code quality audit | — | 2026-05-13 |
 
 ---
 
@@ -291,9 +291,9 @@
 ### Phase 23 — Rust Quality & Performance
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-205](tickets/phase-23-rust-quality/IF-205-container-runtime-research.md) | **Container runtime research** | — | **BLOCKER** — Docker vs Podman vs containerd evaluation, benchmarks, recommendation |
-| [IF-153](tickets/phase-23-rust-quality/IF-153-sqlite-module-split.md) | Split sqlite.rs into domain modules | — | 2204 lines / 128 functions → 16 sub-modules under src/db/sqlite/ |
-| [IF-154](tickets/phase-23-rust-quality/IF-154-large-file-splits.md) | Split remaining large Rust files | — | 11 files over 500 lines → directory modules |
+| [IF-205](tickets/phase-23-rust-quality/IF-205-container-runtime-research.md) | **Container runtime research** | 2026-05-13 | Docker default + Podman opt-in recommendation |
+| [IF-153](tickets/phase-23-rust-quality/IF-153-sqlite-module-split.md) | Split sqlite.rs into domain modules | 2026-05-13 | 22 files split into directory modules, 119 tests pass |
+| [IF-154](tickets/phase-23-rust-quality/IF-154-large-file-splits.md) | Split remaining large Rust files | 2026-05-13 | 22 files over 400 lines → directory modules across 3 phases |
 | [IF-155](tickets/phase-23-rust-quality/IF-155-performance-audit.md) | Rust performance audit | — | Allocation hotspots, async bottlenecks, query efficiency, criterion benchmarks |
 | [IF-156](tickets/phase-23-rust-quality/IF-156-rust-code-quality-audit.md) | Rust code quality audit | — | Safety, error handling, idiomatic patterns, unwrap audit |
 | [IF-157](tickets/phase-23-rust-quality/IF-157-error-type-consolidation.md) | Error type consolidation | — | Consolidate error enums, preserve context, consistent API error shape |
@@ -318,7 +318,7 @@
 | [IF-172](tickets/phase-24-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | — | Caddy L4 TCP proxy for external DB access, IP whitelist |
 | [IF-173](tickets/phase-24-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | — | Pass-through to docker compose, advanced users |
 | [IF-174](tickets/phase-24-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | — | Auto webhooks, PR status checks, PR comments, repo browser |
-| [IF-206](tickets/phase-24-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | — | Config + install detection, bollard socket swap, CI smoke tests |
+| [IF-206](tickets/phase-24-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | 2026-05-13 | Config + install detection, bollard socket swap, CI smoke tests |
 
 ### Phase 25 — Icefall+ Differentiators
 | Ticket | Title | Completed | Notes |
@@ -370,8 +370,8 @@
 | Metric | Count |
 |--------|-------|
 | Total tickets | 202 |
-| Done | 141 |
-| Backlog | 61 |
+| Done | 144 |
+| Backlog | 57 |
 | Superseded | 1 |
 | Phases complete | 19 / 27 |
 
@@ -398,8 +398,8 @@
 | 18 — UX Polish | **Done** | 11/11 |
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
-| 23 — Rust Quality | Backlog | 0/7 |
-| 24 — Parity Gaps | Backlog | 0/17 |
+| 23 — Rust Quality | **In Progress** | 3/7 |
+| 24 — Parity Gaps | **In Progress** | 1/17 |
 | 25 — Icefall+ | Backlog | 0/20 |
 | 26 — MCP Expansion | Backlog | 0/3 |
 | 27 — Comprehensive Docs | Backlog | 0/8 |

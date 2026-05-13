@@ -69,9 +69,10 @@ pub async fn rollback(yes: bool) {
 }
 
 pub async fn rollback_check() {
-    let data_dir = std::env::var("ICEFALL_DATA_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::path::PathBuf::from("/var/lib/icefall"));
+    let data_dir = std::env::var("ICEFALL_DATA_DIR").map_or_else(
+        |_| std::path::PathBuf::from("/var/lib/icefall"),
+        std::path::PathBuf::from,
+    );
 
     let rb = crate::update::rollback::UpdateRollback::new(&data_dir);
     let exit_code = rb.check_and_rollback();

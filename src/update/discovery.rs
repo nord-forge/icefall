@@ -65,12 +65,9 @@ impl UpdateChecker {
         let releases = self.fetch_releases().await?;
 
         // 2. Find the latest matching release (filter by channel / prerelease flag)
-        let release = match Self::find_matching_release(&releases, channel) {
-            Some(r) => r,
-            None => {
-                debug!("no matching release found for channel '{channel}'");
-                return Ok(None);
-            }
+        let Some(release) = Self::find_matching_release(&releases, channel) else {
+            debug!("no matching release found for channel '{channel}'");
+            return Ok(None);
         };
 
         debug!(
@@ -79,12 +76,9 @@ impl UpdateChecker {
         );
 
         // 3. Download manifest JSON from release assets
-        let manifest_url = match Self::find_asset(&release.assets, "manifest.json") {
-            Some(url) => url,
-            None => {
-                warn!("release {} has no manifest.json asset", release.tag_name);
-                return Ok(None);
-            }
+        let Some(manifest_url) = Self::find_asset(&release.assets, "manifest.json") else {
+            warn!("release {} has no manifest.json asset", release.tag_name);
+            return Ok(None);
         };
 
         let manifest_bytes = self
@@ -99,15 +93,12 @@ impl UpdateChecker {
         let manifest = ReleaseManifest::from_bytes(&manifest_bytes)?;
 
         // 4. Download manifest signature from release assets
-        let signature_url = match Self::find_asset(&release.assets, "manifest.json.sig") {
-            Some(url) => url,
-            None => {
-                warn!(
-                    "release {} has no manifest.json.sig asset",
-                    release.tag_name
-                );
-                return Ok(None);
-            }
+        let Some(signature_url) = Self::find_asset(&release.assets, "manifest.json.sig") else {
+            warn!(
+                "release {} has no manifest.json.sig asset",
+                release.tag_name
+            );
+            return Ok(None);
         };
 
         let signature_b64 = self
