@@ -275,6 +275,7 @@
 ### Phase 23 — Rust Quality & Performance
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
+| [IF-205](tickets/phase-23-rust-quality/IF-205-container-runtime-research.md) | **Container runtime research** | — | **BLOCKER** — Docker vs Podman vs containerd evaluation, benchmarks, recommendation |
 | [IF-153](tickets/phase-23-rust-quality/IF-153-sqlite-module-split.md) | Split sqlite.rs into domain modules | — | 2204 lines / 128 functions → 16 sub-modules under src/db/sqlite/ |
 | [IF-154](tickets/phase-23-rust-quality/IF-154-large-file-splits.md) | Split remaining large Rust files | — | 11 files over 500 lines → directory modules |
 | [IF-155](tickets/phase-23-rust-quality/IF-155-performance-audit.md) | Rust performance audit | — | Allocation hotspots, async bottlenecks, query efficiency, criterion benchmarks |
@@ -350,9 +351,9 @@
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 199 |
+| Total tickets | 200 |
 | Done | 141 |
-| Backlog | 58 |
+| Backlog | 59 |
 | Superseded | 1 |
 | Phases complete | 19 / 27 |
 
@@ -379,7 +380,7 @@
 | 18 — UX Polish | **Done** | 11/11 |
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
-| 23 — Rust Quality | Backlog | 0/6 |
+| 23 — Rust Quality | Backlog | 0/7 |
 | 24 — Parity Gaps | Backlog | 0/16 |
 | 25 — Icefall+ | Backlog | 0/20 |
 | 26 — MCP Expansion | Backlog | 0/3 |
@@ -401,7 +402,9 @@ Expansion (Phase 22):
   IF-073 (Docker Compose) → IF-148 (one-click templates)
 
 Rust Quality (Phase 23):
-  IF-153 (sqlite split) → IF-154 (remaining splits)
+  *** IF-205 (container runtime research) — DO FIRST, BLOCKS ALL PHASES 22-27 ***
+  IF-205 decision → all container-touching tickets (IF-152, IF-183, IF-173, IF-165, IF-172)
+  IF-153 (sqlite split) → IF-154 (remaining splits) — can run parallel with IF-205
   IF-153 → IF-155 (performance audit)
   IF-156 (quality audit) — no deps, parallel
   IF-153 → IF-157 (error consolidation)
