@@ -49,6 +49,18 @@ export default function AppCard({ app, latestDeployStatus, latestDeployTime, ser
           <StatusDot status={isOnline ? 'online' : status} />
         </div>
 
+        <div class={styles.badges}>
+          {app.deploy_mode === 'native' && (
+            <span class={styles.modeBadge}>Static</span>
+          )}
+          {app.image_ref && !app.compose_content && (
+            <span class={styles.modeBadge}>Image</span>
+          )}
+          {app.compose_content && (
+            <span class={styles.modeBadge}>Compose</span>
+          )}
+        </div>
+
         {app.git_repo && (
           <span class={styles.repo}>
             {app.git_repo.replace(/^https?:\/\//, '').replace(/\.git$/, '')}

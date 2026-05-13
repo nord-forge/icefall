@@ -1,6 +1,6 @@
 # Icefall — Project Board
 
-> Last updated: 2026-05-11
+> Last updated: 2026-05-13
 
 ---
 
@@ -178,14 +178,14 @@
 ### Phase 16 — Self-Update System
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-097](tickets/phase-16-self-update/IF-097-release-pipeline-signing.md) | Release pipeline & binary signing | — | GitHub Actions multi-arch musl builds, Ed25519 manifest signing, release workflow |
-| [IF-098](tickets/phase-16-self-update/IF-098-update-discovery-api.md) | Update discovery & version checking | — | GitHub Releases polling, manifest verification, semver comparison, API endpoints |
-| [IF-099](tickets/phase-16-self-update/IF-099-update-download-verify.md) | Update download & integrity verification | — | Streaming download with progress, SHA-256 + Ed25519 chain, extraction & validation |
-| [IF-100](tickets/phase-16-self-update/IF-100-update-apply-restart.md) | Update apply, restart & graceful shutdown | — | Atomic binary swap, SQLite backup + migrations, systemd socket activation, zero-downtime |
-| [IF-101](tickets/phase-16-self-update/IF-101-update-rollback.md) | Update rollback & failure recovery | — | Automatic rollback via ExecStopPost, systemd watchdog, manual rollback CLI/API |
-| [IF-102](tickets/phase-16-self-update/IF-102-update-dashboard-ui.md) | Update dashboard UI | — | Sidebar pill, 7-step update dialog, reconnection overlay, settings section |
-| [IF-103](tickets/phase-16-self-update/IF-103-auto-update-scheduling.md) | Auto-update scheduling | — | Maintenance window, pre-download, deploy-aware, breaking change skip |
-| [IF-104](tickets/phase-16-self-update/IF-104-cli-update-command.md) | CLI update command | — | Interactive + scripted update, offline --from-file, rollback subcommand |
+| [IF-097](tickets/phase-16-self-update/IF-097-release-pipeline-signing.md) | Release pipeline & binary signing | 2026-05-13 | GitHub Actions multi-arch musl builds, Ed25519 manifest signing, release workflow, real keypair generated |
+| [IF-098](tickets/phase-16-self-update/IF-098-update-discovery-api.md) | Update discovery & version checking | 2026-05-13 | GitHub Releases polling, manifest verification, semver comparison, API endpoints |
+| [IF-099](tickets/phase-16-self-update/IF-099-update-download-verify.md) | Update download & integrity verification | 2026-05-13 | Streaming download with progress, SHA-256 + Ed25519 chain, extraction & validation |
+| [IF-100](tickets/phase-16-self-update/IF-100-update-apply-restart.md) | Update apply, restart & graceful shutdown | 2026-05-13 | Atomic binary swap, SQLite backup + migrations, systemd socket activation (listenfd + sd-notify), zero-downtime, WatchdogSec=60 |
+| [IF-101](tickets/phase-16-self-update/IF-101-update-rollback.md) | Update rollback & failure recovery | 2026-05-13 | Automatic rollback via ExecStopPost, systemd watchdog, manual rollback CLI/API, `rollback --check` entry point, 7-day cleanup task |
+| [IF-102](tickets/phase-16-self-update/IF-102-update-dashboard-ui.md) | Update dashboard UI | 2026-05-13 | Sidebar pill, 7-step update dialog, reconnection overlay, settings section |
+| [IF-103](tickets/phase-16-self-update/IF-103-auto-update-scheduling.md) | Auto-update scheduling | 2026-05-13 | Maintenance window, pre-download, deploy-aware, breaking change skip |
+| [IF-104](tickets/phase-16-self-update/IF-104-cli-update-command.md) | CLI update command | 2026-05-13 | Interactive + scripted update, offline --from-file, rollback subcommand |
 
 ### Phase 17 — v1.1 Fast Follow
 | Ticket | Title | Completed | Notes |
@@ -199,10 +199,10 @@
 | [IF-079](tickets/phase-17-v1.1-fast-follow/IF-079-volume-management.md) | Volume management & browsing | 2026-05-08 | File browser drawer, upload/download, size tracking, path validation |
 | [IF-080](tickets/phase-17-v1.1-fast-follow/IF-080-s3-object-storage-mounts.md) | S3 / object storage mounts | 2026-05-08 | rclone sidecar, S3 volume type in settings, shared Docker volumes |
 | [IF-081](tickets/phase-17-v1.1-fast-follow/IF-081-expanded-database-support.md) | Expanded database support | 2026-05-08 | MariaDB, ClickHouse, KeyDB, DragonFly, CockroachDB, Valkey, Cassandra + backups for all |
-| [IF-082](tickets/phase-17-v1.1-fast-follow/IF-082-native-static-deploy.md) | Native static site deployment | — | No-Docker deploy for static sites, Caddy file_server, symlink rollback, <5s deploys |
-| [IF-083](tickets/phase-17-v1.1-fast-follow/IF-083-user-profile-page.md) | User profile page | — | Profile view and edit |
-| [IF-084](tickets/phase-17-v1.1-fast-follow/IF-084-user-preferences.md) | User preferences | — | Per-user settings and preferences |
-| [IF-085](tickets/phase-17-v1.1-fast-follow/IF-085-admin-user-management.md) | Admin user management | — | Admin panel for user CRUD |
+| [IF-082](tickets/phase-17-v1.1-fast-follow/IF-082-native-static-deploy.md) | Native static site deployment | 2026-05-13 | No-Docker deploy for static sites, Caddy file_server, symlink rollback, <5s deploys, HTTP health check, deploy mode badges |
+| [IF-083](tickets/phase-17-v1.1-fast-follow/IF-083-user-profile-page.md) | User profile page | 2026-05-13 | 8-section profile page: account info, password, email, 2FA, OAuth, tokens, sessions, preferences, danger zone |
+| [IF-084](tickets/phase-17-v1.1-fast-follow/IF-084-user-preferences.md) | User preferences | 2026-05-13 | Theme, timezone, default project, email notification preferences; DB-persisted, API endpoints |
+| [IF-085](tickets/phase-17-v1.1-fast-follow/IF-085-admin-user-management.md) | Admin user management | 2026-05-13 | Registration controls, role management, password/2FA reset, invite with SMTP email, pending invites |
 
 ### Phase 18 — UX Polish
 | Ticket | Title | Completed | Notes |
@@ -267,10 +267,10 @@
 | Metric | Count |
 |--------|-------|
 | Total tickets | 141 |
-| Done | 113 |
-| Backlog | 27 |
+| Done | 125 |
+| Backlog | 15 |
 | Superseded | 1 |
-| Phases complete | 15 / 19 |
+| Phases complete | 17 / 19 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -290,8 +290,8 @@
 | 13 — Onboarding | **Done** | 10/10 |
 | 14 — Dashboard Surface | **Done** | 6/6 |
 | 15 — Critical Gaps | **Done** | 8/8 |
-| 16 — Self-Update System | Backlog | 0/8 |
-| 17 — v1.1 Fast Follow | Partial | 9/13 |
+| 16 — Self-Update System | **Done** | 8/8 |
+| 17 — v1.1 Fast Follow | **Done** | 13/13 |
 | 18 — UX Polish | Backlog | 0/11 |
 | 20 — Multi-Server | **In Progress** | 25/30 |
 

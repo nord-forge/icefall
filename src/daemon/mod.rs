@@ -4,6 +4,7 @@ pub mod systemd;
 
 use std::sync::Arc;
 
+use listenfd::ListenFd;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tracing::{error, info, warn};
@@ -163,6 +164,22 @@ impl DaemonRunner {
             event_bus.clone(),
         );
 
+        // Daily cleanup of old rollback binaries (7-day retention)
+        {
+            let data_dir = config.data_dir.clone();
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
+                loop {
+                    interval.tick().await;
+                    let rb = crate::update::rollback::UpdateRollback::new(&data_dir);
+                    if let Err(e) = rb.cleanup_old_rollbacks(7) {
+                        warn!(error = %e, "rollback cleanup failed");
+                    }
+                }
+            });
+        }
+
         let agent_registry = crate::agent::registry::AgentRegistry::new();
 
         // Build app state and router
@@ -186,15 +203,48 @@ impl DaemonRunner {
 
         let app = api::build_router(state);
 
-        // Start HTTP server
-        let addr = format!("{}:{}", config.listen_addr, config.listen_port);
-        let listener = TcpListener::bind(&addr).await?;
-        info!("API server listening on {addr}");
+        // Start HTTP server — prefer inherited socket from systemd, fall back to bind
+        let listener = {
+            let mut listenfd = ListenFd::from_env();
+            if let Ok(Some(std_listener)) = listenfd.take_tcp_listener(0) {
+                std_listener.set_nonblocking(true)?;
+                let listener = TcpListener::from_std(std_listener)?;
+                info!(
+                    "API server listening via systemd socket activation on {:?}",
+                    listener.local_addr()
+                );
+                listener
+            } else {
+                let addr = format!("{}:{}", config.listen_addr, config.listen_port);
+                let listener = TcpListener::bind(&addr).await?;
+                info!("API server listening on {addr}");
+                listener
+            }
+        };
+
+        // Signal systemd that we're ready
+        if systemd::is_systemd_managed() {
+            systemd::notify_ready();
+            info!("Notified systemd: ready");
+
+            // Watchdog ping every 30 seconds (WatchdogSec=60 in unit)
+            tokio::spawn(async {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+                    systemd::notify_watchdog();
+                }
+            });
+        }
 
         // Serve with graceful shutdown
         axum::serve(listener, app)
             .with_graceful_shutdown(signals::shutdown_signal())
             .await?;
+
+        if systemd::is_systemd_managed() {
+            systemd::notify_stopping();
+        }
 
         info!("Daemon stopped");
 

@@ -153,9 +153,36 @@ async fn invite_user(
         .create_invitation(&body.email, &role, &token, &expires_at)
         .await?;
 
+    let base_url = state
+        .config
+        .base_domain
+        .as_deref()
+        .map(|d| format!("https://{d}"))
+        .unwrap_or_default();
+    let invite_url = format!("{base_url}/auth/accept-invite?token={token}");
+
+    // Best-effort: send invite email if SMTP is configured
+    if let Ok(channels) = state.db.list_notification_channels().await {
+        if let Some(smtp_channel) = channels.iter().find(|c| c.channel_type == "smtp") {
+            let details = serde_json::json!({
+                "email": &body.email,
+                "role": &role,
+                "invite_url": &invite_url,
+            });
+            let _ = crate::api::routes::notifications::dispatch_notification(
+                &smtp_channel.channel_type,
+                &smtp_channel.config,
+                "user.invited",
+                &format!("You've been invited to Icefall as {role}"),
+                &details,
+            )
+            .await;
+        }
+    }
+
     Ok(Json(serde_json::json!({
         "data": invitation,
-        "invite_url": format!("/auth/accept-invite?token={token}"),
+        "invite_url": invite_url,
     })))
 }
 

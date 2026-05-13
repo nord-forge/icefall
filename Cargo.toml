@@ -60,6 +60,10 @@ ed25519-dalek = { version = "2", features = ["pkcs8", "pem"] }
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 semver = { version = "1", features = ["serde"] }
 
+# Systemd integration
+listenfd = "1"
+sd-notify = "0.4"
+
 # Error handling
 thiserror = "2"
 
@@ -156,6 +160,10 @@ hex = { workspace = true }
 # Self-update & release verification
 ed25519-dalek = { workspace = true }
 semver = { workspace = true }
+
+# Systemd integration
+listenfd = { workspace = true }
+sd-notify = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }

@@ -627,3 +627,18 @@ fn progress_bar(percent: u32, width: usize) -> String {
     let empty = width.saturating_sub(filled);
     format!("[{}{}]", "█".repeat(filled), "░".repeat(empty))
 }
+
+/// Automated rollback check for `ExecStopPost` in the systemd unit.
+///
+/// Checks if a pending update marker exists and is recent (< 5 min).
+/// If so, executes a full rollback. Operates directly on the filesystem
+/// without contacting the daemon (which may be crashed).
+pub async fn rollback_check() {
+    let data_dir = std::env::var("ICEFALL_DATA_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("/var/lib/icefall"));
+
+    let rb = crate::update::rollback::UpdateRollback::new(&data_dir);
+    let exit_code = rb.check_and_rollback();
+    std::process::exit(exit_code);
+}
