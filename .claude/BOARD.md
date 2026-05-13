@@ -4,9 +4,25 @@
 
 ---
 
-## Backlog
+## Backlog — Priority Order
 
-(empty)
+**Now (Podman support):**
+1. IF-205 — Container runtime research (**DONE** — recommendation: Docker default + Podman opt-in)
+2. IF-206 — Podman runtime support (config, install detection, CI)
+3. IF-207 — Podman reference docs (commands, config, differences, setup, migration)
+
+**Next (Rust quality — can run parallel with Podman docs):**
+4. IF-153 — Split sqlite.rs
+5. IF-156 — Rust code quality audit
+
+**Then (Parity gaps):**
+6. IF-174 — GitHub App integration (largest, start early)
+7. IF-159..IF-173 — Remaining parity gap tickets
+
+**Then (Differentiators):**
+8. IF-187 + IF-188 — Config Time Machine + Deploy Replay (small, high value)
+9. IF-184 — MCP Deploy Copilot (demo value)
+10. IF-183 — Ghost Mode (headline feature)
 
 ---
 
@@ -14,7 +30,7 @@
 
 | Ticket | Title | Assignee | Started |
 |--------|-------|----------|---------|
-| — | — | — | — |
+| IF-206 | Podman runtime support | — | 2026-05-13 |
 
 ---
 
