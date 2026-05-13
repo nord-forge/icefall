@@ -9,7 +9,7 @@ import styles from './projects-page.module.css';
 import formStyles from '@styles/form.module.css';
 
 const PROJECT_COLORS = [
-  'oklch(0.55 0.18 260)',
+  'oklch(0.55 0.18 172.85)',
   'oklch(0.55 0.16 155)',
   'oklch(0.55 0.18 25)',
   'oklch(0.58 0.14 75)',

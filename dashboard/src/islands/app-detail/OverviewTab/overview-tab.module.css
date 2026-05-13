@@ -226,13 +226,13 @@
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  background: oklch(0.92 0.04 260);
-  color: oklch(0.35 0.1 260);
+  background: oklch(0.92 0.04 172.85);
+  color: oklch(0.35 0.1 172.85);
 }
 
 :global([data-theme="dark"]) .composeBadge {
-  background: oklch(0.25 0.04 260);
-  color: oklch(0.8 0.06 260);
+  background: oklch(0.25 0.04 172.85);
+  color: oklch(0.8 0.06 172.85);
 }
 
 .composeServiceList {
