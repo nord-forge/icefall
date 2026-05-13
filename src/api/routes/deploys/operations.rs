@@ -1,7 +1,5 @@
-use axum::extract::{Path, Query, State};
-use axum::routing::{get, post};
-use axum::{Json, Router};
-use serde::Deserialize;
+use axum::extract::{Path, State};
+use axum::Json;
 
 use crate::api::error::ApiError;
 use crate::api::AppState;
@@ -12,44 +10,7 @@ use crate::deploy::compose::ComposeDeployer;
 use crate::deploy::manager::DeployManager;
 use crate::deploy::native::NativeDeployer;
 
-pub fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/apps/{id}/deploys", get(list_deploys).post(create_deploy))
-        .route(
-            "/apps/{id}/deploys/{deploy_id}/rollback",
-            post(rollback_deploy),
-        )
-        .route("/deploys/latest", get(get_latest_deploys))
-}
-
-#[derive(Deserialize)]
-struct LatestDeploysParams {
-    app_ids: String,
-}
-
-async fn list_deploys(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let deploys = state.db.list_deploys(&id, 50).await?;
-    Ok(Json(serde_json::json!({ "data": deploys })))
-}
-
-async fn get_latest_deploys(
-    State(state): State<AppState>,
-    Query(params): Query<LatestDeploysParams>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let app_ids: Vec<String> = params
-        .app_ids
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    let deploys = state.db.get_latest_deploys_for_apps(&app_ids).await?;
-    Ok(Json(serde_json::json!({ "data": deploys })))
-}
-
-async fn create_deploy(
+pub(super) async fn create_deploy(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -63,7 +24,6 @@ async fn create_deploy(
     let is_image_deploy = app.image_ref.is_some();
 
     if !is_compose_deploy && !is_image_deploy {
-        // Git-based apps require a configured repo
         app.git_repo
             .as_ref()
             .ok_or_else(|| ApiError::BadRequest("app has no git_repo configured".into()))?;
@@ -89,7 +49,6 @@ async fn create_deploy(
     let env_clone = env.clone();
 
     if is_compose_deploy {
-        // Compose-based deploy: parse YAML, pull images, create containers
         let compose_yaml = app.compose_content.clone().unwrap();
 
         tokio::spawn(async move {
@@ -99,7 +58,6 @@ async fn create_deploy(
                 state.event_bus.clone(),
             );
 
-            // Resolve env vars from the environment and convert to a HashMap for interpolation
             let env_vars_list = state
                 .db
                 .get_env_vars(&env_clone.id)
@@ -122,7 +80,6 @@ async fn create_deploy(
             }
         });
     } else if is_image_deploy {
-        // Image-based deploy: skip the build pipeline and go straight to pulling + deploying
         let image_ref = app.image_ref.clone().unwrap();
 
         tokio::spawn(async move {
@@ -148,7 +105,6 @@ async fn create_deploy(
             }
         });
     } else if app.deploy_mode == "native" {
-        // Native deploy: build on host, serve via Caddy file_server
         let build_config: Option<BuildConfig> = app
             .build_config
             .as_deref()
@@ -179,8 +135,6 @@ async fn create_deploy(
             }
         });
     } else {
-        // Git-based deploy: run the build pipeline first
-        // In "auto" mode, detect the framework and decide between native and container
         let build_config: Option<BuildConfig> = app
             .build_config
             .as_deref()
@@ -192,10 +146,7 @@ async fn create_deploy(
         tokio::spawn(async move {
             let _guard = lock.lock().await;
 
-            // For auto mode, peek at the framework to decide the pipeline.
-            // Clone first, then detect, then choose native vs container.
             if is_auto_mode {
-                // Quick detect: clone + detect to decide the pipeline
                 let work_dir = state.config.data_dir.join("builds").join(&deploy_id);
                 let git_repo = match app_clone.git_repo.as_deref() {
                     Some(r) => r,
@@ -231,7 +182,6 @@ async fn create_deploy(
                     .map(crate::deploy::native::should_use_native)
                     .unwrap_or(false);
 
-                // Clean up the clone — each pipeline will re-clone
                 let _ = tokio::fs::remove_dir_all(&work_dir).await;
 
                 if use_native {
@@ -262,7 +212,6 @@ async fn create_deploy(
                 }
             }
 
-            // Container path: build Docker image + deploy container
             let manager = DeployManager::new(
                 state.docker.clone(),
                 state.caddy.clone(),
@@ -276,7 +225,6 @@ async fn create_deploy(
 
             let image_ref = match target {
                 crate::deploy::DeployTarget::Remote { ref server_id } => {
-                    // Remote build: delegate to agent
                     let executor = match manager.make_remote_executor(server_id).await {
                         Ok(e) => e,
                         Err(e) => {
@@ -332,7 +280,6 @@ async fn create_deploy(
                     }
                 }
                 crate::deploy::DeployTarget::Local => {
-                    // Local build: use BuildOrchestrator
                     let orchestrator = BuildOrchestrator::new(
                         state.docker.clone(),
                         state.db.clone(),
@@ -369,7 +316,7 @@ async fn create_deploy(
     Ok(Json(serde_json::json!({ "data": deploy })))
 }
 
-async fn rollback_deploy(
+pub(super) async fn rollback_deploy(
     State(state): State<AppState>,
     Path((app_id, deploy_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
