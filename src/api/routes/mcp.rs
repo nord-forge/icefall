@@ -220,7 +220,7 @@ async fn call_tool(
                 .docker
                 .list_containers(Some(&label))
                 .await
-                .map_err(|e| ApiError::Internal(Box::new(e)))?;
+                .map_err(ApiError::internal)?;
             let mut restarted = 0;
             for c in containers.iter().filter(|c| c.state == "running") {
                 let _ = state.docker.restart_container(&c.id).await;

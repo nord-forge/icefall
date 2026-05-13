@@ -37,6 +37,6 @@ async fn trigger_backup(
         .await
     {
         Ok(info) => Ok(Json(serde_json::json!({ "data": info }))),
-        Err(e) => Err(ApiError::Internal(Box::new(std::io::Error::other(e)))),
+        Err(e) => Err(ApiError::internal(std::io::Error::other(e))),
     }
 }

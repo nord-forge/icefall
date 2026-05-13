@@ -75,7 +75,7 @@ pub(super) async fn browse_volume(
         .docker
         .exec_in_container(&container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let entries = parse_ls_output(&output);
 
@@ -103,7 +103,7 @@ pub(super) async fn download_file(
         .docker
         .exec_in_container(&container_name, &check_cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
     if check_output.trim() != "FILE" {
         return Err(ApiError::NotFound(format!(
             "File not found or is a directory: {}",
@@ -117,17 +117,17 @@ pub(super) async fn download_file(
         .docker
         .exec_in_container(&container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let bytes = base64::Engine::decode(
         &base64::engine::general_purpose::STANDARD,
         output.trim().replace('\n', ""),
     )
     .map_err(|_| {
-        ApiError::Internal(Box::new(std::io::Error::new(
+        ApiError::internal(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "Failed to decode file contents",
-        )))
+        ))
     })?;
 
     let filename = query.path.rsplit('/').next().unwrap_or("download");
@@ -139,7 +139,7 @@ pub(super) async fn download_file(
             format!("attachment; filename=\"{filename}\""),
         )
         .body(Body::from(bytes))
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     Ok(response)
 }
@@ -190,10 +190,8 @@ pub(super) async fn upload_file(
         header.set_cksum();
         builder
             .append_data(&mut header, &filename, &body[..])
-            .map_err(|e| ApiError::Internal(Box::new(e)))?;
-        builder
-            .finish()
-            .map_err(|e| ApiError::Internal(Box::new(e)))?;
+            .map_err(ApiError::internal)?;
+        builder.finish().map_err(ApiError::internal)?;
     }
 
     use bollard::query_parameters::UploadToContainerOptions;
@@ -209,7 +207,7 @@ pub(super) async fn upload_file(
             bollard::body_full(bytes::Bytes::from(tar_buf)),
         )
         .await
-        .map_err(|e| ApiError::Internal(Box::new(DockerError::Api(e))))?;
+        .map_err(|e| ApiError::internal(DockerError::Api(e)))?;
 
     Ok(Json(serde_json::json!({
         "message": "uploaded",
@@ -230,7 +228,7 @@ pub(super) async fn volume_size(
         .docker
         .exec_in_container(&container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let bytes_used: u64 = output
         .split_whitespace()
@@ -273,7 +271,7 @@ pub(super) async fn delete_file(
         .docker
         .exec_in_container(&container_name, &cmd)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     Ok(Json(serde_json::json!({
         "message": "deleted",

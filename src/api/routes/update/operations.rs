@@ -255,7 +255,7 @@ pub(super) async fn rollback_update(
 
     rollback
         .execute_rollback()
-        .map_err(|e| ApiError::Internal(Box::new(std::io::Error::other(e.to_string()))))?;
+        .map_err(|e| ApiError::internal(std::io::Error::other(e.to_string())))?;
 
     let entry = UpdateHistoryEntry {
         id: new_id(),

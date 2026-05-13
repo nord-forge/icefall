@@ -83,9 +83,7 @@ pub(super) async fn check_for_update(
         }))),
         Err(e) => {
             let _ = state.db.set_update_error(&e.to_string()).await;
-            Err(ApiError::Internal(Box::new(std::io::Error::other(
-                e.to_string(),
-            ))))
+            Err(ApiError::internal(std::io::Error::other(e.to_string())))
         }
     }
 }

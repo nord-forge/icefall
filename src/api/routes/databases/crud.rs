@@ -151,19 +151,19 @@ pub(super) async fn create_database(
             type_config.image.split(':').nth(1).unwrap_or("latest"),
         )
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let container_id = state
         .docker
         .create_container(&container_config)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     state
         .docker
         .start_container(&container_id)
         .await
-        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+        .map_err(ApiError::internal)?;
 
     let connection_string =
         (type_config.connection_string)(&container_name, "", db_user, &password);
