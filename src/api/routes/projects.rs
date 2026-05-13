@@ -31,24 +31,43 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn list_projects(State(state): State<AppState>) -> Result<Json<serde_json::Value>, ApiError> {
-    let projects = state.db.list_projects().await?;
+    let (projects, apps, dbs) = tokio::join!(
+        state.db.list_projects(),
+        state.db.list_apps(),
+        state.db.list_managed_dbs()
+    );
+    let projects = projects?;
+    let apps = apps?;
+    let dbs = dbs?;
 
-    // Include app/database counts for each project
-    let mut result = Vec::with_capacity(projects.len());
-    for project in &projects {
-        let apps = state.db.list_apps_by_project(&project.id).await?;
-        let dbs = state.db.list_managed_dbs_by_project(&project.id).await?;
-        result.push(serde_json::json!({
-            "id": project.id,
-            "name": project.name,
-            "description": project.description,
-            "color": project.color,
-            "app_count": apps.len(),
-            "database_count": dbs.len(),
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-        }));
+    let mut app_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for app in &apps {
+        if let Some(ref pid) = app.project_id {
+            *app_counts.entry(pid).or_default() += 1;
+        }
     }
+    let mut db_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for db in &dbs {
+        if let Some(ref pid) = db.project_id {
+            *db_counts.entry(pid).or_default() += 1;
+        }
+    }
+
+    let result: Vec<_> = projects
+        .iter()
+        .map(|project| {
+            serde_json::json!({
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "color": project.color,
+                "app_count": app_counts.get(project.id.as_str()).copied().unwrap_or(0),
+                "database_count": db_counts.get(project.id.as_str()).copied().unwrap_or(0),
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            })
+        })
+        .collect();
 
     Ok(Json(serde_json::json!({ "data": result })))
 }

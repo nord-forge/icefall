@@ -7,6 +7,7 @@ use tokio::sync::{oneshot, RwLock};
 use super::protocol::AgentMessage;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_PENDING_REQUESTS: usize = 200;
 
 pub struct AgentConnection {
     pub server_id: String,
@@ -96,7 +97,17 @@ impl AgentRegistry {
         let id = crate::db::models::new_id();
 
         let (tx, rx) = oneshot::channel();
-        self.pending_requests.write().await.insert(id.clone(), tx);
+        {
+            let mut pending = self.pending_requests.write().await;
+            if pending.len() >= MAX_PENDING_REQUESTS {
+                tracing::warn!(
+                    "Pending requests at capacity ({}), rejecting new request",
+                    MAX_PENDING_REQUESTS
+                );
+                return Err("Too many pending requests".to_string());
+            }
+            pending.insert(id.clone(), tx);
+        }
 
         let msg = AgentMessage::Request {
             id: id.clone(),

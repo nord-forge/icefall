@@ -113,8 +113,9 @@ async fn call_tool(
             let id = str_param(p, "app_id")?;
             let search = p.get("search").and_then(|v| v.as_str());
             let limit = p.get("limit").and_then(|v| v.as_u64()).unwrap_or(100) as usize;
-            let logs = state.log_store.search(&id, search, None, limit);
-            serde_json::json!({ "logs": logs, "count": logs.len() })
+            let logs = state.log_store.search(&id, search, None, limit).await;
+            let count = logs.len();
+            serde_json::json!({ "logs": logs, "count": count })
         }
         "set_env_var" => {
             let id = str_param(p, "app_id")?;
