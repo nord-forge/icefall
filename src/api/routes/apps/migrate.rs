@@ -105,9 +105,8 @@ pub(super) async fn migrate_app(
             )
             .await;
 
-        let target_app = match state.db.get_app(&app.id).await {
-            Ok(Some(a)) => a,
-            _ => return,
+        let Ok(Some(target_app)) = state.db.get_app(&app.id).await else {
+            return;
         };
 
         let git_repo = match target_app.git_repo.as_deref() {
@@ -221,9 +220,8 @@ pub(super) async fn migrate_app(
             }
         };
 
-        let updated_deploy = match state.db.get_deploy(&deploy_id).await {
-            Ok(Some(d)) => d,
-            _ => return,
+        let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+            return;
         };
 
         let env_clone = env.clone();

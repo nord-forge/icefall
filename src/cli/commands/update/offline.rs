@@ -66,13 +66,10 @@ pub async fn from_file(tarball: &str, manifest_path: &str, signature_path: &str,
     };
 
     let target = crate::update::artifact_target();
-    let artifact = match manifest.artifact_for_target(target) {
-        Some(a) => a,
-        None => {
-            println!("{RED}{STEP_FAILED}{RESET}");
-            eprintln!("  {RED}Error:{RESET} No artifact for target {target} in manifest");
-            std::process::exit(1);
-        }
+    let Some(artifact) = manifest.artifact_for_target(target) else {
+        println!("{RED}{STEP_FAILED}{RESET}");
+        eprintln!("  {RED}Error:{RESET} No artifact for target {target} in manifest");
+        std::process::exit(1);
     };
 
     match crate::update::verify::verify_sha256(&tarball_data, &artifact.sha256) {
@@ -90,17 +87,14 @@ pub async fn from_file(tarball: &str, manifest_path: &str, signature_path: &str,
         return;
     }
 
-    let _client = match CliClient::try_new() {
-        Some(c) => c,
-        None => {
-            println!();
-            println!("  {YELLOW}Daemon is not running.{RESET}");
-            println!("  To apply offline, extract the tarball and replace the binary manually:");
-            println!("    tar xzf {tarball}");
-            println!("    sudo cp icefall /usr/local/bin/icefall");
-            println!("    sudo systemctl restart icefall");
-            return;
-        }
+    let Some(_client) = CliClient::try_new() else {
+        println!();
+        println!("  {YELLOW}Daemon is not running.{RESET}");
+        println!("  To apply offline, extract the tarball and replace the binary manually:");
+        println!("    tar xzf {tarball}");
+        println!("    sudo cp icefall /usr/local/bin/icefall");
+        println!("    sudo systemctl restart icefall");
+        return;
     };
 
     println!();

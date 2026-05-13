@@ -50,8 +50,8 @@ fn parse_stats(stats: &ContainerStatsResponse) -> ContainerStats {
     let (network_rx_bytes, network_tx_bytes) = stats
         .networks
         .as_ref()
-        .map(
-            |nets: &std::collections::HashMap<String, ContainerNetworkStats>| {
+        .map_or(
+            (0, 0), |nets: &std::collections::HashMap<String, ContainerNetworkStats>| {
                 nets.values().fold((0u64, 0u64), |(rx, tx), net| {
                     (
                         rx + net.rx_bytes.unwrap_or(0),
@@ -59,8 +59,7 @@ fn parse_stats(stats: &ContainerStatsResponse) -> ContainerStats {
                     )
                 })
             },
-        )
-        .unwrap_or((0, 0));
+        );
 
     ContainerStats {
         cpu_percent,

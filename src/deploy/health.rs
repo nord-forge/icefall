@@ -10,7 +10,7 @@ pub async fn wait_for_healthy(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(2))
         .build()
-        .unwrap();
+        .expect("reqwest client builder with default TLS");
 
     let url = format!("http://127.0.0.1:{host_port}/");
 

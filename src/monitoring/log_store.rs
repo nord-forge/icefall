@@ -58,13 +58,12 @@ impl LogStore {
         limit: usize,
     ) -> Vec<StoredLogLine> {
         let path = self.log_path(app_id);
-        let query = query.map(|q| q.to_lowercase());
-        let stream_filter = stream_filter.map(|s| s.to_string());
+        let query = query.map(str::to_lowercase);
+        let stream_filter = stream_filter.map(std::string::ToString::to_string);
 
         tokio::task::spawn_blocking(move || {
-            let content = match std::fs::read_to_string(&path) {
-                Ok(c) => c,
-                Err(_) => return Vec::new(),
+            let Ok(content) = std::fs::read_to_string(&path) else {
+                return Vec::new();
             };
 
             content
@@ -172,16 +171,14 @@ pub fn spawn_log_capture(
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-            let apps = match db.list_apps().await {
-                Ok(a) => a,
-                Err(_) => continue,
+            let Ok(apps) = db.list_apps().await else {
+                continue;
             };
 
             for app in &apps {
                 let label = format!("icefall.app={}", app.id);
-                let containers = match docker.list_containers(Some(&label)).await {
-                    Ok(c) => c,
-                    Err(_) => continue,
+                let Ok(containers) = docker.list_containers(Some(&label)).await else {
+                    continue;
                 };
 
                 let running = containers.iter().find(|c| c.state == "running");
@@ -193,7 +190,7 @@ pub fn spawn_log_capture(
                     continue;
                 }
 
-                let container_id = running_id.unwrap();
+                let container_id = running_id.expect("guarded by is_none() check above");
                 active_map.insert(app.id.clone(), container_id.clone());
                 drop(active_map);
 

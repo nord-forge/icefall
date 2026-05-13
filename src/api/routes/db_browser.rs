@@ -323,7 +323,7 @@ async fn execute_redis_query(
         info.password.clone(),
         "--no-auth-warning".into(),
     ];
-    cmd.extend(parts.iter().map(|s| s.to_string()));
+    cmd.extend(parts.iter().map(std::string::ToString::to_string));
 
     let output = state
         .docker

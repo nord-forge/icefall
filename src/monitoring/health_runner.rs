@@ -27,15 +27,13 @@ pub fn spawn_health_runner(
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
 
-            let apps = match db.list_apps().await {
-                Ok(a) => a,
-                Err(_) => continue,
+            let Ok(apps) = db.list_apps().await else {
+                continue;
             };
 
             for app in &apps {
-                let checks = match db.get_health_checks(&app.id).await {
-                    Ok(c) => c,
-                    Err(_) => continue,
+                let Ok(checks) = db.get_health_checks(&app.id).await else {
+                    continue;
                 };
 
                 if checks.is_empty() {
@@ -140,7 +138,7 @@ async fn run_http_check(check: &HealthCheck) -> bool {
         .and_then(|c| serde_json::from_str::<serde_json::Value>(c).ok())
         .unwrap_or_default();
 
-    let port = config.get("port").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+    let port = config.get("port").and_then(serde_json::Value::as_u64).unwrap_or(80) as u16;
     let path = config.get("path").and_then(|v| v.as_str()).unwrap_or("/");
 
     let url = format!("http://127.0.0.1:{port}{path}");
@@ -148,9 +146,8 @@ async fn run_http_check(check: &HealthCheck) -> bool {
         .timeout(Duration::from_secs(5))
         .build();
 
-    let client = match client {
-        Ok(c) => c,
-        Err(_) => return false,
+    let Ok(client) = client else {
+        return false;
     };
 
     match client.get(&url).send().await {
@@ -169,9 +166,8 @@ async fn run_check(check: &HealthCheck, docker: &DockerClient, container_id: &st
                 .and_then(|v| v.get("port")?.as_u64())
                 .unwrap_or(3000) as u16;
 
-            let info = match docker.inspect_container(container_id).await {
-                Ok(i) => i,
-                Err(_) => return false,
+            let Ok(info) = docker.inspect_container(container_id).await else {
+                return false;
             };
 
             let host_port = info
@@ -183,9 +179,8 @@ async fn run_check(check: &HealthCheck, docker: &DockerClient, container_id: &st
                 })
                 .and_then(|p| p.parse::<u16>().ok());
 
-            let host_port = match host_port {
-                Some(p) => p,
-                None => return false,
+            let Some(host_port) = host_port else {
+                return false;
             };
 
             tokio::time::timeout(
@@ -193,20 +188,17 @@ async fn run_check(check: &HealthCheck, docker: &DockerClient, container_id: &st
                 TcpStream::connect(format!("127.0.0.1:{host_port}")),
             )
             .await
-            .map(|r| r.is_ok())
-            .unwrap_or(false)
+            .is_ok_and(|r| r.is_ok())
         }
         "docker" => {
-            let info = match docker.inspect_container(container_id).await {
-                Ok(i) => i,
-                Err(_) => return false,
+            let Ok(info) = docker.inspect_container(container_id).await else {
+                return false;
             };
 
             info.state
                 .and_then(|s| s.health)
                 .and_then(|h| h.status)
-                .map(|s| s.to_string().contains("healthy"))
-                .unwrap_or(false)
+                .is_some_and(|s| s.to_string().contains("healthy"))
         }
         _ => false,
     }

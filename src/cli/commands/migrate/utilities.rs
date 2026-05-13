@@ -20,14 +20,12 @@ pub(super) fn is_daemon_running() -> bool {
     Command::new("systemctl")
         .args(["is-active", "--quiet", "icefall"])
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .is_ok_and(|s| s.success())
 }
 
 pub(super) fn sha256_file(path: &Path) -> String {
-    let mut file = match std::fs::File::open(path) {
-        Ok(f) => f,
-        Err(_) => return String::new(),
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return String::new();
     };
     let mut hasher = sha2::Sha256::new();
     let mut buf = [0u8; 8192];
@@ -57,7 +55,7 @@ pub(super) fn format_bytes(bytes: u64) -> String {
 }
 
 pub(super) fn file_size(path: &Path) -> u64 {
-    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+    std::fs::metadata(path).map_or(0, |m| m.len())
 }
 
 pub(super) fn dir_size(path: &Path) -> u64 {
@@ -75,7 +73,7 @@ fn walkdir(path: &Path) -> u64 {
             if p.is_dir() {
                 total += walkdir(&p);
             } else {
-                total += entry.metadata().map(|m| m.len()).unwrap_or(0);
+                total += entry.metadata().map_or(0, |m| m.len());
             }
         }
     }
@@ -163,7 +161,7 @@ pub(super) fn export_docker_volumes(volumes_dir: &Path) {
 
         match result {
             Ok(out) if out.status.success() => {
-                let size = std::fs::metadata(&tar_path).map(|m| m.len()).unwrap_or(0);
+                let size = std::fs::metadata(&tar_path).map_or(0, |m| m.len());
                 println!(" ✓ ({})", format_bytes(size));
             }
             Ok(out) => println!(" ✗ {}", String::from_utf8_lossy(&out.stderr).trim()),
@@ -177,7 +175,7 @@ pub(super) fn import_docker_volumes(volumes_dir: &Path) {
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|e| e.path().extension().map(|ext| ext == "gz").unwrap_or(false))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "gz"))
         .collect();
 
     if entries.is_empty() {
@@ -259,7 +257,7 @@ pub(super) fn list_icefall_volumes() -> Vec<String> {
     match output {
         Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
             .lines()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .filter(|s| !s.is_empty())
             .collect(),
         _ => Vec::new(),

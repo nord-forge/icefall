@@ -15,9 +15,8 @@ pub async fn post_update_check(
 ) -> Result<(), UpdateError> {
     let applier = UpdateApplier::new(data_dir);
 
-    let marker = match applier.read_pending_marker() {
-        Some(m) => m,
-        None => return Ok(()),
+    let Some(marker) = applier.read_pending_marker() else {
+        return Ok(());
     };
 
     info!(

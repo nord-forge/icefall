@@ -68,9 +68,8 @@ async fn github_webhook(
         return StatusCode::OK;
     }
 
-    let app = match state.db.get_app(&app_id).await {
-        Ok(Some(app)) => app,
-        _ => return StatusCode::NOT_FOUND,
+    let Ok(Some(app)) = state.db.get_app(&app_id).await else {
+        return StatusCode::NOT_FOUND;
     };
 
     if let Some(ref secret) = app.webhook_secret {
@@ -118,9 +117,8 @@ async fn gitlab_webhook(
         return StatusCode::OK;
     }
 
-    let app = match state.db.get_app(&app_id).await {
-        Ok(Some(app)) => app,
-        _ => return StatusCode::NOT_FOUND,
+    let Ok(Some(app)) = state.db.get_app(&app_id).await else {
+        return StatusCode::NOT_FOUND;
     };
 
     if let Some(ref secret) = app.webhook_secret {
@@ -197,9 +195,8 @@ async fn trigger_deploy(
             }
         }
     } else {
-        let envs = match state.db.list_environments(&app.id).await {
-            Ok(e) => e,
-            Err(_) => return,
+        let Ok(envs) = state.db.list_environments(&app.id).await else {
+            return;
         };
         match envs.into_iter().find(|e| e.env_type == "production") {
             Some(env) => env,
@@ -325,9 +322,8 @@ pub fn validate_github_signature(secret: &str, signature_header: &str, body: &[u
         .strip_prefix("sha256=")
         .unwrap_or(signature_header);
 
-    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
-        Ok(m) => m,
-        Err(_) => return false,
+    let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else {
+        return false;
     };
     mac.update(body);
     let result = mac.finalize().into_bytes();

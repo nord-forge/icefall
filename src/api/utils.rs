@@ -42,12 +42,10 @@ pub async fn resolve_domain(domain: &str) -> Result<Vec<IpAddr>, String> {
 }
 
 pub async fn check_dns_points_to(domain: &str, expected_ip: Option<&str>) -> bool {
-    let expected = match expected_ip {
-        Some(ip) => ip,
-        None => return false,
+    let Some(expected) = expected_ip else {
+        return false;
     };
     resolve_domain(domain)
         .await
-        .map(|ips| ips.iter().any(|ip| ip.to_string() == expected))
-        .unwrap_or(false)
+        .is_ok_and(|ips| ips.iter().any(|ip| ip.to_string() == expected))
 }

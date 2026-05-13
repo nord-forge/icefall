@@ -175,9 +175,8 @@ impl UpdateDownloader {
 
     /// Remove any leftover .partial files from previous interrupted downloads.
     async fn cleanup_partial_files(&self) {
-        let mut entries = match tokio::fs::read_dir(&self.updates_dir).await {
-            Ok(entries) => entries,
-            Err(_) => return,
+        let Ok(mut entries) = tokio::fs::read_dir(&self.updates_dir).await else {
+            return;
         };
 
         while let Ok(Some(entry)) = entries.next_entry().await {

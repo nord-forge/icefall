@@ -49,7 +49,7 @@ pub(super) async fn create_deploy(
     let env_clone = env.clone();
 
     if is_compose_deploy {
-        let compose_yaml = app.compose_content.clone().unwrap();
+        let compose_yaml = app.compose_content.clone().expect("guarded by is_compose_deploy");
 
         tokio::spawn(async move {
             let deployer = ComposeDeployer::new(
@@ -80,7 +80,7 @@ pub(super) async fn create_deploy(
             }
         });
     } else if is_image_deploy {
-        let image_ref = app.image_ref.clone().unwrap();
+        let image_ref = app.image_ref.clone().expect("guarded by is_image_deploy");
 
         tokio::spawn(async move {
             let manager = DeployManager::new(
@@ -92,9 +92,8 @@ pub(super) async fn create_deploy(
                 Some(state.agent_registry.clone()),
             );
 
-            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
-                Ok(Some(d)) => d,
-                _ => return,
+            let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                return;
             };
 
             if let Err(e) = manager
@@ -122,9 +121,8 @@ pub(super) async fn create_deploy(
                 state.event_bus.clone(),
             );
 
-            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
-                Ok(Some(d)) => d,
-                _ => return,
+            let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                return;
             };
 
             if let Err(e) = deployer
@@ -148,12 +146,9 @@ pub(super) async fn create_deploy(
 
             if is_auto_mode {
                 let work_dir = state.config.data_dir.join("builds").join(&deploy_id);
-                let git_repo = match app_clone.git_repo.as_deref() {
-                    Some(r) => r,
-                    None => {
-                        tracing::error!("Auto-mode deploy failed: no git_repo");
-                        return;
-                    }
+                let Some(git_repo) = app_clone.git_repo.as_deref() else {
+                    tracing::error!("Auto-mode deploy failed: no git_repo");
+                    return;
                 };
 
                 let clone_opts = crate::build::git::GitCloneOptions {
@@ -179,8 +174,7 @@ pub(super) async fn create_deploy(
                 let detection = crate::build::detect::detect(&work_dir, build_config.as_ref());
                 let use_native = detection
                     .as_ref()
-                    .map(crate::deploy::native::should_use_native)
-                    .unwrap_or(false);
+                    .is_ok_and(crate::deploy::native::should_use_native);
 
                 let _ = tokio::fs::remove_dir_all(&work_dir).await;
 
@@ -192,9 +186,8 @@ pub(super) async fn create_deploy(
                         state.event_bus.clone(),
                     );
 
-                    let updated_deploy = match state.db.get_deploy(&deploy_id).await {
-                        Ok(Some(d)) => d,
-                        _ => return,
+                    let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                        return;
                     };
 
                     if let Err(e) = deployer
@@ -237,12 +230,9 @@ pub(super) async fn create_deploy(
                         }
                     };
 
-                    let git_repo = match app_clone.git_repo.as_deref() {
-                        Some(r) => r,
-                        None => {
-                            tracing::error!("Remote deploy failed: no git_repo");
-                            return;
-                        }
+                    let Some(git_repo) = app_clone.git_repo.as_deref() else {
+                        tracing::error!("Remote deploy failed: no git_repo");
+                        return;
                     };
 
                     let timeout = std::time::Duration::from_secs(
@@ -299,9 +289,8 @@ pub(super) async fn create_deploy(
                 }
             };
 
-            let updated_deploy = match state.db.get_deploy(&deploy_id).await {
-                Ok(Some(d)) => d,
-                _ => return,
+            let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                return;
             };
 
             if let Err(e) = manager
@@ -373,9 +362,8 @@ pub(super) async fn rollback_deploy(
             Some(state.agent_registry.clone()),
         );
 
-        let deploy = match state.db.get_deploy(&rollback_id).await {
-            Ok(Some(d)) => d,
-            _ => return,
+        let Ok(Some(deploy)) = state.db.get_deploy(&rollback_id).await else {
+            return;
         };
 
         if let Err(e) = manager

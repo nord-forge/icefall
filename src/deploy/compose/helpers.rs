@@ -91,7 +91,7 @@ pub(super) fn resolve_service_volumes(
                 if parts.len() >= 2 {
                     let source = parts[0];
                     let target = parts[1];
-                    let read_only = parts.get(2).map(|&s| s == "ro").unwrap_or(false);
+                    let read_only = parts.get(2).is_some_and(|&s| s == "ro");
 
                     let resolved_source = if source.starts_with('/') || source.starts_with('.') {
                         source.to_string()

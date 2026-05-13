@@ -28,8 +28,7 @@ impl DeployManager {
             .as_deref()
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
             .and_then(|v| v.get("port")?.as_u64())
-            .map(|p| p as u16)
-            .unwrap_or(3000)
+            .map_or(3000, |p| p as u16)
     }
 
     pub(super) async fn get_host_port(

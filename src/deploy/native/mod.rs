@@ -278,7 +278,7 @@ impl NativeDeployer {
     }
 
     async fn fail_deploy(&self, deploy_id: &str, output: &[String]) {
-        let tail: Vec<&str> = output.iter().rev().take(50).map(|s| s.as_str()).collect();
+        let tail: Vec<&str> = output.iter().rev().take(50).map(std::string::String::as_str).collect();
         let log = tail.into_iter().rev().collect::<Vec<_>>().join("\n");
         let _ = self
             .db

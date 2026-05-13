@@ -8,23 +8,23 @@ pub async fn status() {
             let version = resp.get("version").and_then(|v| v.as_str()).unwrap_or("?");
             let cpu = resp
                 .get("cpu_percent")
-                .and_then(|v| v.as_f64())
+                .and_then(serde_json::Value::as_f64)
                 .unwrap_or(0.0);
             let mem_used = resp
                 .get("memory_used_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let mem_total = resp
                 .get("memory_total_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let disk_used = resp
                 .get("disk_used_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let disk_total = resp
                 .get("disk_total_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
 
             println!("Icefall Server v{version}");

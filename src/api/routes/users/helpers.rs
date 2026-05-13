@@ -2,9 +2,8 @@ use crate::api::error::ApiError;
 
 pub(super) fn verify_password(password: &str, hash: &str) -> bool {
     use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
-    let parsed = match PasswordHash::new(hash) {
-        Ok(h) => h,
-        Err(_) => return false,
+    let Ok(parsed) = PasswordHash::new(hash) else {
+        return false;
     };
     Argon2::default()
         .verify_password(password.as_bytes(), &parsed)

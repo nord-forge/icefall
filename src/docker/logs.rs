@@ -22,9 +22,7 @@ impl DockerClient {
             follow,
             stdout: true,
             stderr: true,
-            tail: tail
-                .map(|t| t.to_string())
-                .unwrap_or_else(|| "all".to_string()),
+            tail: tail.map_or_else(|| "all".to_string(), |t| t.to_string()),
             ..Default::default()
         };
 

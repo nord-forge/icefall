@@ -210,7 +210,7 @@ impl DeployManager {
                         d.id != deploy.id && d.status == "running" && d.image_ref.is_some()
                     });
                     if let Some(prev) = previous {
-                        let prev_image = prev.image_ref.clone().unwrap();
+                        let prev_image = prev.image_ref.clone().expect("filtered by is_some()");
                         let prev_snapshot: Option<Vec<String>> = prev
                             .env_snapshot
                             .as_deref()

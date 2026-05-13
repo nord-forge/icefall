@@ -35,8 +35,7 @@ async fn get_health(
         let uptime = calculate_uptime(&events);
         let current_status = events
             .first()
-            .map(|e| e.status.as_str())
-            .unwrap_or("unknown");
+            .map_or("unknown", |e| e.status.as_str());
 
         results.push(serde_json::json!({
             "check": check,

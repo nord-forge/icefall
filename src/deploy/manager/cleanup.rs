@@ -24,15 +24,13 @@ impl DeployManager {
             let is_current = container
                 .labels
                 .get("icefall.deploy-id")
-                .map(|id| id == current_deploy_id)
-                .unwrap_or(false);
+                .is_some_and(|id| id == current_deploy_id);
 
             // Skip S3 sidecar containers — they are shared across deploys.
             let is_sidecar = container
                 .labels
                 .get("icefall.s3-sidecar")
-                .map(|v| v == "true")
-                .unwrap_or(false);
+                .is_some_and(|v| v == "true");
 
             if is_current || is_sidecar {
                 continue;

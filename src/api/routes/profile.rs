@@ -115,8 +115,7 @@ async fn list_sessions(
         .map(|s| {
             let is_current = current_session_id
                 .as_ref()
-                .map(|cid| cid == &s.id)
-                .unwrap_or(false);
+                .is_some_and(|cid| cid == &s.id);
             serde_json::json!({
                 "id": s.id,
                 "created_at": s.created_at,
@@ -207,9 +206,8 @@ fn hash_password(password: &str) -> Result<String, ApiError> {
 
 fn verify_password(password: &str, hash: &str) -> bool {
     use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
-    let parsed = match PasswordHash::new(hash) {
-        Ok(h) => h,
-        Err(_) => return false,
+    let Ok(parsed) = PasswordHash::new(hash) else {
+        return false;
     };
     Argon2::default()
         .verify_password(password.as_bytes(), &parsed)

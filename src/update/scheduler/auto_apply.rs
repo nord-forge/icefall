@@ -26,7 +26,7 @@ pub(super) async fn try_auto_apply(
         return Ok(());
     }
 
-    let version = state.available_version.as_deref().unwrap().to_string();
+    let version = state.available_version.as_deref().expect("guarded by is_none() check").to_string();
 
     let now = chrono::Local::now();
     if !is_in_maintenance_window(
@@ -127,13 +127,11 @@ pub(super) fn is_in_maintenance_window(
     window_start: &str,
     window_end: &str,
 ) -> bool {
-    let start = match chrono::NaiveTime::parse_from_str(window_start, "%H:%M") {
-        Ok(t) => t,
-        Err(_) => return false,
+    let Ok(start) = chrono::NaiveTime::parse_from_str(window_start, "%H:%M") else {
+        return false;
     };
-    let end = match chrono::NaiveTime::parse_from_str(window_end, "%H:%M") {
-        Ok(t) => t,
-        Err(_) => return false,
+    let Ok(end) = chrono::NaiveTime::parse_from_str(window_end, "%H:%M") else {
+        return false;
     };
 
     if start <= end {
@@ -150,9 +148,8 @@ fn try_send_pre_window_notification(
     version: &str,
     event_bus: &Arc<EventBus>,
 ) {
-    let start = match chrono::NaiveTime::parse_from_str(window_start, "%H:%M") {
-        Ok(t) => t,
-        Err(_) => return,
+    let Ok(start) = chrono::NaiveTime::parse_from_str(window_start, "%H:%M") else {
+        return;
     };
 
     let notify_duration = chrono::TimeDelta::minutes(notify_before_minutes);

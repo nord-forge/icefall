@@ -80,8 +80,7 @@ pub(super) fn do_backup_sync(
         .map_err(|e| format!("failed to compress archive: {e}"))?;
 
     let size_bytes = std::fs::metadata(&archive_path)
-        .map(|m| m.len() as i64)
-        .unwrap_or(0);
+        .map_or(0, |m| m.len() as i64);
 
     let s3_bucket = std::env::var("ICEFALL_BACKUP_S3_BUCKET").ok();
     if let Some(bucket) = s3_bucket {
@@ -193,7 +192,7 @@ fn export_docker_volumes(volumes_dir: &Path) {
     let volumes: Vec<String> = match output {
         Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
             .lines()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .filter(|s| !s.is_empty())
             .collect(),
         _ => Vec::new(),

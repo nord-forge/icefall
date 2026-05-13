@@ -56,9 +56,8 @@ async fn do_backup(data_path: &Path, filename: &str, s3_key: &str) -> Result<i64
 }
 
 pub(super) async fn cleanup_old_backups(db: &Arc<dyn Database>, retention_count: i64) {
-    let records = match db.list_instance_backup_history(1000).await {
-        Ok(r) => r,
-        Err(_) => return,
+    let Ok(records) = db.list_instance_backup_history(1000).await else {
+        return;
     };
 
     let completed: Vec<_> = records.iter().filter(|r| r.status == "completed").collect();

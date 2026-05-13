@@ -64,11 +64,17 @@ pub async fn import(from: &str, dry_run: bool) {
         std::env::var("ICEFALL_DATA_DIR").unwrap_or_else(|_| "/var/lib/icefall".to_string());
     let data_path = Path::new(&data_dir);
 
-    let temp_dir = tempfile::TempDir::new().unwrap();
+    let temp_dir = tempfile::TempDir::new().unwrap_or_else(|e| {
+        eprintln!("Failed to create temp directory: {e}");
+        std::process::exit(1);
+    });
     let staging = temp_dir.path();
 
     println!("  Extracting archive...");
-    let file = std::fs::File::open(archive_path).unwrap();
+    let file = std::fs::File::open(archive_path).unwrap_or_else(|e| {
+        eprintln!("Failed to open archive: {e}");
+        std::process::exit(1);
+    });
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
     archive.unpack(staging).unwrap_or_else(|e| {
@@ -97,11 +103,11 @@ pub async fn import(from: &str, dry_run: bool) {
         if let Some(contents) = manifest.get("contents") {
             let dumps = contents
                 .get("db_dumps")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let vols = contents
                 .get("volumes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             println!("  Database dumps:  {dumps}");
             println!("  Docker volumes:  {vols}");
