@@ -158,3 +158,133 @@ pub(super) fn parse_ls_output(output: &str) -> Vec<FileEntry> {
 
     entries
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- safe_path ---
+
+    #[test]
+    fn safe_path_empty_user_path_returns_mount() {
+        let result = safe_path("/var/data", "").unwrap();
+        assert_eq!(result, "/var/data");
+    }
+
+    #[test]
+    fn safe_path_normal_subpath() {
+        let result = safe_path("/var/data", "logs/app.log").unwrap();
+        assert_eq!(result, "/var/data/logs/app.log");
+    }
+
+    #[test]
+    fn safe_path_leading_slash_is_trimmed() {
+        let result = safe_path("/var/data", "/subdir/file.txt").unwrap();
+        assert_eq!(result, "/var/data/subdir/file.txt");
+    }
+
+    #[test]
+    fn safe_path_traversal_rejected() {
+        let result = safe_path("/var/data", "../etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_path_traversal_in_middle_rejected() {
+        let result = safe_path("/var/data", "sub/../../../etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_path_null_byte_rejected() {
+        let result = safe_path("/var/data", "file\0.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_path_trailing_slash_on_mount() {
+        let result = safe_path("/var/data/", "logs").unwrap();
+        assert_eq!(result, "/var/data/logs");
+    }
+
+    #[test]
+    fn safe_path_dot_segments_allowed() {
+        // Single dots are not traversal
+        let result = safe_path("/var/data", "./file.txt").unwrap();
+        assert_eq!(result, "/var/data/./file.txt");
+    }
+
+    #[test]
+    fn safe_path_double_dot_standalone_rejected() {
+        let result = safe_path("/var/data", "..");
+        assert!(result.is_err());
+    }
+
+    // --- sanitize_filename ---
+
+    #[test]
+    fn sanitize_filename_normal() {
+        let result = sanitize_filename("report.pdf").unwrap();
+        assert_eq!(result, "report.pdf");
+    }
+
+    #[test]
+    fn sanitize_filename_trims_whitespace() {
+        let result = sanitize_filename("  file.txt  ").unwrap();
+        assert_eq!(result, "file.txt");
+    }
+
+    #[test]
+    fn sanitize_filename_empty_rejected() {
+        assert!(sanitize_filename("").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_whitespace_only_rejected() {
+        assert!(sanitize_filename("   ").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_dot_rejected() {
+        assert!(sanitize_filename(".").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_dotdot_rejected() {
+        assert!(sanitize_filename("..").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_forward_slash_rejected() {
+        assert!(sanitize_filename("path/file.txt").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_backslash_rejected() {
+        assert!(sanitize_filename("path\\file.txt").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_null_byte_rejected() {
+        assert!(sanitize_filename("file\0.txt").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_too_long_rejected() {
+        let long_name = "a".repeat(256);
+        assert!(sanitize_filename(&long_name).is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_max_length_ok() {
+        let name = "a".repeat(255);
+        let result = sanitize_filename(&name).unwrap();
+        assert_eq!(result.len(), 255);
+    }
+
+    #[test]
+    fn sanitize_filename_dotfile_allowed() {
+        let result = sanitize_filename(".gitignore").unwrap();
+        assert_eq!(result, ".gitignore");
+    }
+}
