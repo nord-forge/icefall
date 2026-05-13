@@ -1,4 +1,6 @@
-use std::path::Path;
+mod context;
+mod tests;
+
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -10,9 +12,11 @@ use crate::build::dockerfile::{generate_dockerfile, generate_dockerignore};
 use crate::build::git::{clone_repo, GitCloneOptions};
 use crate::build::{BuildConfig, BuildError, BuildResult, BuildStep, BuildStepStatus, Framework};
 use crate::config::IcefallConfig;
-use crate::db::models::{now_iso8601, App};
+use crate::db::models::App;
 use crate::db::Database;
 use crate::docker::DockerClient;
+
+use context::{create_build_context, finish_step, new_step, redact_secrets};
 
 pub struct BuildOrchestrator {
     docker: Arc<DockerClient>,
@@ -362,149 +366,5 @@ impl BuildOrchestrator {
         }
 
         Ok(removed)
-    }
-}
-
-fn new_step(name: &str) -> BuildStep {
-    BuildStep {
-        name: name.to_string(),
-        status: BuildStepStatus::Running,
-        started_at: Some(now_iso8601()),
-        finished_at: None,
-        output: Vec::new(),
-    }
-}
-
-fn finish_step(step: &mut BuildStep, status: BuildStepStatus) {
-    step.status = status;
-    step.finished_at = Some(now_iso8601());
-}
-
-const IGNORE_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    ".next",
-    ".nuxt",
-    ".output",
-    "target",
-    ".turbo",
-    ".cache",
-    "coverage",
-    "dist",
-];
-
-fn create_build_context(project_dir: &Path) -> Result<Bytes, BuildError> {
-    let buf = Vec::new();
-    let encoder = flate2::write::GzEncoder::new(buf, flate2::Compression::fast());
-    let mut archive = tar::Builder::new(encoder);
-
-    fn walk_and_add(
-        archive: &mut tar::Builder<flate2::write::GzEncoder<Vec<u8>>>,
-        dir: &Path,
-        base: &Path,
-    ) -> std::io::Result<()> {
-        for entry in std::fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-
-            if IGNORE_DIRS.contains(&name_str.as_ref()) {
-                continue;
-            }
-
-            let relative = path.strip_prefix(base).unwrap_or(&path);
-            if path.is_dir() {
-                archive.append_dir(relative, &path)?;
-                walk_and_add(archive, &path, base)?;
-            } else {
-                archive.append_path_with_name(&path, relative)?;
-            }
-        }
-        Ok(())
-    }
-
-    walk_and_add(&mut archive, project_dir, project_dir)
-        .map_err(|e| BuildError::DockerBuild(format!("failed to create tar archive: {e}")))?;
-
-    let encoder = archive
-        .into_inner()
-        .map_err(|e| BuildError::DockerBuild(format!("failed to finalize tar archive: {e}")))?;
-    let compressed = encoder
-        .finish()
-        .map_err(|e| BuildError::DockerBuild(format!("failed to compress archive: {e}")))?;
-
-    Ok(Bytes::from(compressed))
-}
-
-fn redact_secrets(line: &str, secrets: &[String]) -> String {
-    let mut result = line.to_string();
-    for secret in secrets {
-        if secret.len() >= 4 {
-            result = result.replace(secret, "[REDACTED]");
-        }
-    }
-    result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::TempDir;
-
-    #[test]
-    fn creates_valid_tar_archive() {
-        let dir = TempDir::new().unwrap();
-        fs::write(dir.path().join("Dockerfile"), "FROM node:22").unwrap();
-        fs::write(dir.path().join("index.js"), "console.log('hi')").unwrap();
-        fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("src/app.js"), "module.exports = {}").unwrap();
-
-        let context = create_build_context(dir.path()).unwrap();
-        assert!(!context.is_empty());
-
-        let decoder = flate2::read::GzDecoder::new(&context[..]);
-        let mut archive = tar::Archive::new(decoder);
-
-        let entries: Vec<String> = archive
-            .entries()
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .map(|e| e.path().unwrap().to_string_lossy().to_string())
-            .collect();
-
-        assert!(entries.iter().any(|e| e.contains("Dockerfile")));
-        assert!(entries.iter().any(|e| e.contains("index.js")));
-        assert!(entries.iter().any(|e| e.contains("src/app.js")));
-    }
-
-    #[test]
-    fn redacts_single_secret() {
-        let line = "DATABASE_URL=postgres://user:s3cret@host/db";
-        let result = redact_secrets(line, &["s3cret".to_string()]);
-        assert_eq!(result, "DATABASE_URL=postgres://user:[REDACTED]@host/db");
-        assert!(!result.contains("s3cret"));
-    }
-
-    #[test]
-    fn redacts_multiple_secrets() {
-        let line = "API_KEY=abc123 SECRET=xyz789";
-        let result = redact_secrets(line, &["abc123".to_string(), "xyz789".to_string()]);
-        assert_eq!(result, "API_KEY=[REDACTED] SECRET=[REDACTED]");
-    }
-
-    #[test]
-    fn skips_short_secrets() {
-        let line = "PORT=80";
-        let result = redact_secrets(line, &["80".to_string()]);
-        assert_eq!(result, "PORT=80");
-    }
-
-    #[test]
-    fn handles_empty_secrets() {
-        let line = "some build output";
-        let result = redact_secrets(line, &[]);
-        assert_eq!(result, "some build output");
     }
 }
