@@ -12,6 +12,7 @@ use crate::api::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/settings", get(get_settings))
+        .route("/settings/runtime", get(get_runtime_info))
         .route("/settings/base-domain", post(setup_base_domain))
         .route("/settings/base-domain/verify", post(verify_base_domain))
         .route(
@@ -25,6 +26,32 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
         "data": {
             "base_domain": state.config.base_domain,
             "version": env!("CARGO_PKG_VERSION"),
+            "runtime": state.config.runtime.to_string(),
+        }
+    })))
+}
+
+async fn get_runtime_info(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers).await?;
+
+    let runtime_info = state
+        .docker
+        .runtime_version()
+        .await
+        .map_err(|e| ApiError::Internal(Box::new(e)))?;
+
+    Ok(Json(serde_json::json!({
+        "data": {
+            "configured_runtime": state.config.runtime.to_string(),
+            "detected_runtime": runtime_info.name,
+            "version": runtime_info.version,
+            "api_version": runtime_info.api_version,
+            "os": runtime_info.os,
+            "arch": runtime_info.arch,
+            "socket": state.config.container_socket,
         }
     })))
 }

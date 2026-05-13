@@ -2,6 +2,39 @@ use serde::Deserialize;
 
 const DEFAULT_CONFIG_PATH: &str = "/etc/icefall-agent/config.toml";
 
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+pub enum ContainerRuntime {
+    #[serde(rename = "docker")]
+    Docker,
+    #[serde(rename = "podman")]
+    Podman,
+}
+
+impl Default for ContainerRuntime {
+    fn default() -> Self {
+        Self::Docker
+    }
+}
+
+impl std::fmt::Display for ContainerRuntime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Docker => write!(f, "docker"),
+            Self::Podman => write!(f, "podman"),
+        }
+    }
+}
+
+impl ContainerRuntime {
+    pub fn from_socket(socket: &str) -> Self {
+        if socket.contains("podman") {
+            Self::Podman
+        } else {
+            Self::Docker
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AgentConfig {
     pub control_plane_url: String,
@@ -9,15 +42,23 @@ pub struct AgentConfig {
     pub server_id: String,
     #[serde(default = "default_log_level")]
     pub log_level: String,
-    #[serde(default = "default_docker_socket")]
-    pub docker_socket: String,
+    #[serde(default)]
+    pub runtime: ContainerRuntime,
+    #[serde(default = "default_container_socket", alias = "docker_socket")]
+    pub container_socket: String,
     #[serde(default = "default_caddy_admin_url")]
     pub caddy_admin_url: String,
     #[serde(default = "default_data_dir")]
     pub data_dir: String,
 }
 
-fn default_docker_socket() -> String {
+fn default_container_socket() -> String {
+    let podman_sockets = ["/run/podman/podman.sock", "/var/run/podman/podman.sock"];
+    for socket in &podman_sockets {
+        if std::path::Path::new(socket).exists() {
+            return socket.to_string();
+        }
+    }
     "/var/run/docker.sock".to_string()
 }
 
