@@ -192,16 +192,21 @@ async fn try_pre_download(
     let downloader = UpdateDownloader::new(updates_dir);
 
     let db_progress = db.clone();
+    let last_reported_pct = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(-1));
     let download_result = downloader
         .download(&artifact, version, |downloaded, total| {
             if total > 0 {
                 let pct = ((downloaded as f64 / total as f64) * 100.0) as i64;
-                let db_inner = db_progress.clone();
-                tokio::spawn(async move {
-                    let _ = db_inner
-                        .set_update_download_state("downloading", pct, None)
-                        .await;
-                });
+                let last = last_reported_pct.load(std::sync::atomic::Ordering::Relaxed);
+                if pct >= last + 5 || pct == 100 {
+                    last_reported_pct.store(pct, std::sync::atomic::Ordering::Relaxed);
+                    let db_inner = db_progress.clone();
+                    tokio::spawn(async move {
+                        let _ = db_inner
+                            .set_update_download_state("downloading", pct, None)
+                            .await;
+                    });
+                }
             }
         })
         .await;

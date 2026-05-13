@@ -31,21 +31,25 @@ async fn search_logs(
     Path(id): Path<String>,
     Query(params): Query<LogQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let results = state.log_store.search(
-        &id,
-        params.search.as_deref(),
-        params.stream.as_deref(),
-        params.limit,
-    );
+    let results = state
+        .log_store
+        .search(
+            &id,
+            params.search.as_deref(),
+            params.stream.as_deref(),
+            params.limit,
+        )
+        .await;
+    let count = results.len();
 
     Ok(Json(serde_json::json!({
         "data": results,
-        "count": results.len(),
+        "count": count,
     })))
 }
 
 async fn download_logs(State(state): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
-    let content = state.log_store.read_all(&id);
+    let content = state.log_store.read_all(&id).await;
     let filename = format!("attachment; filename=\"{id}-logs.txt\"");
     (
         [

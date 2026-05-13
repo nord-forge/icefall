@@ -144,21 +144,26 @@ async fn run_server_check(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let mut checks = Vec::new();
 
-    let docker_ok = state.docker.ping().await.is_ok();
+    let (docker_result, caddy_result, metrics) = tokio::join!(
+        state.docker.ping(),
+        state.caddy.health_check(),
+        state.server_metrics.read()
+    );
+
+    let docker_ok = docker_result.is_ok();
+    let runtime_label = state.config.runtime.to_string();
     checks.push(serde_json::json!({
-        "id": "docker", "name": "Docker Engine",
+        "id": "docker", "name": format!("Container Runtime ({})", runtime_label),
         "status": if docker_ok { "pass" } else { "fail" },
-        "message": if docker_ok { "Connected" } else { "Not reachable. Run: sudo systemctl start docker" },
+        "message": if docker_ok { "Connected" } else { "Not reachable. Check your container runtime." },
     }));
 
-    let caddy_ok = state.caddy.health_check().await.is_ok();
+    let caddy_ok = caddy_result.is_ok();
     checks.push(serde_json::json!({
         "id": "caddy", "name": "Caddy",
         "status": if caddy_ok { "pass" } else { "warn" },
         "message": if caddy_ok { "Running" } else { "Not reachable. HTTPS won't work" },
     }));
-
-    let metrics = state.server_metrics.read().await;
     let disk_free_gb = (metrics
         .disk_total_bytes
         .saturating_sub(metrics.disk_used_bytes)) as f64

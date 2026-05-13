@@ -171,7 +171,7 @@ impl DaemonRunner {
             event_bus.clone(),
         );
 
-        // Daily audit log pruning (90-day retention)
+        // Daily database cleanup (runs all pruning jobs)
         {
             let db_clone = db.clone();
             tokio::spawn(async move {
@@ -179,14 +179,41 @@ impl DaemonRunner {
                     tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
                 loop {
                     interval.tick().await;
-                    let cutoff = (chrono::Utc::now() - chrono::Duration::days(90))
+                    let now = chrono::Utc::now();
+                    let cutoff_90d = (now - chrono::Duration::days(90))
                         .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-                    match db_clone.prune_audit_logs(&cutoff).await {
-                        Ok(count) if count > 0 => {
-                            info!(pruned = count, "pruned expired audit log entries");
+                    let cutoff_7d = (now - chrono::Duration::days(7))
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+
+                    if let Ok(n) = db_clone.prune_audit_logs(&cutoff_90d).await {
+                        if n > 0 {
+                            info!(pruned = n, "pruned audit log entries");
                         }
-                        Err(e) => warn!(error = %e, "audit log pruning failed"),
-                        _ => {}
+                    }
+                    if let Ok(n) = db_clone.prune_expired_sessions(&cutoff_7d).await {
+                        if n > 0 {
+                            info!(pruned = n, "pruned expired sessions");
+                        }
+                    }
+                    if let Ok(n) = db_clone.prune_expired_tokens().await {
+                        if n > 0 {
+                            info!(pruned = n, "pruned expired API tokens");
+                        }
+                    }
+                    if let Ok(n) = db_clone.prune_expired_invitations().await {
+                        if n > 0 {
+                            info!(pruned = n, "pruned expired invitations");
+                        }
+                    }
+                    if let Ok(n) = db_clone.prune_health_check_events(&cutoff_90d).await {
+                        if n > 0 {
+                            info!(pruned = n, "pruned old health check events");
+                        }
+                    }
+                    if let Ok(n) = db_clone.prune_old_deploys(&cutoff_90d, 100).await {
+                        if n > 0 {
+                            info!(pruned = n, "pruned old deploy records");
+                        }
                     }
                 }
             });

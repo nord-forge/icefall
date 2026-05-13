@@ -111,11 +111,12 @@ async fn verify_base_domain(
     };
 
     let server_ip = detect_server_ip().await;
-
-    let base_ok = check_dns_points_to(&base_domain, server_ip.as_deref()).await;
-
     let test_subdomain = format!("_icefall-verify.{base_domain}");
-    let wildcard_ok = check_dns_points_to(&test_subdomain, server_ip.as_deref()).await;
+
+    let (base_ok, wildcard_ok) = tokio::join!(
+        check_dns_points_to(&base_domain, server_ip.as_deref()),
+        check_dns_points_to(&test_subdomain, server_ip.as_deref())
+    );
 
     Ok(Json(serde_json::json!({
         "configured": true,

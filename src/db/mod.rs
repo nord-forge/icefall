@@ -373,6 +373,13 @@ pub trait Database: Send + Sync + 'static {
     async fn record_update_history(&self, entry: &UpdateHistoryEntry) -> Result<(), DbError>;
     async fn list_update_history(&self, limit: usize) -> Result<Vec<UpdateHistoryEntry>, DbError>;
 
+    // Cleanup / Pruning
+    async fn prune_expired_sessions(&self, older_than: &str) -> Result<u64, DbError>;
+    async fn prune_expired_tokens(&self) -> Result<u64, DbError>;
+    async fn prune_expired_invitations(&self) -> Result<u64, DbError>;
+    async fn prune_health_check_events(&self, older_than: &str) -> Result<u64, DbError>;
+    async fn prune_old_deploys(&self, older_than: &str, keep_per_app: i64) -> Result<u64, DbError>;
+
     // Backup
     async fn vacuum_into(&self, path: &str) -> Result<(), DbError>;
 
