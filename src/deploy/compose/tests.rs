@@ -108,10 +108,7 @@ services:
 #[test]
 fn resolve_env_from_list() {
     let service = ComposeService {
-        environment: ComposeEnvironment::List(vec![
-            "FOO=bar".to_string(),
-            "BAZ=qux".to_string(),
-        ]),
+        environment: ComposeEnvironment::List(vec!["FOO=bar".to_string(), "BAZ=qux".to_string()]),
         ..Default::default()
     };
     let env = resolve_service_env(&service);
@@ -328,10 +325,7 @@ fn resolve_command_args_list() {
         ..Default::default()
     };
     let cmd = resolve_service_command(&service);
-    assert_eq!(
-        cmd,
-        Some(vec!["node".to_string(), "server.js".to_string()])
-    );
+    assert_eq!(cmd, Some(vec!["node".to_string(), "server.js".to_string()]));
 }
 
 #[test]

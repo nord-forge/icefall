@@ -64,11 +64,15 @@ async fn copy_dir_recursive_copies_files() {
     let dst = tmp.path().join("dst");
 
     tokio::fs::create_dir_all(&src).await.unwrap();
-    tokio::fs::write(src.join("hello.txt"), "world").await.unwrap();
+    tokio::fs::write(src.join("hello.txt"), "world")
+        .await
+        .unwrap();
 
     copy_dir_recursive(&src, &dst).await.unwrap();
 
-    let content = tokio::fs::read_to_string(dst.join("hello.txt")).await.unwrap();
+    let content = tokio::fs::read_to_string(dst.join("hello.txt"))
+        .await
+        .unwrap();
     assert_eq!(content, "world");
 }
 
@@ -81,13 +85,19 @@ async fn copy_dir_recursive_copies_nested_dirs() {
     let nested = src.join("sub").join("deep");
 
     tokio::fs::create_dir_all(&nested).await.unwrap();
-    tokio::fs::write(nested.join("file.txt"), "nested content").await.unwrap();
-    tokio::fs::write(src.join("root.txt"), "root content").await.unwrap();
+    tokio::fs::write(nested.join("file.txt"), "nested content")
+        .await
+        .unwrap();
+    tokio::fs::write(src.join("root.txt"), "root content")
+        .await
+        .unwrap();
 
     let dst = tmp.path().join("dst");
     copy_dir_recursive(&src, &dst).await.unwrap();
 
-    let root_content = tokio::fs::read_to_string(dst.join("root.txt")).await.unwrap();
+    let root_content = tokio::fs::read_to_string(dst.join("root.txt"))
+        .await
+        .unwrap();
     assert_eq!(root_content, "root content");
 
     let nested_content = tokio::fs::read_to_string(dst.join("sub").join("deep").join("file.txt"))
@@ -120,7 +130,9 @@ async fn atomic_symlink_creates_symlink() {
     let tmp = tempfile::tempdir().unwrap();
     let target = tmp.path().join("target_dir");
     tokio::fs::create_dir_all(&target).await.unwrap();
-    tokio::fs::write(target.join("index.html"), "<h1>hello</h1>").await.unwrap();
+    tokio::fs::write(target.join("index.html"), "<h1>hello</h1>")
+        .await
+        .unwrap();
 
     let link = tmp.path().join("current");
     atomic_symlink(&target, &link).await.unwrap();
@@ -165,7 +177,9 @@ async fn cleanup_old_deploys_keeps_recent_and_current() {
     // Create deploy directories (v7 UUIDs sort chronologically, simulate with sorted names)
     let dirs = ["01-oldest", "02-old", "03-recent", "04-current"];
     for name in &dirs {
-        tokio::fs::create_dir_all(sites_dir.join(name)).await.unwrap();
+        tokio::fs::create_dir_all(sites_dir.join(name))
+            .await
+            .unwrap();
     }
 
     // Also create a "current" symlink that should be skipped
@@ -174,7 +188,9 @@ async fn cleanup_old_deploys_keeps_recent_and_current() {
         .unwrap();
 
     // Keep 2 most recent (besides current), should remove 01-oldest
-    cleanup_old_deploys(sites_dir, "04-current", 2).await.unwrap();
+    cleanup_old_deploys(sites_dir, "04-current", 2)
+        .await
+        .unwrap();
 
     // current deploy dir should still exist
     assert!(sites_dir.join("04-current").exists());
@@ -194,8 +210,12 @@ async fn cleanup_old_deploys_nothing_to_remove() {
     let tmp = tempfile::tempdir().unwrap();
     let sites_dir = tmp.path();
 
-    tokio::fs::create_dir_all(sites_dir.join("deploy-1")).await.unwrap();
-    tokio::fs::create_dir_all(sites_dir.join("deploy-2")).await.unwrap();
+    tokio::fs::create_dir_all(sites_dir.join("deploy-1"))
+        .await
+        .unwrap();
+    tokio::fs::create_dir_all(sites_dir.join("deploy-2"))
+        .await
+        .unwrap();
 
     // Keep 5 but only 1 non-current deploy exists — nothing should be removed
     cleanup_old_deploys(sites_dir, "deploy-2", 5).await.unwrap();

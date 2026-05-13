@@ -527,7 +527,9 @@ mod tests {
     #[test]
     fn new_id_only_contains_lowercase_alphanumeric() {
         let id = new_id();
-        assert!(id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
+        assert!(id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
     }
 
     #[test]
