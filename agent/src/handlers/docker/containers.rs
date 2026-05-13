@@ -1,22 +1,17 @@
 use std::collections::HashMap;
 
 use bollard::models::{
-    ContainerCreateBody, HostConfig, NetworkConnectRequest, NetworkCreateRequest, PortBinding,
-    VolumeCreateRequest,
+    ContainerCreateBody, HostConfig, NetworkConnectRequest, PortBinding,
 };
 use bollard::query_parameters::{
-    BuildImageOptions, CreateContainerOptions, CreateImageOptions, ListContainersOptions,
-    RemoveContainerOptions, StopContainerOptions,
+    CreateContainerOptions, ListContainersOptions, RemoveContainerOptions, StopContainerOptions,
 };
-use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::info;
 
-use super::HandlerError;
 use crate::context::HandlerContext;
-
-// --- Container operations ---
+use crate::handlers::HandlerError;
 
 #[derive(Debug, Deserialize)]
 struct CreateContainerParams {
@@ -230,178 +225,4 @@ pub async fn container_list(ctx: &HandlerContext, _params: Value) -> Result<Valu
         .collect();
 
     Ok(serde_json::json!({ "containers": result }))
-}
-
-// --- Image operations ---
-
-#[derive(Debug, Deserialize)]
-struct PullImageParams {
-    image: String,
-    #[serde(default = "default_tag")]
-    tag: String,
-}
-
-fn default_tag() -> String {
-    "latest".to_string()
-}
-
-pub async fn image_pull(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: PullImageParams =
-        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
-
-    let options = CreateImageOptions {
-        from_image: Some(p.image.clone()),
-        tag: Some(p.tag.clone()),
-        ..Default::default()
-    };
-
-    let mut stream = ctx.docker.create_image(Some(options), None, None);
-    while let Some(result) = stream.next().await {
-        result?;
-    }
-
-    info!(image = %p.image, tag = %p.tag, "image pulled");
-    Ok(serde_json::json!({ "ok": true, "image": format!("{}:{}", p.image, p.tag) }))
-}
-
-#[derive(Debug, Deserialize)]
-struct BuildImageParams {
-    tag: String,
-    context_tar_b64: String,
-    #[serde(default)]
-    dockerfile: Option<String>,
-}
-
-pub async fn image_build(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: BuildImageParams =
-        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
-
-    let context_bytes = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        &p.context_tar_b64,
-    )
-    .map_err(|e| HandlerError::Other(format!("invalid base64 context: {e}")))?;
-
-    let mut options = BuildImageOptions {
-        t: Some(p.tag.clone()),
-        rm: true,
-        ..Default::default()
-    };
-    if let Some(ref df) = p.dockerfile {
-        options.dockerfile = df.clone();
-    }
-
-    let mut stream = ctx.docker.build_image(
-        options,
-        None,
-        Some(bollard::body_full(context_bytes.into())),
-    );
-
-    while let Some(result) = stream.next().await {
-        let info = result?;
-        if let Some(ref stream_text) = info.stream {
-            let trimmed = stream_text.trim();
-            if !trimmed.is_empty() {
-                let _ = ctx
-                    .event_tx
-                    .send(icefall_common::protocol::AgentMessage::Event {
-                        event_type: "build.output".to_string(),
-                        data: serde_json::json!({ "line": trimmed }),
-                    });
-            }
-        }
-    }
-
-    info!(tag = %p.tag, "image built");
-    Ok(serde_json::json!({ "ok": true, "tag": p.tag }))
-}
-
-// --- Volume operations ---
-
-#[derive(Debug, Deserialize)]
-struct VolumeNameParams {
-    name: String,
-}
-
-pub async fn volume_create(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: VolumeNameParams =
-        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
-
-    let config = VolumeCreateRequest {
-        name: Some(p.name.clone()),
-        ..Default::default()
-    };
-    ctx.docker.create_volume(config).await?;
-
-    info!(name = %p.name, "volume created");
-    Ok(serde_json::json!({ "ok": true }))
-}
-
-pub async fn volume_remove(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: VolumeNameParams =
-        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
-
-    ctx.docker
-        .remove_volume(
-            &p.name,
-            None::<bollard::query_parameters::RemoveVolumeOptions>,
-        )
-        .await?;
-
-    info!(name = %p.name, "volume removed");
-    Ok(serde_json::json!({ "ok": true }))
-}
-
-pub async fn volume_list(ctx: &HandlerContext, _params: Value) -> Result<Value, HandlerError> {
-    let volumes = ctx
-        .docker
-        .list_volumes(None::<bollard::query_parameters::ListVolumesOptions>)
-        .await?;
-
-    let result: Vec<Value> = volumes
-        .volumes
-        .unwrap_or_default()
-        .into_iter()
-        .map(|v| {
-            serde_json::json!({
-                "name": v.name,
-                "driver": v.driver,
-                "mountpoint": v.mountpoint,
-            })
-        })
-        .collect();
-
-    Ok(serde_json::json!({ "volumes": result }))
-}
-
-// --- Network operations ---
-
-#[derive(Debug, Deserialize)]
-struct NetworkNameParams {
-    name: String,
-}
-
-pub async fn network_create(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: NetworkNameParams =
-        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
-
-    let config = NetworkCreateRequest {
-        name: p.name.clone(),
-        driver: Some("bridge".to_string()),
-        ..Default::default()
-    };
-    let response = ctx.docker.create_network(config).await?;
-
-    info!(name = %p.name, "network created");
-    Ok(serde_json::json!({ "id": response.id }))
-}
-
-pub async fn network_remove(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
-    let p: NetworkNameParams =
-        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
-
-    ctx.docker.remove_network(&p.name).await?;
-
-    info!(name = %p.name, "network removed");
-    Ok(serde_json::json!({ "ok": true }))
 }
