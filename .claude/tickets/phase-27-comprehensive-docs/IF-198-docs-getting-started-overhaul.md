@@ -55,6 +55,14 @@ Rewrite the getting started section to be the best onboarding experience in the 
 - [ ] Test with a push
 - [ ] Preview environments setup
 
+## Podman Parity
+
+Every getting started page that mentions Docker must include Podman equivalents:
+- [ ] Installation page: Docker install AND Podman install paths side by side
+- [ ] All `docker` CLI commands shown with `podman` equivalent in a tabbed code block
+- [ ] Quick start: detect runtime section explaining auto-detection during install
+- [ ] Troubleshooting: Podman-specific issues (socket not active, version too old, networking)
+
 ## Standards
 
 - [ ] Every command includes expected output
@@ -62,7 +70,9 @@ Rewrite the getting started section to be the best onboarding experience in the 
 - [ ] Every page has a "Troubleshooting" section at the bottom
 - [ ] Every page has "Next" and "Previous" navigation
 - [ ] Code blocks use proper language tags and are copy-pasteable
+- [ ] Docker/Podman commands shown in tabbed blocks (tab: Docker / tab: Podman)
 
 ## Dependencies
 
 - IF-047 (Documentation site — existing Starlight setup)
+- IF-206 (Podman runtime support)

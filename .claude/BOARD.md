@@ -302,6 +302,7 @@
 | [IF-172](tickets/phase-24-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | — | Caddy L4 TCP proxy for external DB access, IP whitelist |
 | [IF-173](tickets/phase-24-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | — | Pass-through to docker compose, advanced users |
 | [IF-174](tickets/phase-24-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | — | Auto webhooks, PR status checks, PR comments, repo browser |
+| [IF-206](tickets/phase-24-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | — | Config + install detection, bollard socket swap, CI smoke tests |
 
 ### Phase 25 — Icefall+ Differentiators
 | Ticket | Title | Completed | Notes |
@@ -344,6 +345,7 @@
 | [IF-202](tickets/phase-27-comprehensive-docs/IF-202-docs-api-reference-complete.md) | Complete API reference | — | Every REST endpoint + MCP tool with examples, error codes, auth |
 | [IF-203](tickets/phase-27-comprehensive-docs/IF-203-docs-troubleshooting-faq.md) | Troubleshooting & FAQ | — | Symptom-first troubleshooting, 6 categories + FAQ |
 | [IF-204](tickets/phase-27-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | — | Migrate from Coolify, Dokku, CapRover, Heroku, Docker Compose |
+| [IF-207](tickets/phase-27-comprehensive-docs/IF-207-docs-podman-reference.md) | Podman reference docs | — | Command reference, config guide, behavioral differences, setup + migration guides |
 
 ---
 
@@ -351,9 +353,9 @@
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 200 |
+| Total tickets | 202 |
 | Done | 141 |
-| Backlog | 59 |
+| Backlog | 61 |
 | Superseded | 1 |
 | Phases complete | 19 / 27 |
 
@@ -381,10 +383,10 @@
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
 | 23 — Rust Quality | Backlog | 0/7 |
-| 24 — Parity Gaps | Backlog | 0/16 |
+| 24 — Parity Gaps | Backlog | 0/17 |
 | 25 — Icefall+ | Backlog | 0/20 |
 | 26 — MCP Expansion | Backlog | 0/3 |
-| 27 — Comprehensive Docs | Backlog | 0/7 |
+| 27 — Comprehensive Docs | Backlog | 0/8 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |
@@ -411,7 +413,8 @@ Rust Quality (Phase 23):
   IF-153 + IF-157 → IF-158 (test coverage)
 
 Parity Gaps (Phase 24):
-  All tickets independent — can run in parallel
+  IF-206 (Podman support) — do after IF-205 research (done)
+  All other tickets independent — can run in parallel
   IF-174 (GitHub App) is the largest, start early
 
 Icefall+ (Phase 25):
@@ -430,4 +433,5 @@ Comprehensive Docs (Phase 27):
   IF-200 (frameworks) + IF-201 (how-to) — can run in parallel
   IF-202 (API ref) — after IF-195/IF-196 (MCP expansion)
   IF-204 (migration guides) — after all features are stable
+  IF-207 (Podman reference) — after IF-206 (Podman support)
 ```

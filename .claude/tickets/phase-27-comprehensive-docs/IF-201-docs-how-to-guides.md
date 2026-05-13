@@ -65,6 +65,11 @@ Write task-oriented how-to guides for every common workflow a user might need. T
 - [ ] `guides/ghost-mode.mdx` — set up container hibernation for cost savings
 - [ ] `guides/custom-dockerfile.mdx` — override auto-detected Dockerfile
 
+### Podman
+- [ ] `guides/podman-setup.mdx` — install and configure Podman as Icefall's runtime
+- [ ] `guides/podman-migration.mdx` — switch an existing Icefall instance from Docker to Podman
+- [ ] `guides/podman-troubleshooting.mdx` — Podman-specific issues (socket, networking, exec, stats)
+
 ## Standards
 
 - [ ] Each guide: title, prerequisites, numbered steps, expected results, troubleshooting
@@ -72,7 +77,9 @@ Write task-oriented how-to guides for every common workflow a user might need. T
 - [ ] Screenshots for every UI interaction
 - [ ] "Time to complete" estimate at the top of each guide
 - [ ] Cross-links to related concept docs and other guides
+- [ ] All container CLI commands in tabbed blocks: Docker tab / Podman tab
 
 ## Dependencies
 
 - IF-047 (Documentation site)
+- IF-206 (Podman runtime support)

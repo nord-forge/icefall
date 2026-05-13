@@ -49,7 +49,15 @@ Generate comprehensive API reference documentation from the OpenAPI spec. Every 
 - [ ] Error responses documented for each endpoint (not just 200)
 - [ ] Pagination explained with cursor/offset examples
 
+## Podman Parity
+
+- [ ] `api/overview.mdx`: note that Icefall supports both Docker and Podman, link to runtime concept doc
+- [ ] Server endpoints: responses include `runtime` field (docker/podman) — document this
+- [ ] Settings endpoints: `runtime` and `container_socket` fields documented
+- [ ] Any endpoint with runtime-specific behavior: callout box explaining the difference
+
 ## Dependencies
 
 - IF-036 (OpenAPI specification)
 - IF-195 (MCP workflow tools — for MCP reference)
+- IF-206 (Podman runtime support)

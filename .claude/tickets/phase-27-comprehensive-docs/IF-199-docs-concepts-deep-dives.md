@@ -78,13 +78,24 @@ Write comprehensive concept pages that explain HOW Icefall works under the hood.
 - [ ] Database browser: how it connects safely
 - [ ] Scaling considerations
 
+### `concepts/container-runtime.mdx` (new)
+- [ ] Docker vs Podman: what Icefall supports and why
+- [ ] How Icefall talks to the runtime (bollard, socket API)
+- [ ] Runtime auto-detection during installation
+- [ ] Docker-specific behavior vs Podman-specific behavior
+- [ ] Networking differences: Docker bridge vs Podman netavark
+- [ ] When to choose Docker vs Podman (decision guide)
+- [ ] Rootful vs rootless: what's supported, what's coming
+
 ## Standards
 
 - [ ] Every concept page includes a diagram or visual
 - [ ] Technical details backed by code references (not marketing claims)
 - [ ] Comparison callouts: "Unlike X, Icefall does Y because Z"
 - [ ] Each page is self-contained (no mandatory reading order)
+- [ ] Docker/Podman differences called out explicitly wherever behavior diverges
 
 ## Dependencies
 
 - IF-047 (Documentation site)
+- IF-206 (Podman runtime support)

@@ -48,17 +48,32 @@ Write a comprehensive troubleshooting section covering every common issue a user
 - [ ] API token not working: expired, wrong scope, revoked
 - [ ] Lost 2FA device: backup codes, admin reset
 
+### `troubleshooting/podman.mdx`
+- [ ] Podman socket not active: `systemctl enable --now podman.socket`
+- [ ] Podman version too old: minimum 4.0 required, how to upgrade
+- [ ] Container networking: containers can't reach each other (need named network, not default)
+- [ ] Volume permission errors: UID mapping in rootless mode, `:Z` / `:U` suffixes
+- [ ] Terminal/exec not working: known attach/stream compat issues, workarounds
+- [ ] CPU stats showing 0%: Podman stats edge case, expected behavior in rootless
+- [ ] Image build differences: Buildah vs BuildKit behavior
+- [ ] "Connection refused" on Podman socket: socket service not started, wrong path
+- [ ] Switching from Docker to Podman: migration steps, what to watch for
+- [ ] Compose stack issues on Podman: `podman compose` vs `podman-compose` differences
+
 ### `faq.mdx`
 - [ ] How is Icefall different from Coolify/Dokku/CapRover?
 - [ ] Can I run Icefall on ARM servers?
 - [ ] How much RAM does Icefall need?
 - [ ] Can I use Icefall with an existing Docker setup?
+- [ ] Can I use Podman instead of Docker?
+- [ ] What's the difference between Docker and Podman in Icefall?
 - [ ] Does Icefall support Kubernetes?
 - [ ] How do I migrate from Coolify/Dokku to Icefall?
 - [ ] Can I use my own reverse proxy instead of Caddy?
 - [ ] How do backups work? Where are they stored?
 - [ ] Is Icefall production-ready?
 - [ ] How do I contribute?
+- [ ] Can I switch from Docker to Podman on an existing installation?
 
 ## Standards
 
@@ -66,7 +81,9 @@ Write a comprehensive troubleshooting section covering every common issue a user
 - [ ] Each issue: symptoms, diagnostic commands, solution, prevention
 - [ ] Include actual error messages users will see (searchable)
 - [ ] Link to relevant concept docs for deeper understanding
+- [ ] All diagnostic commands shown for both Docker and Podman
 
 ## Dependencies
 
 - IF-047 (Documentation site)
+- IF-206 (Podman runtime support)
