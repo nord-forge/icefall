@@ -175,7 +175,7 @@
 }
 
 .levelOptionActive {
-  color: var(--color-primary, oklch(0.65 0.17 260));
+  color: var(--color-primary, oklch(0.65 0.17 172.85));
 }
 
 .levelIconINFO { color: var(--log-info-level); }

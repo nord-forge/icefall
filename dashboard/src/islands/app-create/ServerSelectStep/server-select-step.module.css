@@ -44,11 +44,11 @@
 
 .cardSelected {
   border-color: var(--color-primary);
-  background: oklch(0.97 0.01 260);
+  background: oklch(0.97 0.01 172.85);
 }
 
 :root[data-theme="dark"] .cardSelected {
-  background: oklch(0.20 0.02 260);
+  background: oklch(0.20 0.02 172.85);
 }
 
 .cardDisabled {

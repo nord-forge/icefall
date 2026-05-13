@@ -46,15 +46,15 @@
 }
 
 .roleBadgeCp {
-  background: oklch(0.93 0.03 260);
-  border: 1px solid oklch(0.80 0.06 260);
-  color: oklch(0.40 0.10 260);
+  background: oklch(0.93 0.03 172.85);
+  border: 1px solid oklch(0.80 0.06 172.85);
+  color: oklch(0.40 0.10 172.85);
 }
 
 :root[data-theme="dark"] .roleBadgeCp {
-  background: oklch(0.25 0.04 260);
-  border-color: oklch(0.40 0.08 260);
-  color: oklch(0.75 0.10 260);
+  background: oklch(0.25 0.04 172.85);
+  border-color: oklch(0.40 0.08 172.85);
+  color: oklch(0.75 0.10 172.85);
 }
 
 .roleBadgeWorker {

@@ -16,7 +16,7 @@
   /* Borders */
   /* a11y [WCAG 1.4.11]: darkened from 0.90 to 0.75 for 3:1 input boundary contrast */
   --color-border: oklch(0.75 0.01 250);
-  --color-border-focus: oklch(0.55 0.19 260);
+  --color-border-focus: oklch(0.50 0.11 172.85);
 
   /* Text */
   --color-text: oklch(0.15 0.02 250);
@@ -29,12 +29,12 @@
   --color-success: oklch(0.52 0.16 155);
   --color-warning: oklch(0.58 0.14 75);
   --color-error: oklch(0.53 0.20 25);
-  --color-info: oklch(0.55 0.19 260);
+  --color-info: oklch(0.50 0.11 172.85);
 
   /* Primary accent */
-  --color-primary: oklch(0.50 0.20 260);
-  --color-primary-hover: oklch(0.44 0.20 260);
-  --color-primary-subtle: oklch(0.94 0.04 260);
+  --color-primary: oklch(0.5978 0.1135 172.85);
+  --color-primary-hover: oklch(0.52 0.12 172.85);
+  --color-primary-subtle: oklch(0.94 0.03 172.85);
   --color-primary-text: oklch(1.0 0 0);
 
   /* Ice accent — cool glacial blue for interactive controls */
@@ -44,8 +44,8 @@
 
   /* Sidebar */
   --color-sidebar-bg: oklch(0.97 0.005 250);
-  --color-sidebar-active: oklch(0.94 0.04 260);
-  --color-sidebar-active-text: oklch(0.50 0.20 260);
+  --color-sidebar-active: oklch(0.94 0.03 172.85);
+  --color-sidebar-active-text: oklch(0.5978 0.1135 172.85);
 
   /* Spacing (4px base) */
   --space-1: 4px;
@@ -104,7 +104,7 @@
 
   /* a11y [WCAG 1.4.11]: raised from 0.30 to 0.36 for 3:1 input boundary contrast on dark surface */
   --color-border: oklch(0.36 0.015 250);
-  --color-border-focus: oklch(0.68 0.12 250);
+  --color-border-focus: oklch(0.65 0.11 172.85);
 
   --color-text: oklch(0.92 0.005 250);
   --color-text-secondary: oklch(0.62 0.01 250);
@@ -116,13 +116,13 @@
   --color-warning: oklch(0.68 0.14 75);
   /* a11y [WCAG 1.4.3]: darkened from 0.65 to 0.55 for white text contrast on danger buttons */
   --color-error: oklch(0.55 0.20 25);
-  --color-info: oklch(0.68 0.12 250);
+  --color-info: oklch(0.65 0.11 172.85);
 
-  /* a11y [WCAG 1.4.3]: raised from 0.55 to 0.65 for 4.5:1 text contrast on dark bg */
-  --color-primary: oklch(0.65 0.17 260);
-  /* a11y [WCAG 1.4.3]: darkened from 0.60 to 0.55 for white text contrast on hover */
-  --color-primary-hover: oklch(0.55 0.19 260);
-  --color-primary-subtle: oklch(0.22 0.06 260);
+  /* a11y [WCAG 1.4.3]: L raised for 4.5:1 text contrast on dark bg */
+  --color-primary: oklch(0.70 0.11 172.85);
+  /* a11y [WCAG 1.4.3]: darkened for white text contrast on hover */
+  --color-primary-hover: oklch(0.60 0.12 172.85);
+  --color-primary-subtle: oklch(0.22 0.05 172.85);
   --color-primary-text: oklch(1.0 0 0);
 
   --color-ice: oklch(0.62 0.12 220);
@@ -130,8 +130,8 @@
   --color-ice-subtle: oklch(0.22 0.05 220);
 
   --color-sidebar-bg: oklch(0.14 0.015 250);
-  --color-sidebar-active: oklch(0.22 0.06 260);
-  --color-sidebar-active-text: oklch(0.75 0.12 260);
+  --color-sidebar-active: oklch(0.22 0.05 172.85);
+  --color-sidebar-active-text: oklch(0.75 0.10 172.85);
 }
 
 @media (prefers-reduced-motion: reduce) {
