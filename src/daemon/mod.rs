@@ -142,6 +142,8 @@ impl DaemonRunner {
         let backup_store = Arc::new(BackupStore::new(&config.data_dir));
         let instance_backup_handle = Arc::new(InstanceBackupHandle::new(db.clone()));
 
+        let config = Arc::new(config);
+
         // Start background tasks
         spawn_server_metrics(
             server_metrics.clone(),
@@ -162,12 +164,12 @@ impl DaemonRunner {
         // Spawn periodic update checker + auto-update applier
         crate::update::scheduler::spawn_update_checker(
             db.clone(),
-            Arc::new(config.clone()),
+            config.clone(),
             event_bus.clone(),
         );
         crate::update::scheduler::spawn_auto_update_applier(
             db.clone(),
-            Arc::new(config.clone()),
+            config.clone(),
             event_bus.clone(),
         );
 
@@ -242,7 +244,7 @@ impl DaemonRunner {
             db,
             docker,
             caddy,
-            config: Arc::new(config.clone()),
+            config: config.clone(),
             event_bus,
             build_locks,
             server_metrics,

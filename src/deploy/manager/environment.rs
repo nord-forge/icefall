@@ -10,14 +10,22 @@ impl DeployManager {
         env: &Environment,
     ) -> Result<Vec<String>, DeployError> {
         let vars = self.db.get_env_vars(&env.id).await?;
-        let mut result: Vec<String> = vars
-            .into_iter()
-            .map(|v| format!("{}={}", v.key, v.value))
-            .collect();
-        if !result.iter().any(|v| v.starts_with("PORT=")) {
+        let mut has_port = false;
+        let mut has_host = false;
+        let mut result: Vec<String> = Vec::with_capacity(vars.len() + 2);
+        for v in vars {
+            if v.key == "PORT" {
+                has_port = true;
+            }
+            if v.key == "HOST" {
+                has_host = true;
+            }
+            result.push(format!("{}={}", v.key, v.value));
+        }
+        if !has_port {
             result.push("PORT=3000".to_string());
         }
-        if !result.iter().any(|v| v.starts_with("HOST=")) {
+        if !has_host {
             result.push("HOST=0.0.0.0".to_string());
         }
         Ok(result)

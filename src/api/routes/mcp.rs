@@ -173,9 +173,17 @@ async fn call_tool(
         "get_health_status" => {
             let id = str_param(p, "app_id")?;
             let checks = state.db.get_health_checks(&id).await?;
-            let mut results = Vec::new();
+            let check_ids: Vec<String> = checks.iter().map(|c| c.id.clone()).collect();
+            let all_events = state
+                .db
+                .get_health_events_for_checks(&check_ids, 10)
+                .await?;
+            let mut results = Vec::with_capacity(checks.len());
             for check in &checks {
-                let events = state.db.get_health_events(&check.id, 10).await?;
+                let events: Vec<_> = all_events
+                    .iter()
+                    .filter(|e| e.health_check_id == check.id)
+                    .collect();
                 let status = events.first().map_or("unknown", |e| e.status.as_str());
                 results.push(serde_json::json!({ "check_type": check.check_type, "status": status, "recent_events": events.len() }));
             }

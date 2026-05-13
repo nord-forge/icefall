@@ -999,6 +999,42 @@ impl Database for SqliteDatabase {
         Ok(events)
     }
 
+    async fn get_health_events_for_checks(
+        &self,
+        health_check_ids: &[String],
+        limit_per_check: i64,
+    ) -> Result<Vec<HealthCheckEvent>, DbError> {
+        if health_check_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders: Vec<&str> = health_check_ids.iter().map(|_| "?").collect();
+        let sql = format!(
+            "SELECT * FROM health_check_events WHERE health_check_id IN ({}) \
+             ORDER BY health_check_id, checked_at DESC",
+            placeholders.join(", ")
+        );
+
+        let mut query = sqlx::query_as::<_, HealthCheckEvent>(&sql);
+        for id in health_check_ids {
+            query = query.bind(id);
+        }
+
+        let all_events = query.fetch_all(&self.pool).await?;
+
+        let mut result = Vec::with_capacity(all_events.len());
+        let mut counts: std::collections::HashMap<&str, i64> = std::collections::HashMap::new();
+        for event in &all_events {
+            let count = counts.entry(&event.health_check_id).or_insert(0);
+            if *count < limit_per_check {
+                result.push(event.clone());
+                *count += 1;
+            }
+        }
+
+        Ok(result)
+    }
+
     // --- Notifications ---
 
     async fn create_notification_channel(

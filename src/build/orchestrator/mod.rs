@@ -40,8 +40,8 @@ impl BuildOrchestrator {
         build_config: Option<BuildConfig>,
     ) -> Result<BuildResult, BuildError> {
         let start = Instant::now();
-        let mut steps: Vec<BuildStep> = Vec::new();
-        let mut all_output: Vec<String> = Vec::new();
+        let mut steps: Vec<BuildStep> = Vec::with_capacity(6);
+        let mut all_output: Vec<String> = Vec::with_capacity(256);
 
         self.db
             .update_deploy_status(deploy_id, "building", None)
@@ -285,7 +285,7 @@ impl BuildOrchestrator {
         context: Bytes,
         secrets: &[String],
     ) -> Result<Vec<String>, BuildError> {
-        let mut lines = Vec::new();
+        let mut lines = Vec::with_capacity(256);
         let mut stream = self.docker.build_image(tag, context);
 
         while let Some(result) = stream.next().await {

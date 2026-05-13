@@ -154,6 +154,11 @@ pub trait Database: Send + Sync + 'static {
         health_check_id: &str,
         limit: i64,
     ) -> Result<Vec<HealthCheckEvent>, DbError>;
+    async fn get_health_events_for_checks(
+        &self,
+        health_check_ids: &[String],
+        limit_per_check: i64,
+    ) -> Result<Vec<HealthCheckEvent>, DbError>;
 
     // Notifications
     async fn create_notification_channel(
