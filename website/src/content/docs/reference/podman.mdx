@@ -1,0 +1,308 @@
+---
+title: Podman Runtime
+description: Use Podman as an alternative container runtime for Icefall.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+Icefall supports Podman as an opt-in alternative to Docker. Both runtimes use the same container API (OCI-compatible), so all Icefall features work identically regardless of which runtime you choose.
+
+<Aside type="note">
+Docker is the default and recommended runtime. Podman support is opt-in for environments where Docker is unavailable or where rootless containers are required.
+</Aside>
+
+## Configuration
+
+### Config file
+
+Set the runtime in your `config.toml`:
+
+```toml title="/etc/icefall/config.toml"
+runtime = "podman"
+container_socket = "/run/podman/podman.sock"
+```
+
+### Environment variables
+
+Override at runtime without changing the config file:
+
+```bash
+# Set runtime explicitly
+export ICEFALL_RUNTIME=podman
+
+# Or point to the Podman socket (runtime auto-detected from path)
+export ICEFALL_CONTAINER_SOCKET=/run/podman/podman.sock
+```
+
+When `ICEFALL_RUNTIME=podman` is set, Icefall automatically switches the socket path to `/run/podman/podman.sock` unless you've set a custom socket path.
+
+### Detection logic
+
+Icefall determines the runtime in this order:
+
+1. `ICEFALL_RUNTIME` env var (`docker` or `podman`)
+2. `ICEFALL_CONTAINER_SOCKET` env var (auto-detects from socket path)
+3. `runtime` field in `config.toml`
+4. Default: `docker` with socket at `/var/run/docker.sock`
+
+If the socket path contains `podman`, the runtime is automatically set to Podman regardless of other settings.
+
+## Setup
+
+### Installing Podman
+
+<Tabs>
+  <TabItem label="Ubuntu / Debian">
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y podman
+    ```
+  </TabItem>
+  <TabItem label="Fedora / RHEL">
+    ```bash
+    sudo dnf install -y podman
+    ```
+  </TabItem>
+  <TabItem label="Arch">
+    ```bash
+    sudo pacman -S podman
+    ```
+  </TabItem>
+</Tabs>
+
+### Enabling the Podman socket
+
+Icefall communicates with the container runtime via a Unix socket. Podman's socket service must be running:
+
+```bash
+# Enable and start the Podman socket (system-wide, root mode)
+sudo systemctl enable --now podman.socket
+
+# Verify the socket is active
+sudo curl --unix-socket /run/podman/podman.sock http://localhost/v4.0.0/libpod/info | head -c 200
+```
+
+For rootless Podman (user-level), enable the user socket instead:
+
+```bash
+systemctl --user enable --now podman.socket
+
+# The socket path will be:
+# /run/user/$(id -u)/podman/podman.sock
+```
+
+If using rootless Podman, set the socket path accordingly:
+
+```toml title="/etc/icefall/config.toml"
+runtime = "podman"
+container_socket = "/run/user/1000/podman/podman.sock"
+```
+
+### Verifying the connection
+
+After configuring Icefall, check that it can reach the Podman socket:
+
+```bash
+# Check Icefall logs after starting
+sudo journalctl -u icefall -n 20
+
+# You should see:
+# Container runtime connected (podman)
+```
+
+## Behavioral differences
+
+Podman is API-compatible with Docker through its Docker-compatible socket, but there are some differences to be aware of:
+
+### What works identically
+
+| Feature | Status |
+|---------|--------|
+| Container create / start / stop / remove | Identical |
+| Image pull / build / tag / remove | Identical |
+| Volume create / remove | Identical |
+| Network create / remove | Identical |
+| Container logs (streaming) | Identical |
+| Container exec | Identical |
+| Health checks | Identical |
+| Port mapping | Identical |
+| Environment variables | Identical |
+| Resource limits (memory, CPU) | Identical |
+| Docker Compose files | Works via `podman compose` |
+
+### Known differences
+
+| Area | Docker | Podman | Impact |
+|------|--------|--------|--------|
+| **Daemon** | Runs as a persistent daemon (`dockerd`) | Daemonless — socket-activated on demand | First API call after idle may have ~100ms extra latency |
+| **Default networking** | Bridge network with DNS by default | Requires explicit network creation for DNS | Icefall creates networks explicitly, so this is handled |
+| **Compose** | `docker compose` (built-in plugin) | `podman compose` (separate install) | Install `podman-compose` or `docker-compose` |
+| **Build cache** | Shared layer cache by default | Cache behavior depends on storage driver | Builds may be slightly slower on first run |
+| **Rootless mode** | Requires extra setup | Rootless by default | Icefall works with both root and rootless |
+| **Systemd integration** | `dockerd.service` always running | Socket-activated, starts on demand | Lower idle resource usage |
+| **Image storage** | `/var/lib/docker` | `/var/lib/containers` (root) or `~/.local/share/containers` (rootless) | Different cleanup paths |
+
+### Compose support
+
+Icefall uses the `compose_command` for the configured runtime:
+
+- **Docker:** `docker compose`
+- **Podman:** `podman compose`
+
+Make sure you have a Compose implementation installed:
+
+```bash
+# Option 1: podman-compose (Python-based)
+pip install podman-compose
+
+# Option 2: docker-compose standalone
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+## Command reference
+
+Icefall abstracts the container runtime through its API, so you rarely need to interact with Podman directly. For debugging, here are the equivalent commands:
+
+### Container management
+
+| Icefall action | Podman equivalent |
+|----------------|-------------------|
+| Start app | `podman start <container>` |
+| Stop app | `podman stop <container>` |
+| Restart app | `podman restart <container>` |
+| View logs | `podman logs -f <container>` |
+| Exec into container | `podman exec -it <container> sh` |
+| List Icefall containers | `podman ps --filter label=icefall.app` |
+
+### Image management
+
+| Icefall action | Podman equivalent |
+|----------------|-------------------|
+| List images | `podman images --filter reference=icefall/*` |
+| Remove old images | `podman image prune -f` |
+| Inspect image | `podman inspect <image>` |
+
+### Volume management
+
+| Icefall action | Podman equivalent |
+|----------------|-------------------|
+| List volumes | `podman volume ls --filter name=icefall` |
+| Inspect volume | `podman volume inspect <name>` |
+| Remove volume | `podman volume rm <name>` |
+
+### Network management
+
+| Icefall action | Podman equivalent |
+|----------------|-------------------|
+| List networks | `podman network ls --filter name=icefall` |
+| Inspect network | `podman network inspect <name>` |
+
+## Migrating from Docker to Podman
+
+### Before you start
+
+1. Back up your Icefall instance: `icefall migrate export backup.tar.gz`
+2. Note your running apps: `icefall apps list`
+3. Stop the Icefall daemon: `sudo systemctl stop icefall`
+
+### Migration steps
+
+```bash
+# 1. Install Podman
+sudo apt-get install -y podman
+
+# 2. Enable the Podman socket
+sudo systemctl enable --now podman.socket
+
+# 3. Update Icefall config
+sudo sed -i 's/^runtime = "docker"/runtime = "podman"/' /etc/icefall/config.toml
+sudo sed -i 's|container_socket = "/var/run/docker.sock"|container_socket = "/run/podman/podman.sock"|' /etc/icefall/config.toml
+
+# 4. Restart Icefall
+sudo systemctl start icefall
+
+# 5. Verify the connection
+sudo journalctl -u icefall -n 5 | grep "Container runtime"
+# Should show: Container runtime connected (podman)
+
+# 6. Redeploy your apps (images need to be rebuilt for Podman's storage)
+icefall apps list
+# For each app, trigger a new deploy from the dashboard or CLI
+```
+
+<Aside type="caution">
+Docker images are stored in `/var/lib/docker` and Podman images in `/var/lib/containers`. Switching runtimes means your existing container images are not shared between them. Apps will need a fresh deploy to pull or build images under Podman.
+</Aside>
+
+### Rolling back to Docker
+
+If you need to switch back:
+
+```bash
+# 1. Stop Icefall
+sudo systemctl stop icefall
+
+# 2. Revert config
+sudo sed -i 's/^runtime = "podman"/runtime = "docker"/' /etc/icefall/config.toml
+sudo sed -i 's|container_socket = "/run/podman/podman.sock"|container_socket = "/var/run/docker.sock"|' /etc/icefall/config.toml
+
+# 3. Restart
+sudo systemctl start icefall
+```
+
+## Troubleshooting
+
+### "Container runtime connection failed"
+
+The Podman socket is not running or Icefall can't reach it.
+
+```bash
+# Check if the socket is active
+sudo systemctl status podman.socket
+
+# Check if the socket file exists
+ls -la /run/podman/podman.sock
+
+# Try a direct API call
+sudo curl --unix-socket /run/podman/podman.sock http://localhost/v4.0.0/libpod/info
+```
+
+### "Permission denied" on socket
+
+Icefall needs read/write access to the Podman socket.
+
+```bash
+# Check socket permissions
+ls -la /run/podman/podman.sock
+
+# If running Icefall as a non-root user, add it to the podman group
+# or use rootless Podman with the user socket path
+```
+
+### Builds are slower than Docker
+
+Podman may not share build cache as aggressively as Docker, especially on first builds. Subsequent builds should be comparable. If builds are consistently slow:
+
+```bash
+# Check Podman's storage driver
+podman info --format '{{.Store.GraphDriverName}}'
+
+# overlay2 is recommended for best performance
+# If using vfs, switch to overlay:
+# Edit /etc/containers/storage.conf
+# [storage]
+# driver = "overlay"
+```
+
+### Database containers not starting
+
+Some database images (especially CockroachDB) may need additional Podman configuration for volume permissions:
+
+```bash
+# Check container logs
+podman logs icefall-db-<name>
+
+# If permission errors, try:
+podman unshare chown -R 999:999 /var/lib/containers/storage/volumes/<volume>/_data
+```
