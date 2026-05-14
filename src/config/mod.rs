@@ -115,6 +115,8 @@ pub struct IcefallConfig {
     pub health_check_interval_ms: u64,
     #[serde(default = "defaults::deploy_stop_timeout_secs")]
     pub deploy_stop_timeout_secs: i64,
+    #[serde(default = "defaults::ssl_check_interval_hours")]
+    pub ssl_check_interval_hours: u64,
 }
 
 impl IcefallConfig {
@@ -267,6 +269,7 @@ impl Default for IcefallConfig {
             health_check_attempts: defaults::health_check_attempts(),
             health_check_interval_ms: defaults::health_check_interval_ms(),
             deploy_stop_timeout_secs: defaults::deploy_stop_timeout_secs(),
+            ssl_check_interval_hours: defaults::ssl_check_interval_hours(),
         }
     }
 }

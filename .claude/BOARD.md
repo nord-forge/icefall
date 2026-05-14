@@ -305,13 +305,13 @@
 | [IF-214](tickets/phase-24-feature-parity/IF-214-docker-cleanup-per-server.md) | Container cleanup per server | — | Per-server cleanup config, thresholds, execution history, manual trigger |
 | [IF-215](tickets/phase-24-feature-parity/IF-215-database-backup-import-restore.md) | Database backup import & restore | — | Upload dump file or restore from S3, per-engine commands, chunked upload |
 | [IF-216](tickets/phase-24-feature-parity/IF-216-server-disk-usage-alerts.md) | Server disk usage alerts | 2026-05-14 | Per-server thresholds, state machine (normal/warning/critical), DiskAlert events |
-| [IF-217](tickets/phase-24-feature-parity/IF-217-ssl-certificate-monitoring.md) | SSL certificate expiration monitoring | — | Daily cert check, expiry alerts at 14d/7d/0d, domain status indicators |
-| [IF-218](tickets/phase-24-feature-parity/IF-218-global-search.md) | Global search across resources | — | Persistent search bar, unified cross-type results, keyboard nav |
-| [IF-219](tickets/phase-24-feature-parity/IF-219-unmanaged-container-visibility.md) | Unmanaged container visibility | — | Show non-Icefall containers on server, basic lifecycle actions |
+| [IF-217](tickets/phase-24-feature-parity/IF-217-ssl-certificate-monitoring.md) | SSL certificate expiration monitoring | 2026-05-14 | Daily openssl check, domain SSL fields, expiry alerts at 14d/7d/0d |
+| [IF-218](tickets/phase-24-feature-parity/IF-218-global-search.md) | Global search across resources | 2026-05-14 | `GET /search?q=` — LIKE across apps/databases/servers/projects/domains |
+| [IF-219](tickets/phase-24-feature-parity/IF-219-unmanaged-container-visibility.md) | Unmanaged container visibility | 2026-05-14 | `GET /servers/{id}/containers?unmanaged=true`, label-based filtering |
 | [IF-220](tickets/phase-24-feature-parity/IF-220-configuration-drift-detection.md) | Configuration drift detection | 2026-05-14 | SHA-256 config hash, drift API, DriftBanner component, stores hash on deploy |
 | [IF-221](tickets/phase-24-feature-parity/IF-221-force-rebuild-without-cache.md) | Force rebuild without cache | 2026-05-14 | no_cache param through full pipeline, split deploy button, CLI --no-cache, MCP |
 | [IF-222](tickets/phase-24-feature-parity/IF-222-deployment-cancel.md) | Cancel in-progress deployment | 2026-05-14 | Cancel API, status check between build steps, cancel button in DeploysTab |
-| [IF-223](tickets/phase-24-feature-parity/IF-223-webhook-outbound-generic.md) | Outbound webhook notifications | — | Configurable HTTP webhooks with HMAC, retry, delivery log |
+| [IF-223](tickets/phase-24-feature-parity/IF-223-webhook-outbound-generic.md) | Outbound webhook notifications | 2026-05-14 | Multiple endpoints, HMAC-SHA256 signing, delivery log, test button |
 | [IF-224](tickets/phase-24-feature-parity/IF-224-git-submodule-lfs-support.md) | Git submodule & LFS support | 2026-05-14 | submodules/lfs/shallow toggles on GitCloneOptions, post-clone steps |
 | [IF-225](tickets/phase-24-feature-parity/IF-225-database-ssl-certificates.md) | Database SSL certificates | — | Per-server CA, per-DB certs, SSL mode config, cert rotation |
 
@@ -386,8 +386,8 @@
 | Metric | Count |
 |--------|-------|
 | Total tickets | 220 |
-| Done | 156 |
-| Backlog | 63 |
+| Done | 160 |
+| Backlog | 59 |
 | Superseded | 1 |
 | Phases complete | 20 / 28 |
 
@@ -415,7 +415,7 @@
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
 | 23 — Rust Quality | **Done** | 7/7 |
-| 24 — Feature Parity | **In Progress** | 7/18 |
+| 24 — Feature Parity | **In Progress** | 11/18 |
 | 25 — Parity Gaps | **In Progress** | 1/17 |
 | 26 — Icefall+ | Backlog | 0/20 |
 | 27 — MCP Expansion | Backlog | 0/3 |

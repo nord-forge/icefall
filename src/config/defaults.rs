@@ -88,3 +88,7 @@ pub fn health_check_interval_ms() -> u64 {
 pub fn deploy_stop_timeout_secs() -> i64 {
     10
 }
+
+pub fn ssl_check_interval_hours() -> u64 {
+    24
+}

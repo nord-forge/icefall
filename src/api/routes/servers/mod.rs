@@ -1,4 +1,5 @@
 mod agent;
+mod containers;
 mod crud;
 mod scripts;
 
@@ -29,6 +30,10 @@ pub fn routes() -> Router<AppState> {
         .route("/servers/update-all", post(agent::update_all_agents))
         .route("/agent/download/{target}", get(scripts::download_agent))
         .route("/agent/uninstall", get(scripts::uninstall_script))
+        .route(
+            "/servers/{id}/containers",
+            get(containers::list_server_containers),
+        )
 }
 
 pub(crate) async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {

@@ -87,6 +87,38 @@ pub trait Database: Send + Sync + 'static {
         ssl_status: &str,
     ) -> Result<(), DbError>;
     async fn delete_domain(&self, id: &str) -> Result<(), DbError>;
+    async fn list_all_domains(&self) -> Result<Vec<Domain>, DbError>;
+    async fn update_domain_ssl_info(
+        &self,
+        id: &str,
+        issuer: Option<&str>,
+        expires_at: Option<&str>,
+    ) -> Result<(), DbError>;
+
+    // Webhook endpoints
+    async fn list_webhook_endpoints(&self) -> Result<Vec<WebhookEndpoint>, DbError>;
+    async fn create_webhook_endpoint(
+        &self,
+        endpoint: &NewWebhookEndpoint,
+    ) -> Result<WebhookEndpoint, DbError>;
+    async fn delete_webhook_endpoint(&self, id: &str) -> Result<(), DbError>;
+    async fn create_webhook_delivery(
+        &self,
+        endpoint_id: &str,
+        event: &str,
+        status_code: Option<i32>,
+        response_time_ms: Option<i32>,
+        attempt: i32,
+        error: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_webhook_deliveries(
+        &self,
+        endpoint_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WebhookDelivery>, DbError>;
+
+    // Search
+    async fn search(&self, query: &str) -> Result<serde_json::Value, DbError>;
 
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
