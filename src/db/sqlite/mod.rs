@@ -1,6 +1,7 @@
 mod apps;
 mod audit;
 mod backups;
+mod cleanup;
 mod databases;
 mod deploys;
 mod domains;
@@ -11,9 +12,11 @@ mod notifications;
 mod oauth;
 mod onboarding;
 mod projects;
+mod scheduled_tasks;
 mod search;
 mod servers;
 mod sessions;
+mod shared_variables;
 mod updates;
 mod users;
 mod webhooks;
@@ -313,6 +316,123 @@ impl Database for SqliteDatabase {
 
     async fn search(&self, query: &str) -> Result<serde_json::Value, DbError> {
         search::search(&self.pool, query).await
+    }
+
+    // --- Scheduled tasks ---
+
+    async fn list_scheduled_tasks(&self, app_id: &str) -> Result<Vec<ScheduledTask>, DbError> {
+        scheduled_tasks::list_scheduled_tasks(&self.pool, app_id).await
+    }
+
+    async fn create_scheduled_task(
+        &self,
+        task: &NewScheduledTask,
+    ) -> Result<ScheduledTask, DbError> {
+        scheduled_tasks::create_scheduled_task(&self.pool, task).await
+    }
+
+    async fn update_scheduled_task_enabled(&self, id: &str, enabled: bool) -> Result<(), DbError> {
+        scheduled_tasks::update_scheduled_task_enabled(&self.pool, id, enabled).await
+    }
+
+    async fn delete_scheduled_task(&self, id: &str) -> Result<(), DbError> {
+        scheduled_tasks::delete_scheduled_task(&self.pool, id).await
+    }
+
+    async fn list_all_enabled_scheduled_tasks(&self) -> Result<Vec<ScheduledTask>, DbError> {
+        scheduled_tasks::list_all_enabled_scheduled_tasks(&self.pool).await
+    }
+
+    async fn create_task_execution(
+        &self,
+        task_id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<ScheduledTaskExecution, DbError> {
+        scheduled_tasks::create_task_execution(&self.pool, task_id, status, output).await
+    }
+
+    async fn update_task_execution(
+        &self,
+        id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<(), DbError> {
+        scheduled_tasks::update_task_execution(&self.pool, id, status, output).await
+    }
+
+    async fn list_task_executions(
+        &self,
+        task_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ScheduledTaskExecution>, DbError> {
+        scheduled_tasks::list_task_executions(&self.pool, task_id, limit).await
+    }
+
+    // --- Shared variables ---
+
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::list_shared_variables(&self.pool, scope, scope_id).await
+    }
+
+    async fn create_shared_variable(
+        &self,
+        var: &NewSharedVariable,
+    ) -> Result<SharedVariable, DbError> {
+        shared_variables::create_shared_variable(&self.pool, var).await
+    }
+
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError> {
+        shared_variables::delete_shared_variable(&self.pool, id).await
+    }
+
+    async fn resolve_shared_variables(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<(String, String, String)>, DbError> {
+        shared_variables::resolve_shared_variables(&self.pool, app_id).await
+    }
+
+    // --- Container cleanup ---
+
+    async fn create_cleanup_execution(
+        &self,
+        server_id: &str,
+    ) -> Result<ContainerCleanupExecution, DbError> {
+        cleanup::create_cleanup_execution(&self.pool, server_id).await
+    }
+
+    async fn update_cleanup_execution(
+        &self,
+        id: &str,
+        status: &str,
+        space_reclaimed: Option<i64>,
+        images: i32,
+        volumes: i32,
+        networks: i32,
+    ) -> Result<(), DbError> {
+        cleanup::update_cleanup_execution(
+            &self.pool,
+            id,
+            status,
+            space_reclaimed,
+            images,
+            volumes,
+            networks,
+        )
+        .await
+    }
+
+    async fn list_cleanup_executions(
+        &self,
+        server_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ContainerCleanupExecution>, DbError> {
+        cleanup::list_cleanup_executions(&self.pool, server_id, limit).await
     }
 
     // --- Users ---

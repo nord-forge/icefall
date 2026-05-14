@@ -20,10 +20,12 @@ pub mod onboarding;
 pub mod openapi;
 pub mod profile;
 pub mod projects;
+pub mod scheduled_tasks;
 pub mod search;
 pub mod server;
 pub mod servers;
 pub mod settings;
+pub mod shared_variables;
 pub mod terminal;
 pub mod two_factor;
 pub mod update;
@@ -69,6 +71,8 @@ pub fn api_routes() -> Router<AppState> {
         .merge(update::routes())
         .merge(audit::routes())
         .merge(openapi::routes())
+        .merge(scheduled_tasks::routes())
+        .merge(shared_variables::routes())
         .route("/search", axum::routing::get(search::search))
         .route(
             "/notifications/webhooks",

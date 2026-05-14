@@ -296,13 +296,13 @@
 ### Phase 24 — Feature Parity
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-208](tickets/phase-24-feature-parity/IF-208-scheduled-tasks-cron-in-container.md) | Scheduled tasks (cron-in-container) | — | Cron-based tasks via container exec, execution history, manual trigger |
-| [IF-209](tickets/phase-24-feature-parity/IF-209-shared-variables-hierarchical.md) | Shared variables (hierarchical) | — | Project/server-scoped env vars with cascade inheritance |
+| [IF-208](tickets/phase-24-feature-parity/IF-208-scheduled-tasks-cron-in-container.md) | Scheduled tasks (cron-in-container) | 2026-05-14 | CRUD + run-now + execution history, container exec, per-app task management |
+| [IF-209](tickets/phase-24-feature-parity/IF-209-shared-variables-hierarchical.md) | Shared variables (hierarchical) | 2026-05-14 | Project/server scopes, cascade resolution, upsert on conflict, resolve endpoint |
 | [IF-210](tickets/phase-24-feature-parity/IF-210-environment-cloning.md) | Environment cloning | — | Clone environments/resources to other projects, servers; optional volume data copy |
 | [IF-211](tickets/phase-24-feature-parity/IF-211-pre-deploy-commands.md) | Pre-deployment commands | 2026-05-14 | pre_deploy_commands field, exec in container after health check, fail-stops deploy |
 | [IF-212](tickets/phase-24-feature-parity/IF-212-http-basic-auth-per-app.md) | HTTP basic auth per app | 2026-05-14 | bcrypt hash, Caddy authentication handler, with_basic_auth route builder |
 | [IF-213](tickets/phase-24-feature-parity/IF-213-server-ssh-terminal.md) | Server-level terminal | — | In-browser host OS shell via PTY, admin-only, per-server enable |
-| [IF-214](tickets/phase-24-feature-parity/IF-214-docker-cleanup-per-server.md) | Container cleanup per server | — | Per-server cleanup config, thresholds, execution history, manual trigger |
+| [IF-214](tickets/phase-24-feature-parity/IF-214-docker-cleanup-per-server.md) | Container cleanup per server | 2026-05-14 | 8 per-server config fields, execution history table, cleanup CRUD |
 | [IF-215](tickets/phase-24-feature-parity/IF-215-database-backup-import-restore.md) | Database backup import & restore | — | Upload dump file or restore from S3, per-engine commands, chunked upload |
 | [IF-216](tickets/phase-24-feature-parity/IF-216-server-disk-usage-alerts.md) | Server disk usage alerts | 2026-05-14 | Per-server thresholds, state machine (normal/warning/critical), DiskAlert events |
 | [IF-217](tickets/phase-24-feature-parity/IF-217-ssl-certificate-monitoring.md) | SSL certificate expiration monitoring | 2026-05-14 | Daily openssl check, domain SSL fields, expiry alerts at 14d/7d/0d |
@@ -386,8 +386,8 @@
 | Metric | Count |
 |--------|-------|
 | Total tickets | 220 |
-| Done | 160 |
-| Backlog | 59 |
+| Done | 163 |
+| Backlog | 56 |
 | Superseded | 1 |
 | Phases complete | 20 / 28 |
 
@@ -415,7 +415,7 @@
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
 | 23 — Rust Quality | **Done** | 7/7 |
-| 24 — Feature Parity | **In Progress** | 11/18 |
+| 24 — Feature Parity | **In Progress** | 14/18 |
 | 25 — Parity Gaps | **In Progress** | 1/17 |
 | 26 — Icefall+ | Backlog | 0/20 |
 | 27 — MCP Expansion | Backlog | 0/3 |

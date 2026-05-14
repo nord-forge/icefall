@@ -120,6 +120,73 @@ pub trait Database: Send + Sync + 'static {
     // Search
     async fn search(&self, query: &str) -> Result<serde_json::Value, DbError>;
 
+    // Scheduled tasks
+    async fn list_scheduled_tasks(&self, app_id: &str) -> Result<Vec<ScheduledTask>, DbError>;
+    async fn create_scheduled_task(
+        &self,
+        task: &NewScheduledTask,
+    ) -> Result<ScheduledTask, DbError>;
+    async fn update_scheduled_task_enabled(
+        &self,
+        id: &str,
+        enabled: bool,
+    ) -> Result<(), DbError>;
+    async fn delete_scheduled_task(&self, id: &str) -> Result<(), DbError>;
+    async fn list_all_enabled_scheduled_tasks(&self) -> Result<Vec<ScheduledTask>, DbError>;
+    async fn create_task_execution(
+        &self,
+        task_id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<ScheduledTaskExecution, DbError>;
+    async fn update_task_execution(
+        &self,
+        id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_task_executions(
+        &self,
+        task_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ScheduledTaskExecution>, DbError>;
+
+    // Shared variables
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError>;
+    async fn create_shared_variable(
+        &self,
+        var: &NewSharedVariable,
+    ) -> Result<SharedVariable, DbError>;
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError>;
+    async fn resolve_shared_variables(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<(String, String, String)>, DbError>;
+
+    // Container cleanup executions
+    async fn create_cleanup_execution(
+        &self,
+        server_id: &str,
+    ) -> Result<ContainerCleanupExecution, DbError>;
+    async fn update_cleanup_execution(
+        &self,
+        id: &str,
+        status: &str,
+        space_reclaimed: Option<i64>,
+        images: i32,
+        volumes: i32,
+        networks: i32,
+    ) -> Result<(), DbError>;
+    async fn list_cleanup_executions(
+        &self,
+        server_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ContainerCleanupExecution>, DbError>;
+
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;
