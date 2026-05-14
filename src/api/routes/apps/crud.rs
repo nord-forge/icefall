@@ -41,6 +41,7 @@ pub(super) struct UpdateAppRequest {
     compose_content: Option<Option<String>>,
     project_id: Option<Option<String>>,
     deploy_mode: Option<String>,
+    disable_build_cache: Option<bool>,
 }
 
 pub(super) async fn list_apps(
@@ -148,6 +149,7 @@ pub(super) async fn create_app(
                     project_id: None,
                     deploy_mode: None,
                     server_id: None,
+                    disable_build_cache: None,
                 },
             )
             .await;
@@ -209,6 +211,7 @@ pub(super) async fn update_app(
                 project_id: body.project_id,
                 deploy_mode: body.deploy_mode,
                 server_id: None,
+                disable_build_cache: body.disable_build_cache,
             },
         )
         .await?;

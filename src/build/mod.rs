@@ -31,4 +31,6 @@ pub enum BuildError {
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Detect(#[from] DetectError),
+    #[error("build cancelled")]
+    Cancelled,
 }

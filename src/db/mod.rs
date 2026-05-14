@@ -196,6 +196,11 @@ pub trait Database: Send + Sync + 'static {
         deploy_id: &str,
         env_snapshot: &str,
     ) -> Result<(), DbError>;
+    async fn update_deploy_config_hash(
+        &self,
+        deploy_id: &str,
+        config_hash: &str,
+    ) -> Result<(), DbError>;
 
     // User profile updates
     async fn update_user_password(&self, user_id: &str, password_hash: &str)

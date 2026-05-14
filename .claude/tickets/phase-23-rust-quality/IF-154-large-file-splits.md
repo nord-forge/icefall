@@ -16,12 +16,12 @@ After the sqlite.rs split (IF-153), several other Rust files exceed 500 lines an
 | `src/api/routes/oauth.rs` | 726 | `oauth/mod.rs` (router mount), `oauth/github.rs` (GitHub PKCE flow), `oauth/google.rs` (Google PKCE flow), `oauth/linking.rs` (account linking logic) |
 | `src/cli/commands/migrate.rs` | 712 | `migrate/mod.rs` (CLI args), `migrate/export.rs` (tar.gz creation), `migrate/import.rs` (restore + validation) |
 | `src/api/routes/servers.rs` | 698 | `servers/mod.rs` (router), `servers/crud.rs` (CRUD endpoints), `servers/agent.rs` (enrollment + WebSocket), `servers/metrics.rs` (metric endpoints) |
-| `src/deploy/manager.rs` | 694 | `manager/mod.rs` (DeployManager struct + deploy entry point), `manager/local.rs` (local Docker deploy logic), `manager/remote.rs` (remote deploy via agent), `manager/blue_green.rs` (blue-green swap logic) |
+| `src/deploy/manager.rs` | 694 | `manager/mod.rs` (DeployManager struct + deploy entry point), `manager/local.rs` (local container deploy logic), `manager/remote.rs` (remote deploy via agent), `manager/blue_green.rs` (blue-green swap logic) |
 | `src/api/routes/update.rs` | 657 | `update/mod.rs` (router), `update/check.rs` (version check + discovery), `update/apply.rs` (trigger + status), `update/settings.rs` (auto-update config) |
 | `src/api/routes/apps.rs` | 598 | `apps/mod.rs` (router), `apps/crud.rs` (create/read/update/delete), `apps/actions.rs` (start/stop/restart/migrate) |
 | `src/api/routes/databases.rs` | 554 | `databases/mod.rs` (router), `databases/crud.rs` (provisioning + CRUD), `databases/backups.rs` (backup endpoints), `databases/browser.rs` (query browser) — or merge `db_browser.rs` into this |
 | `src/db/models.rs` | 515 | `models/mod.rs` (re-exports), `models/app.rs`, `models/deploy.rs`, `models/user.rs`, `models/server.rs`, `models/settings.rs` — group by domain |
-| `src/build/orchestrator.rs` | 510 | `orchestrator/mod.rs` (pipeline entry), `orchestrator/clone.rs` (git clone), `orchestrator/detect.rs` (framework detection dispatch), `orchestrator/build.rs` (Docker image build) |
+| `src/build/orchestrator.rs` | 510 | `orchestrator/mod.rs` (pipeline entry), `orchestrator/clone.rs` (git clone), `orchestrator/detect.rs` (framework detection dispatch), `orchestrator/build.rs` (container image build) |
 | `src/update/apply.rs` | 505 | `apply/mod.rs` (update flow), `apply/download.rs` (fetch + verify), `apply/swap.rs` (atomic binary replacement + migrations) |
 
 ## Acceptance Criteria

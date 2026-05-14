@@ -16,5 +16,9 @@ pub fn routes() -> Router<AppState> {
             "/apps/{id}/deploys/{deploy_id}/rollback",
             post(operations::rollback_deploy),
         )
+        .route(
+            "/deploys/{deploy_id}/cancel",
+            post(operations::cancel_deploy),
+        )
         .route("/deploys/latest", get(query::get_latest_deploys))
 }

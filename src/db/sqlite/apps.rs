@@ -126,12 +126,15 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.server_id.as_deref(),
     };
+    let disable_build_cache = update
+        .disable_build_cache
+        .unwrap_or(existing.disable_build_cache);
     let now = now_iso8601();
 
     sqlx::query(
         "UPDATE apps SET name = ?, git_repo = ?, git_branch = ?, framework = ?,
          build_config = ?, resource_limits = ?, preview_enabled = ?,
-         preview_branch_pattern = ?, tags = ?, volumes = ?, image_ref = ?, compose_content = ?, project_id = ?, deploy_mode = ?, server_id = ?, updated_at = ? WHERE id = ?",
+         preview_branch_pattern = ?, tags = ?, volumes = ?, image_ref = ?, compose_content = ?, project_id = ?, deploy_mode = ?, server_id = ?, disable_build_cache = ?, updated_at = ? WHERE id = ?",
     )
     .bind(name)
     .bind(git_repo)
@@ -148,6 +151,7 @@ pub(super) async fn update_app(
     .bind(project_id)
     .bind(deploy_mode)
     .bind(server_id)
+    .bind(disable_build_cache)
     .bind(&now)
     .bind(id)
     .execute(pool)

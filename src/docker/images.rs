@@ -39,11 +39,13 @@ impl DockerClient {
         &self,
         tag: &str,
         tar: Bytes,
+        no_cache: bool,
     ) -> impl Stream<Item = Result<BuildInfo, DockerError>> + '_ {
         let options = BuildImageOptions {
             t: Some(tag.to_string()),
             rm: true,
             forcerm: true,
+            nocache: no_cache,
             ..Default::default()
         };
 

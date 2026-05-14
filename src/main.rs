@@ -16,7 +16,7 @@ async fn main() {
         },
         Commands::Init => icefall::cli::init::run().await,
         Commands::Login => icefall::cli::commands::login::run().await,
-        Commands::Deploy => icefall::cli::commands::deploy::run().await,
+        Commands::Deploy { no_cache } => icefall::cli::commands::deploy::run(no_cache).await,
         Commands::Apps { command } => match command {
             AppsCommands::List => icefall::cli::commands::apps::list().await,
             AppsCommands::Info { app } => icefall::cli::commands::apps::info(&app).await,

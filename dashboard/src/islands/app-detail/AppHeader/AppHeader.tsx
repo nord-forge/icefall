@@ -4,7 +4,7 @@ import Button from '@islands/shared/Button/Button';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import { useState } from 'preact/hooks';
-import { Settings, Rocket, GitBranch, Container, Layers, Square, Play, RotateCw } from 'lucide-preact';
+import { Settings, Rocket, GitBranch, Container, Layers, Square, Play, RotateCw, ChevronDown, Zap } from 'lucide-preact';
 import styles from './app-header.module.css';
 
 type Props = {
@@ -21,20 +21,20 @@ export default function AppHeader({ app, status, onStatusChange, serverName, ser
   const [starting, setStarting] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [optimisticStatus, setOptimisticStatus] = useState<DeployStatus | 'online' | null>(null);
+  const [deployMenuOpen, setDeployMenuOpen] = useState(false);
 
   const displayStatus = optimisticStatus ?? status;
   const isRunning = displayStatus === 'running' || displayStatus === 'online';
   const isStopped = displayStatus === 'stopped';
 
-  async function handleDeploy() {
+  async function handleDeploy(noCache = false) {
     setDeploying(true);
-    // Optimistic: show deploying status immediately
+    setDeployMenuOpen(false);
     setOptimisticStatus('deploying');
     try {
-      await api.triggerDeploy(app.id);
+      await api.triggerDeploy(app.id, noCache ? { no_cache: true } : undefined);
       window.location.href = `/apps/${app.id}/deploys`;
     } catch (err: any) {
-      // Revert optimistic status
       setOptimisticStatus(null);
       addToast('error', err.message || 'Failed to trigger deploy');
       setDeploying(false);
@@ -156,9 +156,33 @@ export default function AppHeader({ app, status, onStatusChange, serverName, ser
             <Settings size={14} /> Settings
           </Button>
         </a>
-        <Button variant="primary" onClick={handleDeploy} loading={deploying}>
-          <Rocket size={14} /> Deploy
-        </Button>
+        <div class={styles.deployGroup}>
+          <Button variant="primary" onClick={() => handleDeploy(false)} loading={deploying}>
+            <Rocket size={14} /> Deploy
+          </Button>
+          <button
+            type="button"
+            class={styles.deployMenuToggle}
+            onClick={() => setDeployMenuOpen(!deployMenuOpen)}
+            aria-expanded={deployMenuOpen}
+            aria-haspopup="true"
+            aria-label="Deploy options"
+          >
+            <ChevronDown size={14} />
+          </button>
+          {deployMenuOpen && (
+            <div class={styles.deployMenu} role="menu">
+              <button
+                type="button"
+                class={styles.deployMenuItem}
+                role="menuitem"
+                onClick={() => handleDeploy(true)}
+              >
+                <Zap size={14} /> Force Rebuild (no cache)
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -28,7 +28,7 @@ Run `cargo test -- --list` to get the full count. Key gaps based on code inspect
 
 ### Deploy Pipeline Tests
 
-- [ ] Unit test: `DeployManager::deploy` with a mock Docker client — verify the blue-green sequence
+- [ ] Unit test: `DeployManager::deploy` with a mock container runtime client — verify the blue-green sequence
 - [ ] Unit test: rollback triggers when health check fails
 - [ ] Unit test: Compose parser handles valid multi-service files
 - [ ] Unit test: Compose parser rejects invalid/malformed files gracefully
@@ -73,14 +73,14 @@ Run `cargo test -- --list` to get the full count. Key gaps based on code inspect
 
 - Use `axum::test::TestClient` for API route tests — it runs the full middleware stack
 - For database tests, use an in-memory SQLite database (`sqlite::memory:`)
-- Mock the Docker client using a trait + mock implementation rather than hitting a real Docker daemon
+- Mock the container runtime client using a trait + mock implementation rather than hitting a real Docker/Podman daemon
 - The agent tests can use `tokio::sync::mpsc` to simulate the WebSocket connection
 - Keep integration tests in `tests/` directory, unit tests next to the code
 
 ## Out of Scope
 
 - Frontend/dashboard tests
-- E2E tests that require a running Docker daemon
+- E2E tests that require a running container runtime daemon (Docker/Podman)
 - Load/stress testing
 - Fuzzing (valuable but separate initiative)
 
