@@ -16,6 +16,7 @@ export type App = {
   project_id: string | null;
   server_id: string | null;
   deploy_mode: string;
+  disable_build_cache: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +46,8 @@ export type Deploy = {
   image_ref: string | null;
   container_id: string | null;
   env_snapshot: string | null;
+  no_cache: boolean;
+  config_hash: string | null;
   created_at: string;
 }
 

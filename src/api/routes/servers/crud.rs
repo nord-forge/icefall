@@ -217,21 +217,8 @@ pub(super) async fn delete_server(
                 .update_app(
                     &app.id,
                     &crate::db::models::UpdateApp {
-                        name: None,
-                        git_repo: None,
-                        git_branch: None,
-                        framework: None,
-                        build_config: None,
-                        resource_limits: None,
-                        preview_enabled: None,
-                        preview_branch_pattern: None,
-                        tags: None,
-                        volumes: None,
-                        image_ref: None,
-                        compose_content: None,
-                        project_id: None,
-                        deploy_mode: None,
                         server_id: Some(Some(CONTROL_PLANE_SERVER_ID.to_string())),
+                        ..Default::default()
                     },
                 )
                 .await;

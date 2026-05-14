@@ -246,6 +246,24 @@ impl NativeDeployer {
             .await?;
         self.emit_status(app, deploy, "running");
 
+        // Store config hash for drift detection
+        if let Ok(env_vars_list) = self.db.get_env_vars(&env.id).await {
+            let env_pairs: Vec<(String, String)> = env_vars_list
+                .into_iter()
+                .map(|v| (v.key, v.value))
+                .collect();
+            let domain_list: Vec<String> = self
+                .db
+                .list_domains(&app.id)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|d| d.domain)
+                .collect();
+            let hash = crate::deploy::drift::compute_config_hash(app, &env_pairs, &domain_list);
+            let _ = self.db.update_deploy_config_hash(&deploy.id, &hash).await;
+        }
+
         Ok(())
     }
 

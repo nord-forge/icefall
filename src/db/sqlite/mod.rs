@@ -420,6 +420,14 @@ impl Database for SqliteDatabase {
         deploys::update_deploy_env_snapshot(&self.pool, deploy_id, env_snapshot).await
     }
 
+    async fn update_deploy_config_hash(
+        &self,
+        deploy_id: &str,
+        config_hash: &str,
+    ) -> Result<(), DbError> {
+        deploys::update_deploy_config_hash(&self.pool, deploy_id, config_hash).await
+    }
+
     // --- Env var extras ---
 
     async fn delete_env_vars_by_environment(&self, environment_id: &str) -> Result<(), DbError> {

@@ -93,6 +93,7 @@ async fn call_tool(
             let env = envs
                 .first()
                 .ok_or_else(|| ApiError::BadRequest("app has no environments".into()))?;
+            let no_cache = p.get("no_cache").and_then(|v| v.as_bool()).unwrap_or(false);
             let deploy = state
                 .db
                 .create_deploy(&crate::db::models::NewDeploy {
@@ -100,6 +101,7 @@ async fn call_tool(
                     environment_id: env.id.clone(),
                     git_sha: None,
                     server_id: None,
+                    no_cache,
                 })
                 .await?;
             serde_json::json!({ "deploy_id": deploy.id, "status": deploy.status, "message": format!("Deploy triggered for {}", app.name) })

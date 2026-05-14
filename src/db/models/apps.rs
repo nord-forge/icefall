@@ -19,6 +19,7 @@ pub struct App {
     pub project_id: Option<String>,
     pub deploy_mode: String,
     pub server_id: Option<String>,
+    pub disable_build_cache: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -51,4 +52,5 @@ pub struct UpdateApp {
     pub project_id: Option<Option<String>>,
     pub deploy_mode: Option<String>,
     pub server_id: Option<Option<String>>,
+    pub disable_build_cache: Option<bool>,
 }

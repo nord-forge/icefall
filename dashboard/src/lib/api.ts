@@ -102,11 +102,22 @@ export const api = {
   getLatestDeploys: (appIds: string[]) =>
     request<{ data: Deploy[] }>(`/deploys/latest?app_ids=${appIds.join(',')}`),
 
-  triggerDeploy: (appId: string) =>
-    request<{ data: Deploy }>(`/apps/${appId}/deploys`, { method: 'POST' }),
+  triggerDeploy: (appId: string, options?: { no_cache?: boolean }) =>
+    request<{ data: Deploy }>(`/apps/${appId}/deploys`, {
+      method: 'POST',
+      ...(options ? { body: JSON.stringify(options) } : {}),
+    }),
 
   rollbackDeploy: (appId: string, deployId: string) =>
     request<{ data: Deploy }>(`/apps/${appId}/deploys/${deployId}/rollback`, { method: 'POST' }),
+
+  cancelDeploy: (deployId: string) =>
+    request<{ data: Deploy }>(`/deploys/${deployId}/cancel`, { method: 'POST' }),
+
+  checkDrift: (appId: string) =>
+    request<{ data: { drifted: boolean; current_hash: string; deployed_hash: string | null; fields: string[] } }>(
+      `/apps/${appId}/drift`
+    ),
 
   listEnvVars: (appId: string, reveal = false) =>
     request<{ data: EnvVar[] }>(`/apps/${appId}/env${reveal ? '?reveal=true' : ''}`),
