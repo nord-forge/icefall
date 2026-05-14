@@ -1,0 +1,75 @@
+---
+title: MCP Integration — Generic Client
+description: Connect any MCP-compatible client to Icefall
+---
+
+## Endpoints
+
+Icefall's MCP server exposes these JSON-RPC endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/mcp/tools` | GET | List all available tools |
+| `/api/v1/mcp/call` | POST | Execute a tool |
+| `/api/v1/mcp/resources` | GET | List browsable resources |
+| `/api/v1/mcp/resources/read` | POST | Read a resource by URI |
+| `/api/v1/mcp/prompts` | GET | List prompt templates |
+| `/api/v1/mcp/prompts/get` | POST | Get a prompt with arguments |
+
+## Authentication
+
+All endpoints require a Bearer token:
+
+```
+Authorization: Bearer icefall_your_api_token
+```
+
+Create tokens at **Settings > API Tokens** in the Icefall dashboard.
+
+## Tool Call Example
+
+```bash
+curl -X POST https://your-instance.com/api/v1/mcp/call \
+  -H "Authorization: Bearer icefall_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "list_apps", "params": {}}'
+```
+
+Response:
+```json
+{
+  "result": {
+    "apps": [
+      { "id": "abc123", "name": "my-api", "status": "running", ... }
+    ]
+  }
+}
+```
+
+## Resource Read Example
+
+```bash
+curl -X POST https://your-instance.com/api/v1/mcp/resources/read \
+  -H "Authorization: Bearer icefall_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"uri": "icefall://apps"}'
+```
+
+## Tool Reference
+
+### Core (13 tools)
+`list_apps`, `get_app`, `deploy_app`, `get_deploy_status`, `get_logs`, `set_env_var`, `get_env_vars`, `create_database`, `list_databases`, `get_health_status`, `get_server_status`, `add_domain`, `restart_app`
+
+### Workflow (5 tools)
+`diagnose`, `suggest_fix`, `cancel_deploy`, `rollback_deploy`, `approve_deploy`
+
+### Bulk Operations (2 tools)
+`bulk_restart`, `bulk_deploy`
+
+### Resource Management (3 tools)
+`create_app`, `list_servers`, `server_forecast`
+
+### Utility (4 tools)
+`export_bundle`, `search`, `get_analytics`
+
+**Total: 27 tools**

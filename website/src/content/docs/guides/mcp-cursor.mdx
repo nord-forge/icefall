@@ -1,0 +1,41 @@
+---
+title: MCP Integration — Cursor
+description: Connect Cursor to your Icefall instance for AI-assisted deployment
+---
+
+## Setup
+
+1. Create an API token in Icefall: **Settings > API Tokens > Create Token**.
+
+2. Open Cursor Settings (`Cmd+,`) and navigate to **MCP Servers**.
+
+3. Add a new server:
+
+```json
+{
+  "icefall": {
+    "url": "https://your-icefall-instance.com/api/v1/mcp",
+    "headers": {
+      "Authorization": "Bearer icefall_your_token_here"
+    }
+  }
+}
+```
+
+4. Restart Cursor. Icefall tools are now available in Cursor's AI chat.
+
+## Usage
+
+In Cursor's chat panel, you can now ask:
+
+- "Deploy this project to production"
+- "What's the status of my-api?"
+- "Show me the recent deploy logs"
+- "Rollback my-api to the previous version"
+- "Create a new app from this repo"
+
+Cursor will use Icefall's MCP tools to execute these operations directly from your editor.
+
+## Available Tools
+
+See the [Claude Code guide](/guides/mcp-claude-code) for the full list of 27 tools, resources, and prompts — they're identical across all MCP clients.
