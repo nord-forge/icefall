@@ -44,6 +44,12 @@ pub struct App {
     pub status_page_enabled: bool,
     pub power_nap_priority: String,
     pub power_nap_custom_schedule: Option<String>,
+    pub project_environment_id: Option<String>,
+    pub template_id: Option<String>,
+    pub template_version: Option<String>,
+    pub has_custom_proxy_config: bool,
+    pub proxy_presets: Option<String>,
+    pub tunnel_enabled: bool,
     pub created_at: String,
     pub updated_at: String,
 }
