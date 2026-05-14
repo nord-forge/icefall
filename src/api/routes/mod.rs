@@ -1,15 +1,20 @@
 pub mod agent_ws;
+pub mod analytics;
 pub mod apps;
 pub mod audit;
 pub mod auth;
 pub mod backups;
+pub mod bundles;
+pub mod config_history;
 pub mod databases;
 pub mod db_browser;
 pub mod deploys;
 pub mod domains;
 pub mod env_vars;
 pub mod events;
+pub mod forecast;
 pub mod health;
+pub mod incidents;
 pub mod instance_backup;
 pub mod logs;
 pub mod mcp;
@@ -61,6 +66,7 @@ pub fn api_routes() -> Router<AppState> {
         .merge(onboarding::routes())
         .merge(mcp::routes())
         .merge(instance_backup::routes())
+        .merge(incidents::routes())
         .merge(terminal::routes())
         .merge(two_factor::routes())
         .merge(oauth::routes())
@@ -70,6 +76,34 @@ pub fn api_routes() -> Router<AppState> {
         .merge(audit::routes())
         .merge(openapi::routes())
         .route("/search", axum::routing::get(search::search))
+        .route(
+            "/analytics/deploys",
+            axum::routing::get(analytics::deploy_analytics),
+        )
+        .route(
+            "/apps/{id}/config-history",
+            axum::routing::get(config_history::list_app_config_history),
+        )
+        .route(
+            "/deploys/{id}/events",
+            axum::routing::get(config_history::list_deploy_events),
+        )
+        .route(
+            "/deploys/{id}/approve",
+            axum::routing::post(config_history::approve_deploy),
+        )
+        .route(
+            "/servers/{id}/forecast",
+            axum::routing::get(forecast::server_forecast),
+        )
+        .route(
+            "/apps/{id}/export",
+            axum::routing::get(bundles::export_bundle),
+        )
+        .route(
+            "/bundles/import",
+            axum::routing::post(bundles::import_bundle),
+        )
         .route(
             "/notifications/webhooks",
             axum::routing::get(webhook_endpoints::list_endpoints)

@@ -1,12 +1,20 @@
+mod analytics;
 mod apps;
 mod audit;
 mod backups;
+mod canary;
+mod config_history;
 mod databases;
+mod deploy_approvals;
+mod deploy_events;
 mod deploys;
 mod domains;
+mod drift;
 mod environments;
+mod forecast;
 mod github;
 mod health;
+mod incidents;
 mod maintenance;
 mod notifications;
 mod oauth;
@@ -396,6 +404,160 @@ impl Database for SqliteDatabase {
 
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError> {
         github::delete_github_installation(&self.pool, id).await
+    }
+
+    // --- Config history ---
+
+    async fn record_config_change(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        field: &str,
+        old_value: Option<&str>,
+        new_value: Option<&str>,
+        changed_by: Option<&str>,
+    ) -> Result<(), DbError> {
+        config_history::record_config_change(
+            &self.pool,
+            resource_type,
+            resource_id,
+            field,
+            old_value,
+            new_value,
+            changed_by,
+        )
+        .await
+    }
+
+    async fn list_config_history(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ConfigHistoryEntry>, DbError> {
+        config_history::list_config_history(&self.pool, resource_type, resource_id, limit).await
+    }
+
+    // --- Deploy events ---
+
+    async fn record_deploy_event(
+        &self,
+        deploy_id: &str,
+        event_type: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), DbError> {
+        deploy_events::record_deploy_event(&self.pool, deploy_id, event_type, data).await
+    }
+
+    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError> {
+        deploy_events::list_deploy_events(&self.pool, deploy_id).await
+    }
+
+    // --- Deploy approvals ---
+
+    async fn create_deploy_approval(
+        &self,
+        deploy_id: &str,
+        action: &str,
+        user_id: &str,
+        comment: Option<&str>,
+    ) -> Result<DeployApproval, DbError> {
+        deploy_approvals::create_deploy_approval(&self.pool, deploy_id, action, user_id, comment)
+            .await
+    }
+
+    async fn get_deploy_approval(
+        &self,
+        deploy_id: &str,
+    ) -> Result<Option<DeployApproval>, DbError> {
+        deploy_approvals::get_deploy_approval(&self.pool, deploy_id).await
+    }
+
+    // --- Canary results ---
+
+    async fn store_canary_result(
+        &self,
+        deploy_id: &str,
+        p50: f64,
+        p95: f64,
+        p99: f64,
+        errors: i32,
+        total: i32,
+        verdict: &str,
+    ) -> Result<CanaryResult, DbError> {
+        canary::store_canary_result(&self.pool, deploy_id, p50, p95, p99, errors, total, verdict)
+            .await
+    }
+
+    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError> {
+        canary::get_canary_baseline(&self.pool, app_id).await
+    }
+
+    // --- Drift events ---
+
+    async fn record_drift_event(
+        &self,
+        app_id: &str,
+        drifted_fields: &str,
+        declared: Option<&str>,
+        actual: Option<&str>,
+    ) -> Result<DriftEvent, DbError> {
+        drift::record_drift_event(&self.pool, app_id, drifted_fields, declared, actual).await
+    }
+
+    async fn list_drift_events(
+        &self,
+        app_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DriftEvent>, DbError> {
+        drift::list_drift_events(&self.pool, app_id, limit).await
+    }
+
+    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError> {
+        drift::resolve_drift_event(&self.pool, id).await
+    }
+
+    // --- Resource forecasting ---
+
+    async fn get_server_metrics_for_forecast(
+        &self,
+        server_id: &str,
+        days: i64,
+    ) -> Result<Vec<(f64, f64, f64)>, DbError> {
+        forecast::get_server_metrics_for_forecast(&self.pool, server_id, days).await
+    }
+
+    // --- Incidents ---
+
+    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError> {
+        incidents::create_incident(&self.pool, incident).await
+    }
+
+    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError> {
+        incidents::list_incidents(&self.pool, limit).await
+    }
+
+    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError> {
+        incidents::update_incident_status(&self.pool, id, status).await
+    }
+
+    async fn add_incident_note(
+        &self,
+        incident_id: &str,
+        content: &str,
+        author_id: Option<&str>,
+    ) -> Result<IncidentNote, DbError> {
+        incidents::add_incident_note(&self.pool, incident_id, content, author_id).await
+    }
+
+    // --- Deploy analytics ---
+
+    async fn get_deploy_analytics(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<serde_json::Value, DbError> {
+        analytics::get_deploy_analytics(&self.pool, from, to).await
     }
 
     // --- Users ---
