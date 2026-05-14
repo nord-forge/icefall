@@ -1,0 +1,45 @@
+---
+title: Set up auto-deploy
+description: Deploy automatically when you push to your git repository
+---
+
+## Enable auto-deploy
+
+1. Open your app's **Settings** tab
+2. In the **Auto-deploy** section, toggle **Enable auto-deploy on push**
+3. Copy the **Webhook URL** and **Secret**
+
+## Configure GitHub
+
+1. Go to your repo's **Settings > Webhooks**
+2. Click **Add webhook**
+3. Paste the webhook URL
+4. Set content type to `application/json`
+5. Paste the secret
+6. Select **Just the push event**
+7. Click **Add webhook**
+
+## Configure GitLab
+
+1. Go to your project's **Settings > Webhooks**
+2. Paste the webhook URL
+3. Paste the secret token
+4. Check **Push events**
+5. Click **Add webhook**
+
+## Test it
+
+Push a commit to your configured branch. The deploy should start within seconds — check the **Deploys** tab.
+
+## Preview environments
+
+Enable preview deployments for PR branches:
+
+1. In app settings, toggle **Enable preview deployments**
+2. Set a branch pattern (e.g., `feature/*`)
+3. Preview environments are created automatically when matching branches are pushed
+
+## Next steps
+
+- [Deploy by git tag](/guides/deploy-by-tag)
+- [Preview environments guide](/guides/preview-environments)

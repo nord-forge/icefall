@@ -1,45 +1,48 @@
 ---
-title: Introduction
-description: What is Icefall and who is it for?
+title: What is Icefall?
+description: A fast, simple, self-hosted deployment platform
 ---
 
-Icefall is a **self-hosted deployment platform** — a single binary that turns any Linux server into a PaaS. Push your code, Icefall handles the rest: builds, containers, SSL, domains, databases, and monitoring.
+Icefall is a self-hosted PaaS that ships as a single Rust binary. One command to install, zero external dependencies — no PostgreSQL, no Redis, no PHP runtime.
 
-## Who is it for?
+## Who it's for
 
-- **Solo developers** who want Vercel/Netlify-style deploys on their own server
-- **Small teams** who need a deployment platform without the complexity of Kubernetes
-- **Agencies** managing multiple client projects on a single VPS
-- **Anyone** tired of manually configuring Nginx, Docker Compose, and Let's Encrypt
+Solo developers and small teams running 1-10 apps on their own servers. If you want the simplicity of Heroku with the control of self-hosting, without burning half your VPS memory on platform overhead.
 
-## Key Features
+## How it's different
 
-- **Git-push deploys** — connect a repo, push to main, your app is live
-- **Framework detection** — auto-detects Astro, Next.js, Nuxt, React, Vue, Node.js
-- **Preview environments** — every feature branch gets its own URL
-- **Managed databases** — one-click Postgres, MySQL, Redis, MongoDB with auto-backups
-- **SSL everywhere** — automatic HTTPS via Caddy + Let's Encrypt
-- **Health monitoring** — TCP health checks, auto-restart, uptime tracking
-- **Real-time logs** — streaming build and runtime logs
-- **CLI + Dashboard + MCP** — manage from terminal, browser, or AI agent
+| | Icefall | Traditional PaaS |
+|---|---|---|
+| Install | Single binary + SQLite | PHP/Node + PostgreSQL + Redis |
+| Memory at idle | ~30 MB | 300-500 MB |
+| Static sites | Native (no Docker) | Docker container |
+| Multi-server | WebSocket agents | SSH per operation |
+| AI integration | 27 MCP tools | None |
+| Self-update | Atomic swap + rollback | Docker rebuild |
+
+## System requirements
+
+| Requirement | Minimum | Recommended |
+|---|---|---|
+| OS | Ubuntu 22.04+ / Debian 12+ / CentOS 9+ | Ubuntu 24.04 |
+| RAM | 1 GB | 2 GB+ |
+| Disk | 10 GB | 20 GB+ |
+| Container runtime | Docker 24+ or Podman 4+ | Docker 27+ |
+| CPU | 1 core | 2+ cores |
 
 ## Architecture
 
-Icefall is a single Rust binary (`icefall`) that runs as a daemon:
+**Single server**: Icefall binary + SQLite + Caddy + Docker/Podman — all on one machine.
 
-```
-┌─────────────────────────────────────┐
-│  Icefall Daemon (Rust/Axum)         │
-│  ├── REST API + SSE Events          │
-│  ├── Build Engine (git → Docker)    │
-│  ├── Deploy Manager                 │
-│  ├── Health Check Runner            │
-│  └── Metrics Collector              │
-├─────────────────────────────────────┤
-│  Caddy (reverse proxy, auto-SSL)    │
-├─────────────────────────────────────┤
-│  Docker Engine (containers)         │
-└─────────────────────────────────────┘
-```
+**Multi-server**: A control plane coordinates worker servers via WebSocket agents. Each worker runs its own Docker/Podman + Caddy.
 
-No Kubernetes. No YAML. No 47-step tutorial. One binary, one config file.
+## Three interfaces
+
+1. **Dashboard** — browser-based UI for visual management
+2. **CLI** — `icefall deploy`, `icefall apps list`, `icefall logs`
+3. **MCP Server** — 27 tools for AI-assisted deployment via Claude Code, Cursor, or any MCP client
+
+## Next steps
+
+- [Install Icefall](/getting-started/installation)
+- [Quick start: deploy your first app](/getting-started/quick-start)

@@ -1,0 +1,31 @@
+---
+title: Deployments
+description: How Icefall deploys your applications
+---
+
+## Deploy lifecycle
+
+1. **Trigger**: manual, webhook push, API call, CLI, MCP tool, or scheduled
+2. **Clone**: git clone with optional branch, tag, or SHA
+3. **Detect**: auto-detect framework, package manager, and Node version
+4. **Build**: generate Dockerfile, build container image (or skip for native static deploys)
+5. **Swap**: blue-green deployment — new container starts alongside old one
+6. **Health check**: verify the new container responds before routing traffic
+7. **Route**: Caddy switches traffic to the new container
+8. **Cleanup**: stop and remove the old container
+
+## Deploy modes
+
+- **Auto**: Icefall detects whether to use container or native mode
+- **Container**: full Docker/Podman build pipeline
+- **Native**: static site deploy without Docker — files served directly by Caddy
+- **Image**: deploy a pre-built container image from a registry
+- **Compose**: multi-service Docker Compose stack
+
+## Zero-downtime
+
+The blue-green strategy ensures zero downtime. The old container keeps serving traffic until the new one passes health checks. If health checks fail, the old container stays active and the new one is removed.
+
+## Rollback
+
+Every successful deploy's container image is kept (configurable retention count). Rollback reuses the old image — no rebuild needed, instant recovery.

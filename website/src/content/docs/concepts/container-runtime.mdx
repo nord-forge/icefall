@@ -1,0 +1,31 @@
+---
+title: Container runtime
+description: Docker and Podman support
+---
+
+## Supported runtimes
+
+Icefall supports both Docker and Podman as container runtimes. Both are accessed through the same API (bollard library) via the container socket.
+
+## Configuration
+
+Set the runtime in `config.toml`:
+
+```toml
+runtime = "docker"           # or "podman"
+container_socket = "/var/run/docker.sock"  # auto-detected
+```
+
+## Differences
+
+| Feature | Docker | Podman |
+|---------|--------|--------|
+| Daemon | dockerd (always running) | Socket-activated (on-demand) |
+| Networking | Bridge (automatic DNS) | Netavark (needs named network for DNS) |
+| Building | BuildKit | Buildah |
+| Rootless | Requires configuration | Default mode |
+| Compose | docker compose | podman compose |
+
+## Switching runtimes
+
+See the [Podman reference](/reference/podman) for migration steps.

@@ -1,0 +1,32 @@
+---
+title: Add a custom domain
+description: Configure DNS and SSL for your app
+---
+
+## Add the domain
+
+1. Open your app's **Domains** tab
+2. Click **Add domain**
+3. Enter your domain (e.g., `app.example.com`)
+
+## Configure DNS
+
+Point your domain to your server's IP address:
+
+| Type | Name | Value |
+|------|------|-------|
+| A | `app` | `YOUR_SERVER_IP` |
+
+For a root domain (`example.com`), some DNS providers require an ALIAS or ANAME record.
+
+## SSL certificate
+
+Caddy automatically provisions a Let's Encrypt certificate. This happens within 60 seconds of the DNS record propagating.
+
+Check the domain's **SSL status** badge — it should show "active" with a green lock.
+
+## Troubleshooting
+
+- **DNS not propagating**: Wait up to 48 hours. Check with `dig app.example.com`
+- **SSL error**: Verify the domain resolves to your server IP. Check Caddy logs.
+- **Mixed content**: Ensure your app doesn't hardcode `http://` URLs

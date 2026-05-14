@@ -1,0 +1,33 @@
+---
+title: Networking
+description: How domains, routing, and internal communication work
+---
+
+## Caddy reverse proxy
+
+Icefall uses Caddy as its reverse proxy. Caddy handles:
+- Automatic HTTPS via Let's Encrypt
+- HTTP/2 and HSTS by default
+- Route management via the Caddy admin API
+
+## Domain routing
+
+Each app can have multiple domains. Caddy routes incoming requests by hostname to the correct container's port.
+
+## Path-based routing
+
+Multiple services can share a domain with different paths:
+- `example.com/` → frontend app
+- `example.com/api` → backend app
+
+## Internal URLs
+
+Containers on the same server get predictable internal hostnames:
+- `my-app.icefall.internal` — app containers
+- `my-db.icefall.internal` — database containers
+
+These use Docker/Podman's built-in DNS resolution on bridge networks.
+
+## Multi-server networking
+
+Internal URLs only work between containers on the same server. Cross-server communication requires public domains or Caddy-proxied routes.
