@@ -15,6 +15,9 @@ const TABS = [
   { key: 'databases', label: 'Databases' },
   { key: 'terminal', label: 'Terminal' },
   { key: 'domains', label: 'Domains' },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'proxy', label: 'Proxy' },
+  { key: 'history', label: 'History' },
   { key: 'settings', label: 'Settings' },
 ];
 
@@ -26,6 +29,9 @@ const TAB_PRELOADERS: Record<string, () => void> = {
   databases: () => { import('@islands/app-detail/DatabaseTab/DatabaseTab'); },
   terminal: () => { import('@islands/app-detail/TerminalTab/TerminalTab'); },
   domains: () => { import('@islands/app-detail/DomainsTab/DomainsTab'); },
+  tasks: () => { import('@islands/app-detail/TasksTab/TasksTab'); },
+  proxy: () => { import('@islands/app-detail/ProxyTab/ProxyTab'); },
+  history: () => { import('@islands/app-detail/HistoryTab/HistoryTab'); },
   settings: () => { import('@islands/app-detail/SettingsTab/SettingsTab'); },
 };
 

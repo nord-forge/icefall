@@ -34,11 +34,15 @@ const { title } = Astro.props;
       body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
       .ice-layout { display: flex; min-height: 100vh; }
       .ice-sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; z-index: 100; transform: translateX(-100%); }
-      .ice-main { flex: 1; min-width: 0; }
+      .ice-main { flex: 1; min-width: 0; padding: 24px; }
       @media (min-width: 641px) {
         .ice-sidebar { transform: translateX(0); }
         .ice-main { margin-left: 220px; }
       }
+      /* Prevent flash of unstyled content during View Transitions */
+      ::view-transition-old(root) { animation-duration: 0.15s; }
+      ::view-transition-new(root) { animation-duration: 0.15s; }
+      [data-astro-transition-fallback="animate"] { animation: none !important; }
     </style>
     <script is:inline>
       (function() {

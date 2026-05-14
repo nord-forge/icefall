@@ -96,6 +96,7 @@ pub fn api_routes() -> Router<AppState> {
             "/servers/{id}/forecast",
             axum::routing::get(forecast::server_forecast),
         )
+        .route("/templates", axum::routing::get(list_templates))
         .route(
             "/apps/{id}/export",
             axum::routing::get(bundles::export_bundle),
@@ -121,4 +122,11 @@ pub fn api_routes() -> Router<AppState> {
             "/notifications/webhooks/{id}/test",
             axum::routing::post(webhook_endpoints::test_endpoint),
         )
+}
+
+async fn list_templates(
+    axum::extract::State(state): axum::extract::State<crate::api::AppState>,
+) -> Result<axum::Json<serde_json::Value>, crate::api::error::ApiError> {
+    let templates = state.db.list_service_templates().await?;
+    Ok(axum::Json(serde_json::json!({ "data": templates })))
 }

@@ -1,0 +1,11 @@
+.badge {
+  display: inline-flex; align-items: center; border-radius: var(--radius-full);
+  font-weight: var(--weight-medium); white-space: nowrap;
+}
+.sm { padding: 1px var(--space-2); font-size: var(--text-xs); }
+.md { padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
+.default { background: var(--color-surface-hover); color: var(--color-text-secondary); }
+.success { background: oklch(0.92 0.04 145); color: oklch(0.35 0.1 145); }
+.warning { background: oklch(0.92 0.06 85); color: oklch(0.4 0.12 85); }
+.error { background: oklch(0.92 0.06 25); color: oklch(0.4 0.15 25); }
+.info { background: oklch(0.92 0.04 250); color: oklch(0.4 0.1 250); }

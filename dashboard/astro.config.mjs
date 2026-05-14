@@ -23,6 +23,10 @@ export default defineConfig({
         '@lib': path.resolve('./src/lib'),
         '@stores': path.resolve('./src/stores'),
       },
+      dedupe: ['preact', 'preact/hooks', 'preact/compat', 'preact/jsx-runtime', '@preact/signals'],
+    },
+    optimizeDeps: {
+      include: ['preact', 'preact/hooks', 'preact/devtools', 'preact/debug', 'preact/jsx-runtime', '@nanostores/preact', 'lucide-preact'],
     },
     css: {
       modules: {

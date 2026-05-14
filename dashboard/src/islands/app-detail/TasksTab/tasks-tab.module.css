@@ -1,0 +1,10 @@
+.page { display: flex; flex-direction: column; gap: var(--space-4); }
+.header { display: flex; align-items: center; justify-content: space-between; }
+.title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.loading, .empty { color: var(--color-text-muted); font-size: var(--text-sm); }
+.form { display: flex; flex-direction: column; gap: var(--space-3); }
+.taskRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.taskName { font-size: var(--text-sm); display: block; }
+.taskCron { font-size: var(--text-xs); color: var(--color-text-muted); display: block; margin-top: var(--space-1); }
+.taskCmd { font-size: var(--text-xs); color: var(--color-text-secondary); display: block; }
+.taskActions { display: flex; align-items: center; gap: var(--space-2); }
