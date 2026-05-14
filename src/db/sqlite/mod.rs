@@ -1,7 +1,11 @@
+mod analytics;
 mod apps;
 mod audit;
 mod backups;
+mod config_history;
 mod databases;
+mod deploy_approvals;
+mod deploy_events;
 mod deploys;
 mod domains;
 mod environments;
@@ -396,6 +400,83 @@ impl Database for SqliteDatabase {
 
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError> {
         github::delete_github_installation(&self.pool, id).await
+    }
+
+    // --- Config history ---
+
+    async fn record_config_change(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        field: &str,
+        old_value: Option<&str>,
+        new_value: Option<&str>,
+        changed_by: Option<&str>,
+    ) -> Result<(), DbError> {
+        config_history::record_config_change(
+            &self.pool,
+            resource_type,
+            resource_id,
+            field,
+            old_value,
+            new_value,
+            changed_by,
+        )
+        .await
+    }
+
+    async fn list_config_history(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ConfigHistoryEntry>, DbError> {
+        config_history::list_config_history(&self.pool, resource_type, resource_id, limit).await
+    }
+
+    // --- Deploy events ---
+
+    async fn record_deploy_event(
+        &self,
+        deploy_id: &str,
+        event_type: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), DbError> {
+        deploy_events::record_deploy_event(&self.pool, deploy_id, event_type, data).await
+    }
+
+    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError> {
+        deploy_events::list_deploy_events(&self.pool, deploy_id).await
+    }
+
+    // --- Deploy approvals ---
+
+    async fn create_deploy_approval(
+        &self,
+        deploy_id: &str,
+        action: &str,
+        user_id: &str,
+        comment: Option<&str>,
+    ) -> Result<DeployApproval, DbError> {
+        deploy_approvals::create_deploy_approval(&self.pool, deploy_id, action, user_id, comment)
+            .await
+    }
+
+    async fn get_deploy_approval(
+        &self,
+        deploy_id: &str,
+    ) -> Result<Option<DeployApproval>, DbError> {
+        deploy_approvals::get_deploy_approval(&self.pool, deploy_id).await
+    }
+
+    // --- Deploy analytics ---
+
+    async fn get_deploy_analytics(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<serde_json::Value, DbError> {
+        analytics::get_deploy_analytics(&self.pool, from, to).await
     }
 
     // --- Users ---

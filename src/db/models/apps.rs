@@ -30,6 +30,9 @@ pub struct App {
     pub pre_deploy_commands: Option<String>,
     pub post_deploy_commands: Option<String>,
     pub ssh_key_id: Option<String>,
+    pub last_request_at: Option<String>,
+    pub exempt_from_inactivity: bool,
+    pub require_deploy_approval: bool,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -81,6 +81,9 @@ mod tests {
             pre_deploy_commands: None,
             post_deploy_commands: None,
             ssh_key_id: None,
+            last_request_at: None,
+            exempt_from_inactivity: false,
+            require_deploy_approval: false,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }

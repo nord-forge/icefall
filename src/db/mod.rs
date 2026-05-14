@@ -152,6 +152,50 @@ pub trait Database: Send + Sync + 'static {
     async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError>;
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError>;
 
+    // Config history
+    async fn record_config_change(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        field: &str,
+        old_value: Option<&str>,
+        new_value: Option<&str>,
+        changed_by: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_config_history(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ConfigHistoryEntry>, DbError>;
+
+    // Deploy events
+    async fn record_deploy_event(
+        &self,
+        deploy_id: &str,
+        event_type: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), DbError>;
+    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError>;
+
+    // Deploy approvals
+    async fn create_deploy_approval(
+        &self,
+        deploy_id: &str,
+        action: &str,
+        user_id: &str,
+        comment: Option<&str>,
+    ) -> Result<DeployApproval, DbError>;
+    async fn get_deploy_approval(&self, deploy_id: &str)
+        -> Result<Option<DeployApproval>, DbError>;
+
+    // Deploy analytics
+    async fn get_deploy_analytics(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<serde_json::Value, DbError>;
+
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;
