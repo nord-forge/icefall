@@ -13,6 +13,7 @@ mod servers;
 mod settings;
 mod updates;
 mod users;
+mod webhooks;
 
 pub use apps::*;
 pub use audit::*;
@@ -29,6 +30,7 @@ pub use servers::*;
 pub use settings::*;
 pub use updates::*;
 pub use users::*;
+pub use webhooks::*;
 
 use chrono::Utc;
 

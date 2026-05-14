@@ -1,28 +1,22 @@
 # Icefall — Project Board
 
-> Last updated: 2026-05-13
+> Last updated: 2026-05-14
 
 ---
 
 ## Backlog — Priority Order
 
-**Now (Rust quality):**
-1. IF-156 — Rust code quality audit
-2. IF-207 — Podman reference docs (commands, config, differences, setup, migration)
+**Now (Feature parity — Phase 24):**
+1. IF-208..IF-219, IF-223..IF-225 — Remaining feature parity tickets
 
-**Next (Rust quality continued):**
-3. IF-155 — Rust performance audit
-4. IF-157 — Error type consolidation
-5. IF-158 — Test coverage expansion
+**Then (Parity gaps — Phase 25):**
+8. IF-174 — GitHub App integration (largest, start early)
+9. IF-159..IF-173 — Remaining parity gap tickets
 
-**Then (Parity gaps):**
-6. IF-174 — GitHub App integration (largest, start early)
-7. IF-159..IF-173 — Remaining parity gap tickets
-
-**Then (Differentiators):**
-8. IF-187 + IF-188 — Config Time Machine + Deploy Replay (small, high value)
-9. IF-184 — MCP Deploy Copilot (demo value)
-10. IF-183 — Ghost Mode (headline feature)
+**Then (Differentiators — Phase 26):**
+10. IF-187 + IF-188 — Config Time Machine + Deploy Replay (small, high value)
+11. IF-184 — MCP Deploy Copilot (demo value)
+12. IF-183 — Ghost Mode (headline feature)
 
 ---
 
@@ -30,7 +24,7 @@
 
 | Ticket | Title | Assignee | Started |
 |--------|-------|----------|---------|
-| IF-156 | Rust code quality audit | — | 2026-05-13 |
+| — | — | — | — |
 
 ---
 
@@ -294,74 +288,96 @@
 | [IF-205](tickets/phase-23-rust-quality/IF-205-container-runtime-research.md) | **Container runtime research** | 2026-05-13 | Docker default + Podman opt-in recommendation |
 | [IF-153](tickets/phase-23-rust-quality/IF-153-sqlite-module-split.md) | Split sqlite.rs into domain modules | 2026-05-13 | 22 files split into directory modules, 119 tests pass |
 | [IF-154](tickets/phase-23-rust-quality/IF-154-large-file-splits.md) | Split remaining large Rust files | 2026-05-13 | 22 files over 400 lines → directory modules across 3 phases |
-| [IF-155](tickets/phase-23-rust-quality/IF-155-performance-audit.md) | Rust performance audit | — | Allocation hotspots, async bottlenecks, query efficiency, criterion benchmarks |
-| [IF-156](tickets/phase-23-rust-quality/IF-156-rust-code-quality-audit.md) | Rust code quality audit | — | Safety, error handling, idiomatic patterns, unwrap audit |
-| [IF-157](tickets/phase-23-rust-quality/IF-157-error-type-consolidation.md) | Error type consolidation | — | Consolidate error enums, preserve context, consistent API error shape |
-| [IF-158](tickets/phase-23-rust-quality/IF-158-test-coverage-expansion.md) | Test coverage expansion | — | Deploy pipeline, API routes, agent protocol tests, coverage reporting |
+| [IF-155](tickets/phase-23-rust-quality/IF-155-performance-audit.md) | Rust performance audit | 2026-05-14 | N+1 queries, Vec pre-allocation, Arc clone elimination — PR #33 |
+| [IF-156](tickets/phase-23-rust-quality/IF-156-rust-code-quality-audit.md) | Rust code quality audit | 2026-05-14 | Bare unwrap() elimination, idiomatic patterns — PR #32 |
+| [IF-157](tickets/phase-23-rust-quality/IF-157-error-type-consolidation.md) | Error type consolidation | 2026-05-14 | Error type improvements — PR #35 |
+| [IF-158](tickets/phase-23-rust-quality/IF-158-test-coverage-expansion.md) | Test coverage expansion | 2026-05-14 | 235 tests passing (+1519 lines), compose/native/deploy/db/env coverage |
 
-### Phase 24 — Parity Gaps
+### Phase 24 — Feature Parity
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-159](tickets/phase-24-parity-gaps/IF-159-registration-toggle.md) | Registration enable/disable | — | Settings toggle, 403 when disabled |
-| [IF-160](tickets/phase-24-parity-gaps/IF-160-monorepo-base-directory.md) | Monorepo support (base directory) | — | `base_directory` field, build context subdirectory |
-| [IF-161](tickets/phase-24-parity-gaps/IF-161-multiple-domains-per-app.md) | Multiple domains per app | — | Primary domain indicator, Caddy multi-route |
-| [IF-162](tickets/phase-24-parity-gaps/IF-162-deploy-by-tag.md) | Deploy by git tag | — | Tag checkout, tag autocomplete, webhook tag events |
-| [IF-163](tickets/phase-24-parity-gaps/IF-163-post-deploy-commands.md) | Post-deployment commands | — | Docker exec after deploy, SSE streamed output |
-| [IF-164](tickets/phase-24-parity-gaps/IF-164-backup-retention-config.md) | Configurable backup retention | — | Per-database retention count, replaces hardcoded 7 |
-| [IF-165](tickets/phase-24-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | — | Extend IF-077 to DB containers, type-specific shells |
-| [IF-166](tickets/phase-24-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | — | Deploy branch field, branch autocomplete |
-| [IF-167](tickets/phase-24-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | — | Wire 3 event types to notification dispatch |
-| [IF-168](tickets/phase-24-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | — | Granular read/write/deploy permissions per token |
-| [IF-169](tickets/phase-24-parity-gaps/IF-169-ssh-key-management.md) | SSH key management | — | Generate/import Ed25519/RSA keys, git auth integration |
-| [IF-170](tickets/phase-24-parity-gaps/IF-170-docker-registry-credentials.md) | Docker registry credentials | — | Registry CRUD, pull/push auth, Docker Hub/GHCR/GitLab |
-| [IF-171](tickets/phase-24-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | — | Auto `{app}.icefall.internal` hostnames for service-to-service |
-| [IF-172](tickets/phase-24-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | — | Caddy L4 TCP proxy for external DB access, IP whitelist |
-| [IF-173](tickets/phase-24-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | — | Pass-through to docker compose, advanced users |
-| [IF-174](tickets/phase-24-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | — | Auto webhooks, PR status checks, PR comments, repo browser |
-| [IF-206](tickets/phase-24-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | 2026-05-13 | Config + install detection, bollard socket swap, CI smoke tests |
+| [IF-208](tickets/phase-24-feature-parity/IF-208-scheduled-tasks-cron-in-container.md) | Scheduled tasks (cron-in-container) | — | Cron-based tasks via container exec, execution history, manual trigger |
+| [IF-209](tickets/phase-24-feature-parity/IF-209-shared-variables-hierarchical.md) | Shared variables (hierarchical) | — | Project/server-scoped env vars with cascade inheritance |
+| [IF-210](tickets/phase-24-feature-parity/IF-210-environment-cloning.md) | Environment cloning | — | Clone environments/resources to other projects, servers; optional volume data copy |
+| [IF-211](tickets/phase-24-feature-parity/IF-211-pre-deploy-commands.md) | Pre-deployment commands | 2026-05-14 | pre_deploy_commands field, exec in container after health check, fail-stops deploy |
+| [IF-212](tickets/phase-24-feature-parity/IF-212-http-basic-auth-per-app.md) | HTTP basic auth per app | 2026-05-14 | bcrypt hash, Caddy authentication handler, with_basic_auth route builder |
+| [IF-213](tickets/phase-24-feature-parity/IF-213-server-ssh-terminal.md) | Server-level terminal | — | In-browser host OS shell via PTY, admin-only, per-server enable |
+| [IF-214](tickets/phase-24-feature-parity/IF-214-docker-cleanup-per-server.md) | Container cleanup per server | — | Per-server cleanup config, thresholds, execution history, manual trigger |
+| [IF-215](tickets/phase-24-feature-parity/IF-215-database-backup-import-restore.md) | Database backup import & restore | — | Upload dump file or restore from S3, per-engine commands, chunked upload |
+| [IF-216](tickets/phase-24-feature-parity/IF-216-server-disk-usage-alerts.md) | Server disk usage alerts | 2026-05-14 | Per-server thresholds, state machine (normal/warning/critical), DiskAlert events |
+| [IF-217](tickets/phase-24-feature-parity/IF-217-ssl-certificate-monitoring.md) | SSL certificate expiration monitoring | 2026-05-14 | Daily openssl check, domain SSL fields, expiry alerts at 14d/7d/0d |
+| [IF-218](tickets/phase-24-feature-parity/IF-218-global-search.md) | Global search across resources | 2026-05-14 | `GET /search?q=` — LIKE across apps/databases/servers/projects/domains |
+| [IF-219](tickets/phase-24-feature-parity/IF-219-unmanaged-container-visibility.md) | Unmanaged container visibility | 2026-05-14 | `GET /servers/{id}/containers?unmanaged=true`, label-based filtering |
+| [IF-220](tickets/phase-24-feature-parity/IF-220-configuration-drift-detection.md) | Configuration drift detection | 2026-05-14 | SHA-256 config hash, drift API, DriftBanner component, stores hash on deploy |
+| [IF-221](tickets/phase-24-feature-parity/IF-221-force-rebuild-without-cache.md) | Force rebuild without cache | 2026-05-14 | no_cache param through full pipeline, split deploy button, CLI --no-cache, MCP |
+| [IF-222](tickets/phase-24-feature-parity/IF-222-deployment-cancel.md) | Cancel in-progress deployment | 2026-05-14 | Cancel API, status check between build steps, cancel button in DeploysTab |
+| [IF-223](tickets/phase-24-feature-parity/IF-223-webhook-outbound-generic.md) | Outbound webhook notifications | 2026-05-14 | Multiple endpoints, HMAC-SHA256 signing, delivery log, test button |
+| [IF-224](tickets/phase-24-feature-parity/IF-224-git-submodule-lfs-support.md) | Git submodule & LFS support | 2026-05-14 | submodules/lfs/shallow toggles on GitCloneOptions, post-clone steps |
+| [IF-225](tickets/phase-24-feature-parity/IF-225-database-ssl-certificates.md) | Database SSL certificates | — | Per-server CA, per-DB certs, SSL mode config, cert rotation |
 
-### Phase 25 — Icefall+ Differentiators
+### Phase 25 — Parity Gaps
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-175](tickets/phase-25-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | — | Frequency, success rate, build time trends, heatmap |
-| [IF-176](tickets/phase-25-icefall-plus/IF-176-resource-usage-forecasting.md) | Resource usage forecasting | — | "Disk full in X days" predictions via linear regression |
-| [IF-177](tickets/phase-25-icefall-plus/IF-177-deploy-preview-screenshots.md) | Deploy preview screenshots | — | Auto-capture after deploy, visual timeline |
-| [IF-178](tickets/phase-25-icefall-plus/IF-178-incident-timeline.md) | Incident timeline & status page | — | Auto-detect incidents, public status page per app |
-| [IF-179](tickets/phase-25-icefall-plus/IF-179-scheduled-deploys.md) | Scheduled deploys | — | Deploy at a specific time, maintenance window support |
-| [IF-180](tickets/phase-25-icefall-plus/IF-180-app-dependency-graph.md) | App dependency graph | — | Interactive infrastructure visualization |
-| [IF-181](tickets/phase-25-icefall-plus/IF-181-api-playground.md) | Built-in API playground | — | Interactive API explorer from OpenAPI spec |
-| [IF-182](tickets/phase-25-icefall-plus/IF-182-deployment-approvals.md) | Deployment approval gates | — | Require admin approval for production deploys |
-| [IF-183](tickets/phase-25-icefall-plus/IF-183-ghost-mode-hibernation.md) | Ghost Mode (container hibernation) | — | Auto-suspend idle containers, wake on first request, Rust proxy holds connection |
-| [IF-184](tickets/phase-25-icefall-plus/IF-184-mcp-deploy-copilot.md) | MCP Deploy Copilot | — | Multi-step conversational deploys, diagnose, suggest_fix tools |
-| [IF-185](tickets/phase-25-icefall-plus/IF-185-drift-detective.md) | Drift Detective | — | Continuous config reconciliation, detect out-of-band changes, one-click revert |
-| [IF-186](tickets/phase-25-icefall-plus/IF-186-canary-probe.md) | Canary Probe | — | Post-deploy synthetic load test, auto-rollback on regression |
-| [IF-187](tickets/phase-25-icefall-plus/IF-187-config-time-machine.md) | Config Time Machine | — | Full config versioning, diff any two points, one-click restore |
-| [IF-188](tickets/phase-25-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | — | Structured deploy event streams, deploy diff comparison |
-| [IF-189](tickets/phase-25-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | — | Flag idle apps, suggest hibernate/delete, weekly digest |
-| [IF-190](tickets/phase-25-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | — | `icefall tunnel` — local port forwarding via agent WebSocket, no SSH |
-| [IF-191](tickets/phase-25-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | — | Right-size resource limits, co-location suggestions, savings estimates |
-| [IF-192](tickets/phase-25-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | — | Export/import `.icefall` files for app sharing |
-| [IF-193](tickets/phase-25-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | — | Collapse repetitive lines, anomaly highlighting, noise suppression |
-| [IF-194](tickets/phase-25-icefall-plus/IF-194-power-nap-scheduler.md) | Power Nap Scheduler | — | Quiet hours: suspend low-priority apps, reduce resources for standard apps |
+| [IF-159](tickets/phase-25-parity-gaps/IF-159-registration-toggle.md) | Registration enable/disable | — | Settings toggle, 403 when disabled |
+| [IF-160](tickets/phase-25-parity-gaps/IF-160-monorepo-base-directory.md) | Monorepo support (base directory) | — | `base_directory` field, build context subdirectory |
+| [IF-161](tickets/phase-25-parity-gaps/IF-161-multiple-domains-per-app.md) | Multiple domains per app | — | Primary domain indicator, Caddy multi-route |
+| [IF-162](tickets/phase-25-parity-gaps/IF-162-deploy-by-tag.md) | Deploy by git tag | — | Tag checkout, tag autocomplete, webhook tag events |
+| [IF-163](tickets/phase-25-parity-gaps/IF-163-post-deploy-commands.md) | Post-deployment commands | — | Container exec after deploy, SSE streamed output |
+| [IF-164](tickets/phase-25-parity-gaps/IF-164-backup-retention-config.md) | Configurable backup retention | — | Per-database retention count, replaces hardcoded 7 |
+| [IF-165](tickets/phase-25-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | — | Extend IF-077 to DB containers, type-specific shells |
+| [IF-166](tickets/phase-25-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | — | Deploy branch field, branch autocomplete |
+| [IF-167](tickets/phase-25-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | — | Wire 3 event types to notification dispatch |
+| [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | — | Granular read/write/deploy permissions per token |
+| [IF-169](tickets/phase-25-parity-gaps/IF-169-ssh-key-management.md) | SSH key management | — | Generate/import Ed25519/RSA keys, git auth integration |
+| [IF-170](tickets/phase-25-parity-gaps/IF-170-docker-registry-credentials.md) | Container registry credentials | — | Registry CRUD, pull/push auth, Docker Hub/GHCR/GitLab |
+| [IF-171](tickets/phase-25-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | — | Auto `{app}.icefall.internal` hostnames for service-to-service |
+| [IF-172](tickets/phase-25-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | — | Caddy L4 TCP proxy for external DB access, IP whitelist |
+| [IF-173](tickets/phase-25-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | — | Pass-through to docker compose / podman compose, advanced users |
+| [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | — | Auto webhooks, PR status checks, PR comments, repo browser |
+| [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | 2026-05-13 | Config + install detection, bollard socket swap, CI smoke tests |
 
-### Phase 26 — MCP Expansion
+### Phase 26 — Icefall+ Differentiators
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-195](tickets/phase-26-mcp-expansion/IF-195-mcp-workflow-tools.md) | MCP workflow orchestration tools | — | ~30 tools: bulk ops, resource creation, server management, utilities |
-| [IF-196](tickets/phase-26-mcp-expansion/IF-196-mcp-resource-protocol.md) | MCP resources & prompts protocol | — | Browsable resources (icefall://apps), pre-built prompt templates |
-| [IF-197](tickets/phase-26-mcp-expansion/IF-197-mcp-claude-code-integration-guide.md) | MCP integration guides | — | Claude Code, Cursor, Windsurf setup + example workflows |
+| [IF-175](tickets/phase-26-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | — | Frequency, success rate, build time trends, heatmap |
+| [IF-176](tickets/phase-26-icefall-plus/IF-176-resource-usage-forecasting.md) | Resource usage forecasting | — | "Disk full in X days" predictions via linear regression |
+| [IF-177](tickets/phase-26-icefall-plus/IF-177-deploy-preview-screenshots.md) | Deploy preview screenshots | — | Auto-capture after deploy, visual timeline |
+| [IF-178](tickets/phase-26-icefall-plus/IF-178-incident-timeline.md) | Incident timeline & status page | — | Auto-detect incidents, public status page per app |
+| [IF-179](tickets/phase-26-icefall-plus/IF-179-scheduled-deploys.md) | Scheduled deploys | — | Deploy at a specific time, maintenance window support |
+| [IF-180](tickets/phase-26-icefall-plus/IF-180-app-dependency-graph.md) | App dependency graph | — | Interactive infrastructure visualization |
+| [IF-181](tickets/phase-26-icefall-plus/IF-181-api-playground.md) | Built-in API playground | — | Interactive API explorer from OpenAPI spec |
+| [IF-182](tickets/phase-26-icefall-plus/IF-182-deployment-approvals.md) | Deployment approval gates | — | Require admin approval for production deploys |
+| [IF-183](tickets/phase-26-icefall-plus/IF-183-ghost-mode-hibernation.md) | Ghost Mode (container hibernation) | — | Auto-suspend idle containers, wake on first request, Rust proxy holds connection |
+| [IF-184](tickets/phase-26-icefall-plus/IF-184-mcp-deploy-copilot.md) | MCP Deploy Copilot | — | Multi-step conversational deploys, diagnose, suggest_fix tools |
+| [IF-185](tickets/phase-26-icefall-plus/IF-185-drift-detective.md) | Drift Detective | — | Continuous config reconciliation, detect out-of-band changes, one-click revert |
+| [IF-186](tickets/phase-26-icefall-plus/IF-186-canary-probe.md) | Canary Probe | — | Post-deploy synthetic load test, auto-rollback on regression |
+| [IF-187](tickets/phase-26-icefall-plus/IF-187-config-time-machine.md) | Config Time Machine | — | Full config versioning, diff any two points, one-click restore |
+| [IF-188](tickets/phase-26-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | — | Structured deploy event streams, deploy diff comparison |
+| [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | — | Flag idle apps, suggest hibernate/delete, weekly digest |
+| [IF-190](tickets/phase-26-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | — | `icefall tunnel` — local port forwarding via agent WebSocket, no SSH |
+| [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | — | Right-size resource limits, co-location suggestions, savings estimates |
+| [IF-192](tickets/phase-26-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | — | Export/import `.icefall` files for app sharing |
+| [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | — | Collapse repetitive lines, anomaly highlighting, noise suppression |
+| [IF-194](tickets/phase-26-icefall-plus/IF-194-power-nap-scheduler.md) | Power Nap Scheduler | — | Quiet hours: suspend low-priority apps, reduce resources for standard apps |
 
-### Phase 27 — Comprehensive Documentation
+### Phase 27 — MCP Expansion
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
-| [IF-198](tickets/phase-27-comprehensive-docs/IF-198-docs-getting-started-overhaul.md) | Getting started overhaul | — | 6 pages: intro, install, quickstart, first DB, domain, auto-deploy |
-| [IF-199](tickets/phase-27-comprehensive-docs/IF-199-docs-concepts-deep-dives.md) | Concepts deep dives | — | 8 pages: architecture, builds, deploys, networking, security, multi-server, envs, databases |
-| [IF-200](tickets/phase-27-comprehensive-docs/IF-200-docs-framework-guides-complete.md) | Complete framework guides | — | 19 frameworks: Astro, Next.js, Remix, SvelteKit, Laravel, Rails, Django, Go, Rust, .NET, etc. |
-| [IF-201](tickets/phase-27-comprehensive-docs/IF-201-docs-how-to-guides.md) | How-to guides | — | 35+ task-oriented guides covering every common workflow |
-| [IF-202](tickets/phase-27-comprehensive-docs/IF-202-docs-api-reference-complete.md) | Complete API reference | — | Every REST endpoint + MCP tool with examples, error codes, auth |
-| [IF-203](tickets/phase-27-comprehensive-docs/IF-203-docs-troubleshooting-faq.md) | Troubleshooting & FAQ | — | Symptom-first troubleshooting, 6 categories + FAQ |
-| [IF-204](tickets/phase-27-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | — | Migrate from Coolify, Dokku, CapRover, Heroku, Docker Compose |
-| [IF-207](tickets/phase-27-comprehensive-docs/IF-207-docs-podman-reference.md) | Podman reference docs | — | Command reference, config guide, behavioral differences, setup + migration guides |
+| [IF-195](tickets/phase-27-mcp-expansion/IF-195-mcp-workflow-tools.md) | MCP workflow orchestration tools | — | ~30 tools: bulk ops, resource creation, server management, utilities |
+| [IF-196](tickets/phase-27-mcp-expansion/IF-196-mcp-resource-protocol.md) | MCP resources & prompts protocol | — | Browsable resources (icefall://apps), pre-built prompt templates |
+| [IF-197](tickets/phase-27-mcp-expansion/IF-197-mcp-claude-code-integration-guide.md) | MCP integration guides | — | Claude Code, Cursor, Windsurf setup + example workflows |
+
+### Phase 28 — Comprehensive Documentation
+| Ticket | Title | Completed | Notes |
+|--------|-------|-----------|-------|
+| [IF-198](tickets/phase-28-comprehensive-docs/IF-198-docs-getting-started-overhaul.md) | Getting started overhaul | — | 6 pages: intro, install, quickstart, first DB, domain, auto-deploy |
+| [IF-199](tickets/phase-28-comprehensive-docs/IF-199-docs-concepts-deep-dives.md) | Concepts deep dives | — | 8 pages: architecture, builds, deploys, networking, security, multi-server, envs, databases |
+| [IF-200](tickets/phase-28-comprehensive-docs/IF-200-docs-framework-guides-complete.md) | Complete framework guides | — | 19 frameworks: Astro, Next.js, Remix, SvelteKit, Laravel, Rails, Django, Go, Rust, .NET, etc. |
+| [IF-201](tickets/phase-28-comprehensive-docs/IF-201-docs-how-to-guides.md) | How-to guides | — | 35+ task-oriented guides covering every common workflow |
+| [IF-202](tickets/phase-28-comprehensive-docs/IF-202-docs-api-reference-complete.md) | Complete API reference | — | Every REST endpoint + MCP tool with examples, error codes, auth |
+| [IF-203](tickets/phase-28-comprehensive-docs/IF-203-docs-troubleshooting-faq.md) | Troubleshooting & FAQ | — | Symptom-first troubleshooting, 6 categories + FAQ |
+| [IF-204](tickets/phase-28-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | — | From Dokku, CapRover, Heroku, Docker Compose |
+| [IF-207](tickets/phase-28-comprehensive-docs/IF-207-docs-podman-reference.md) | Podman reference docs | 2026-05-14 | Command reference, config guide, behavioral differences, setup + migration guides — PR #34 |
 
 ---
 
@@ -369,11 +385,11 @@
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 202 |
-| Done | 144 |
-| Backlog | 57 |
+| Total tickets | 220 |
+| Done | 160 |
+| Backlog | 59 |
 | Superseded | 1 |
-| Phases complete | 19 / 27 |
+| Phases complete | 20 / 28 |
 
 ### Progress
 | Phase | Status | Tickets |
@@ -398,17 +414,18 @@
 | 18 — UX Polish | **Done** | 11/11 |
 | 20 — Multi-Server | **Done** | 30/30 |
 | 22 — Expansion (v1.2) | Backlog | 0/6 |
-| 23 — Rust Quality | **In Progress** | 3/7 |
-| 24 — Parity Gaps | **In Progress** | 1/17 |
-| 25 — Icefall+ | Backlog | 0/20 |
-| 26 — MCP Expansion | Backlog | 0/3 |
-| 27 — Comprehensive Docs | Backlog | 0/8 |
+| 23 — Rust Quality | **Done** | 7/7 |
+| 24 — Feature Parity | **In Progress** | 11/18 |
+| 25 — Parity Gaps | **In Progress** | 1/17 |
+| 26 — Icefall+ | Backlog | 0/20 |
+| 27 — MCP Expansion | Backlog | 0/3 |
+| 28 — Comprehensive Docs | **In Progress** | 1/8 |
 
 ### Size breakdown
 | Size | Count | Estimated effort |
 |------|-------|-----------------|
-| S | 31 | 1-2 days each |
-| M | 101 | 3-5 days each |
+| S | 40 | 1-2 days each |
+| M | 108 | 3-5 days each |
 | L | 28 | 1-2 weeks each |
 
 ### Critical path (must complete in order)
@@ -428,12 +445,23 @@ Rust Quality (Phase 23):
   IF-153 → IF-157 (error consolidation)
   IF-153 + IF-157 → IF-158 (test coverage)
 
-Parity Gaps (Phase 24):
+Feature Parity (Phase 24):
+  High-value quick wins: IF-220 (drift detection), IF-221 (force rebuild), IF-222 (deploy cancel)
+  IF-208 (scheduled tasks) — depends on IF-077/IF-163 (exec infrastructure)
+  IF-209 (shared variables) — depends on IF-074 (projects), IF-147 (environments)
+  IF-210 (env cloning) — depends on IF-147 (environments)
+  IF-211 (pre-deploy) — depends on IF-163 (post-deploy, shared UI)
+  IF-214 (container cleanup per server) — depends on IF-152 (base cleanup)
+  IF-215 (DB import/restore) — depends on IF-030 (backups)
+  IF-216 (disk alerts) — depends on IF-127 (agent metrics)
+  All others are independent — can run in parallel
+
+Parity Gaps (Phase 25):
   IF-206 (Podman support) — do after IF-205 research (done)
   All other tickets independent — can run in parallel
   IF-174 (GitHub App) is the largest, start early
 
-Icefall+ (Phase 25):
+Icefall+ (Phase 26):
   IF-183 (Ghost Mode) is the headline feature — start early
   IF-183 → IF-189 (Dead App Detector) → IF-194 (Power Nap)
   IF-184 (MCP Copilot) — high demo value, no deps
@@ -441,10 +469,10 @@ Icefall+ (Phase 25):
   IF-187 (Config Time Machine) + IF-188 (Deploy Replay) — small, start first
   IF-190 (Secure Tunnel) — no deps
 
-MCP Expansion (Phase 26):
+MCP Expansion (Phase 27):
   IF-195 (workflow tools) → IF-196 (resources + prompts) → IF-197 (integration guides)
 
-Comprehensive Docs (Phase 27):
+Comprehensive Docs (Phase 28):
   IF-198 (getting started) — do first
   IF-200 (frameworks) + IF-201 (how-to) — can run in parallel
   IF-202 (API ref) — after IF-195/IF-196 (MCP expansion)

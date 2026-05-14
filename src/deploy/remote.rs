@@ -168,6 +168,20 @@ impl RemoteExecutor {
             .await
     }
 
+    pub async fn exec_in_container(&self, id: &str, cmd: &[String]) -> Result<String, DeployError> {
+        let result = self
+            .call(
+                "container.exec",
+                serde_json::json!({ "id": id, "cmd": cmd }),
+            )
+            .await?;
+        Ok(result
+            .get("output")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string())
+    }
+
     pub async fn list_containers_by_label(
         &self,
         _label: &str,

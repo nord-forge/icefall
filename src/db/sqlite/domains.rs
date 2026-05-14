@@ -26,6 +26,9 @@ pub(super) async fn add_domain(pool: &SqlitePool, domain: &NewDomain) -> Result<
         path: domain.path.clone(),
         verified: false,
         ssl_status: "pending".to_string(),
+        ssl_issuer: None,
+        ssl_expires_at: None,
+        ssl_last_checked_at: None,
         created_at: now,
     })
 }
@@ -59,5 +62,31 @@ pub(super) async fn delete_domain(pool: &SqlitePool, id: &str) -> Result<(), DbE
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub(super) async fn list_all_domains(pool: &SqlitePool) -> Result<Vec<Domain>, DbError> {
+    let domains = sqlx::query_as::<_, Domain>("SELECT * FROM domains WHERE verified = TRUE")
+        .fetch_all(pool)
+        .await?;
+    Ok(domains)
+}
+
+pub(super) async fn update_domain_ssl_info(
+    pool: &SqlitePool,
+    id: &str,
+    issuer: Option<&str>,
+    expires_at: Option<&str>,
+) -> Result<(), DbError> {
+    let now = now_iso8601();
+    sqlx::query(
+        "UPDATE domains SET ssl_issuer = ?, ssl_expires_at = ?, ssl_last_checked_at = ? WHERE id = ?",
+    )
+    .bind(issuer)
+    .bind(expires_at)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }

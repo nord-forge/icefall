@@ -29,6 +29,7 @@ pub enum EventType {
     UpdateStep,
     ServerConnected,
     ServerDisconnected,
+    DiskAlert,
 }
 
 impl EventType {
@@ -45,6 +46,7 @@ impl EventType {
             Self::UpdateStep => "update.step",
             Self::ServerConnected => "server.connected",
             Self::ServerDisconnected => "server.disconnected",
+            Self::DiskAlert => "server.disk.alert",
         }
     }
 }

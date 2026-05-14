@@ -41,7 +41,11 @@ pub enum Commands {
     /// Authenticate with the icefall server
     Login,
     /// Deploy the current project
-    Deploy,
+    Deploy {
+        /// Force rebuild without using build cache
+        #[arg(long)]
+        no_cache: bool,
+    },
     /// Manage applications
     Apps {
         #[command(subcommand)]

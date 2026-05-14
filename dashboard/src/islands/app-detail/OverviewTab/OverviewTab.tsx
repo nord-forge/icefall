@@ -4,6 +4,7 @@ import { api } from '@lib/api';
 import { formatRelativeTime, shortSha, formatDuration } from '@lib/format';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import UptimeTimeline from '@islands/shared/UptimeTimeline/UptimeTimeline';
+import DriftBanner from '@islands/app-detail/DriftBanner/DriftBanner';
 import styles from './overview-tab.module.css';
 
 type Props = {
@@ -52,6 +53,7 @@ export default function OverviewTab({ app }: Props) {
 
   return (
     <div class={styles.grid}>
+      <DriftBanner appId={app.id} />
       <div class={styles.panel}>
         <h3 class={styles.sectionTitle}>
           Status

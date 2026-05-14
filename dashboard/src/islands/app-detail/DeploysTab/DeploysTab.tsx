@@ -5,7 +5,7 @@ import type { Deploy } from '@lib/types';
 import { formatRelativeTime, formatDuration, shortSha } from '@lib/format';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import Button from '@islands/shared/Button/Button';
-import { RotateCcw } from 'lucide-preact';
+import { RotateCcw, X } from 'lucide-preact';
 import styles from './deploys-tab.module.css';
 
 type Props = {
@@ -16,6 +16,20 @@ export default function DeploysTab({ appId }: Props) {
   const [deploys, setDeploys] = useState<Deploy[]>([]);
   const [loading, setLoading] = useState(true);
   const [rollingBack, setRollingBack] = useState('');
+  const [cancelling, setCancelling] = useState('');
+
+  async function handleCancel(deployId: string) {
+    setCancelling(deployId);
+    try {
+      await api.cancelDeploy(deployId);
+      const { data } = await api.listDeploys(appId);
+      setDeploys(data);
+      addToast('info', 'Deploy cancelled');
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to cancel deploy');
+    }
+    setCancelling('');
+  }
 
   async function handleRollback(deployId: string) {
     setRollingBack(deployId);
@@ -88,6 +102,16 @@ export default function DeploysTab({ appId }: Props) {
                   {formatRelativeTime(d.created_at)}
                 </td>
                 <td class={styles.cell}>
+                  {(d.status === 'pending' || d.status === 'building' || d.status === 'deploying') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCancel(d.id)}
+                      loading={cancelling === d.id}
+                    >
+                      <X size={12} /> Cancel
+                    </Button>
+                  )}
                   {canRollback && (
                     <Button
                       variant="ghost"

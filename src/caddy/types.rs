@@ -25,6 +25,8 @@ pub struct CaddyHandler {
     pub root: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub try_files: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub providers: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,9 +69,32 @@ impl CaddyRoute {
                 }]),
                 root: None,
                 try_files: None,
+                providers: None,
             }],
             terminal: Some(true),
         }
+    }
+
+    pub fn with_basic_auth(mut self, username: &str, password_hash: &str) -> Self {
+        let auth_handler = CaddyHandler {
+            handler: "authentication".to_string(),
+            upstreams: None,
+            root: None,
+            try_files: None,
+            providers: Some(serde_json::json!({
+                "http_basic": {
+                    "accounts": [{
+                        "username": username,
+                        "password": password_hash,
+                    }],
+                    "hash": {
+                        "algorithm": "bcrypt"
+                    }
+                }
+            })),
+        };
+        self.handle.insert(0, auth_handler);
+        self
     }
 
     /// Create a file_server route for serving static files with SPA fallback.
@@ -90,20 +115,21 @@ impl CaddyRoute {
                         "{http.request.uri.path}/index.html".to_string(),
                         "/index.html".to_string(),
                     ]),
+                    providers: None,
                 },
-                // vars handler to set the root
                 CaddyHandler {
                     handler: "vars".to_string(),
                     upstreams: None,
                     root: Some(root_path.to_string()),
                     try_files: None,
+                    providers: None,
                 },
-                // file_server handler
                 CaddyHandler {
                     handler: "file_server".to_string(),
                     upstreams: None,
                     root: Some(root_path.to_string()),
                     try_files: None,
+                    providers: None,
                 },
             ],
             terminal: Some(true),

@@ -1,6 +1,6 @@
 use crate::cli::client::CliClient;
 
-pub async fn run() {
+pub async fn run(no_cache: bool) {
     let client = CliClient::new_or_exit();
 
     let config = load_project_config();
@@ -15,9 +15,20 @@ pub async fn run() {
         }
     };
 
-    println!("Deploying app {app_id}...");
+    if no_cache {
+        println!("Deploying app {app_id} (force rebuild, no cache)...");
+    } else {
+        println!("Deploying app {app_id}...");
+    }
+
+    let body = if no_cache {
+        serde_json::json!({"no_cache": true})
+    } else {
+        serde_json::json!({})
+    };
+
     match client
-        .post::<serde_json::Value>(&format!("/apps/{app_id}/deploys"), &serde_json::json!({}))
+        .post::<serde_json::Value>(&format!("/apps/{app_id}/deploys"), &body)
         .await
     {
         Ok(resp) => {

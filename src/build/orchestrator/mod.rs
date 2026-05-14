@@ -38,6 +38,7 @@ impl BuildOrchestrator {
         deploy_id: &str,
         app: &App,
         build_config: Option<BuildConfig>,
+        no_cache: bool,
     ) -> Result<BuildResult, BuildError> {
         let start = Instant::now();
         let mut steps: Vec<BuildStep> = Vec::with_capacity(6);
@@ -65,6 +66,9 @@ impl BuildOrchestrator {
             sha: None,
             ssh_key_path: None,
             token: None,
+            submodules: app.git_submodules_enabled,
+            lfs: app.git_lfs_enabled,
+            shallow: app.git_shallow_clone,
         };
 
         match clone_repo(&clone_opts, &work_dir).await {
@@ -90,6 +94,11 @@ impl BuildOrchestrator {
         }
         steps.push(step);
 
+        if self.is_cancelled(deploy_id).await {
+            let _ = tokio::fs::remove_dir_all(&work_dir).await;
+            return Err(BuildError::Cancelled);
+        }
+
         // Step 2: Detect
         let mut step = new_step("Detecting framework");
         let detection = match detect(&work_dir, build_config.as_ref()) {
@@ -114,6 +123,11 @@ impl BuildOrchestrator {
             }
         };
         steps.push(step);
+
+        if self.is_cancelled(deploy_id).await {
+            let _ = tokio::fs::remove_dir_all(&work_dir).await;
+            return Err(BuildError::Cancelled);
+        }
 
         // Step 3: Generate Dockerfile
         let mut step = new_step("Generating Dockerfile");
@@ -159,6 +173,11 @@ impl BuildOrchestrator {
         }
         steps.push(step);
 
+        if self.is_cancelled(deploy_id).await {
+            let _ = tokio::fs::remove_dir_all(&work_dir).await;
+            return Err(BuildError::Cancelled);
+        }
+
         // Step 4: Build image
         let mut step = new_step("Building container image");
         let image_tag = format!("icefall/{}:{}", app.name, deploy_id);
@@ -181,9 +200,13 @@ impl BuildOrchestrator {
             .and_then(|c| c.build_timeout_secs)
             .unwrap_or(self.config.build_timeout_secs);
 
+        if no_cache {
+            all_output.push("Force rebuild: build cache disabled".to_string());
+        }
+
         let build_result = tokio::time::timeout(
             Duration::from_secs(timeout_secs),
-            self.stream_build(&image_tag, context, &secrets),
+            self.stream_build(&image_tag, context, &secrets, no_cache, deploy_id),
         )
         .await;
 
@@ -284,9 +307,12 @@ impl BuildOrchestrator {
         tag: &str,
         context: Bytes,
         secrets: &[String],
+        no_cache: bool,
+        deploy_id: &str,
     ) -> Result<Vec<String>, BuildError> {
         let mut lines = Vec::with_capacity(256);
-        let mut stream = self.docker.build_image(tag, context);
+        let mut stream = self.docker.build_image(tag, context, no_cache);
+        let mut line_count = 0u32;
 
         while let Some(result) = stream.next().await {
             let info = result?;
@@ -305,9 +331,21 @@ impl BuildOrchestrator {
                     .unwrap_or_else(|| "unknown build error".to_string());
                 return Err(BuildError::DockerBuild(msg));
             }
+
+            line_count += 1;
+            if line_count % 50 == 0 && self.is_cancelled(deploy_id).await {
+                return Err(BuildError::Cancelled);
+            }
         }
 
         Ok(lines)
+    }
+
+    async fn is_cancelled(&self, deploy_id: &str) -> bool {
+        matches!(
+            self.db.get_deploy(deploy_id).await,
+            Ok(Some(d)) if d.status == "cancelled"
+        )
     }
 
     async fn fail_deploy(&self, deploy_id: &str, output: &[String]) {

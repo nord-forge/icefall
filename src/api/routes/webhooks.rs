@@ -214,6 +214,7 @@ async fn trigger_deploy(
             environment_id: env.id.clone(),
             git_sha: Some(sha.to_string()),
             server_id: None,
+            no_cache: false,
         })
         .await
     {
@@ -241,7 +242,10 @@ async fn trigger_deploy(
         let orchestrator =
             BuildOrchestrator::new(state.docker.clone(), state.db.clone(), state.config.clone());
 
-        match orchestrator.build(&deploy_id, &app, build_config).await {
+        match orchestrator
+            .build(&deploy_id, &app, build_config, false)
+            .await
+        {
             Ok(result) => {
                 let manager = DeployManager::new(
                     state.docker.clone(),

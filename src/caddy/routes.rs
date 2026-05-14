@@ -3,7 +3,8 @@ use crate::caddy::{CaddyClient, CaddyError};
 
 impl CaddyClient {
     pub async fn add_route(&self, domain: &str, upstream: &str) -> Result<(), CaddyError> {
-        self.add_route_with_path(domain, None, upstream).await
+        self.add_route_with_options(domain, None, upstream, None)
+            .await
     }
 
     pub async fn add_route_with_path(
@@ -12,7 +13,21 @@ impl CaddyClient {
         path: Option<&str>,
         upstream: &str,
     ) -> Result<(), CaddyError> {
-        let route = CaddyRoute::reverse_proxy_with_path(domain, path, upstream);
+        self.add_route_with_options(domain, path, upstream, None)
+            .await
+    }
+
+    pub async fn add_route_with_options(
+        &self,
+        domain: &str,
+        path: Option<&str>,
+        upstream: &str,
+        basic_auth: Option<(&str, &str)>,
+    ) -> Result<(), CaddyError> {
+        let mut route = CaddyRoute::reverse_proxy_with_path(domain, path, upstream);
+        if let Some((username, password_hash)) = basic_auth {
+            route = route.with_basic_auth(username, password_hash);
+        }
         let url = format!("{}/config/apps/http/servers/srv0/routes", self.base_url());
 
         let response = self.client().post(&url).json(&route).send().await?;

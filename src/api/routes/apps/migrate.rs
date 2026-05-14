@@ -69,6 +69,7 @@ pub(super) async fn migrate_app(
             environment_id: env.id.clone(),
             git_sha: None,
             server_id: Some(body.target_server_id.clone()),
+            no_cache: false,
         })
         .await?;
 
@@ -196,7 +197,10 @@ pub(super) async fn migrate_app(
                     state.db.clone(),
                     state.config.clone(),
                 );
-                match orchestrator.build(&deploy_id, &target_app, None).await {
+                match orchestrator
+                    .build(&deploy_id, &target_app, None, false)
+                    .await
+                {
                     Ok(result) => result.image_ref,
                     Err(e) => {
                         tracing::error!("Migration build failed: {e}");

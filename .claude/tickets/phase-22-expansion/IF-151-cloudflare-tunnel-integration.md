@@ -39,7 +39,7 @@ Add a guided Cloudflare Tunnel setup flow so users behind NAT, CGNAT, or restric
 - [ ] Image: `cloudflare/cloudflared:latest` (pinned to a specific version in production)
 - [ ] Restart policy: `unless-stopped`
 - [ ] Config file mounted at `/etc/cloudflared/config.yml`
-- [ ] Connected to the same Docker network as Icefall app containers (so it can reach them by container name)
+- [ ] Connected to the same container network as Icefall app containers (so it can reach them by container name)
 - [ ] Logs captured and available via the existing log viewer (treated as a system service, not an app)
 - [ ] Auto-restart on config change: after regenerating ingress rules, restart the cloudflared container
 - [ ] Resource limits: 128MB memory, 0.25 CPU shares (cloudflared is lightweight)
@@ -57,7 +57,7 @@ Add a guided Cloudflare Tunnel setup flow so users behind NAT, CGNAT, or restric
       service: http://icefall-app2-blue:8080
     - service: http_status:404
   ```
-- [ ] Hostname resolution uses the app's Docker container name + port
+- [ ] Hostname resolution uses the app's container name + port
 - [ ] If the app has path-based routing (IF-069), the ingress rule includes the path matcher
 - [ ] Wildcard domains (`*.example.com`) are supported if the user's Cloudflare plan allows it
 
@@ -97,7 +97,7 @@ Add a guided Cloudflare Tunnel setup flow so users behind NAT, CGNAT, or restric
 - The tunnel token encodes the tunnel ID and credentials — no need to store them separately
 - Ingress rules are order-dependent — more specific rules must come before less specific ones, catch-all last
 - `cloudflared` can reload config without restart via `SIGHUP`, but a container restart is simpler and more reliable
-- Network: create a shared Docker network (`icefall-tunnel`) that both app containers and the cloudflared container join
+- Network: create a shared container network (`icefall-tunnel`) that both app containers and the cloudflared container join (works with both Docker bridge and Podman netavark)
 - If the user is already using Caddy for SSL: Cloudflare Tunnel handles TLS termination at Cloudflare's edge, so the tunnel sends plain HTTP to the app container. Caddy is bypassed for tunneled domains.
 
 ## Out of Scope
@@ -110,6 +110,6 @@ Add a guided Cloudflare Tunnel setup flow so users behind NAT, CGNAT, or restric
 
 ## Dependencies
 
-- IF-004 (Docker Engine client — for managing the cloudflared container)
+- IF-004 (Container runtime client — for managing the cloudflared container)
 - IF-069 (Path-based routing — for path-aware ingress rules)
 - IF-023 (Domain management — tunnel toggle lives on domain settings)
