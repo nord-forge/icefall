@@ -1,0 +1,66 @@
+---
+title: "Migrate from dokku"
+description: "Step-by-step migration from dokku to Icefall"
+---
+
+## Overview
+
+This guide walks you through migrating your applications from dokku to Icefall. The process involves exporting your app configurations, recreating them in Icefall, migrating databases, and updating DNS.
+
+## Before you start
+
+1. Install Icefall on your new server ([installation guide](/getting-started/installation))
+2. Complete the onboarding wizard
+3. Note down all your current apps, databases, domains, and environment variables
+
+## Step 1: Export app configurations
+
+For each app, document:
+- Git repository URL and branch
+- Environment variables
+- Domain names
+- Database connections
+- Volume mounts / persistent storage
+
+## Step 2: Create apps in Icefall
+
+For each app:
+1. Click **Create app** in the dashboard
+2. Enter the git repo URL and branch
+3. Configure build settings (Icefall auto-detects most frameworks)
+4. Set environment variables from your export
+
+Or use the CLI:
+```bash
+icefall apps create --name my-app --repo https://github.com/user/repo
+```
+
+## Step 3: Migrate databases
+
+1. Dump your database from the source platform
+2. Create a managed database in Icefall
+3. Restore the dump using the database import feature
+
+## Step 4: Configure domains
+
+1. Add your domains in the app's **Domains** tab
+2. Update DNS records to point to your Icefall server's IP
+3. Wait for DNS propagation and SSL provisioning
+
+## Step 5: Set up auto-deploy
+
+1. Update webhook URLs in your git provider
+2. Enable auto-deploy in app settings
+3. Push a test commit to verify
+
+## Step 6: Verify
+
+- Check health status for all apps
+- Verify SSL certificates
+- Test all domains
+- Confirm database connections
+- Verify backup schedules
+
+## Rollback plan
+
+Keep your old platform running until you've verified everything works on Icefall. Only decommission after 48+ hours of stable operation.

@@ -1,0 +1,30 @@
+---
+title: Security
+description: Authentication, encryption, and container isolation
+---
+
+## Authentication
+
+- **Dashboard**: session cookies (HTTP-only, Secure, SameSite=Strict)
+- **API**: Bearer tokens with `icefall_` prefix, SHA-256 hashed
+- **OAuth**: GitHub + Google SSO with PKCE flow
+- **2FA**: TOTP with backup codes
+
+## Authorization
+
+Three roles: **admin**, **deployer**, **viewer**.
+- Admin: full access including user management and settings
+- Deployer: can create apps, trigger deploys, manage databases
+- Viewer: read-only access to all resources
+
+## Encryption
+
+- **At rest**: AES-256-GCM for environment variables and credentials in SQLite
+- **In transit**: TLS everywhere — Caddy handles HTTPS automatically
+- **Remote deploys**: X25519 Diffie-Hellman key agreement + AES-256-GCM envelope encryption for env vars sent to worker servers
+
+## Container isolation
+
+- Each app runs in its own container with resource limits
+- Compose stacks get isolated bridge networks
+- Database containers are not publicly accessible by default

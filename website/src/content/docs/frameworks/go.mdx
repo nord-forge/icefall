@@ -1,0 +1,50 @@
+---
+title: "Deploy go"
+description: "Deploy a go application on Icefall"
+---
+
+## Prerequisites
+
+- A go project in a git repository
+- An Icefall instance with a connected server
+
+## Quick deploy
+
+1. Click **Create app** in the Icefall dashboard
+2. Paste your git repository URL
+3. Icefall auto-detects the framework and configures build settings
+4. Click **Deploy**
+
+Or via CLI:
+```bash
+icefall deploy
+```
+
+## Build configuration
+
+Icefall detects go projects and generates an optimized Dockerfile with:
+- Multi-stage build (builder + runtime)
+- Dependency caching for faster rebuilds
+- Non-root user in production
+
+## Environment variables
+
+Set environment variables in the **Env vars** tab. Common variables:
+
+- `PORT` — auto-detected, usually not needed
+- `NODE_ENV` / `RAILS_ENV` / `APP_ENV` — set to `production`
+- `DATABASE_URL` — link a managed database for auto-injection
+
+## Custom Dockerfile
+
+If Icefall's auto-generated Dockerfile doesn't suit your needs, add a `Dockerfile` to your repo root. Icefall will use it instead of generating one.
+
+## Health checks
+
+Configure a health check path in app settings (e.g., `/health` or `/api/health`). Icefall checks this endpoint after each deploy.
+
+## Next steps
+
+- [Add a custom domain](/getting-started/custom-domain)
+- [Set up auto-deploy](/getting-started/auto-deploy)
+- [Connect a database](/getting-started/first-database)

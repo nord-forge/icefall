@@ -1,0 +1,25 @@
+---
+title: Database issues
+description: Fix connection, backup, and performance problems
+---
+
+## Can't connect to database
+
+**Checklist**:
+1. Is the database container running? Check in the dashboard
+2. Use the internal URL (`db-name.icefall.internal`) from apps on the same server
+3. For external access, enable public port in database settings
+4. Verify credentials from the database detail page
+
+## Backup fails
+
+**Common causes**:
+- Disk full: check server disk usage in metrics
+- Timeout: increase backup timeout for large databases
+- Permissions: verify the backup user has dump privileges
+
+## Data lost on redeploy
+
+**Cause**: Volume not configured. Container data is ephemeral without persistent storage.
+
+**Fix**: Add a volume mount in app settings pointing to your data directory.

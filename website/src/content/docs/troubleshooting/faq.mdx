@@ -1,0 +1,48 @@
+---
+title: FAQ
+description: Frequently asked questions about Icefall
+---
+
+## General
+
+### What container runtimes does Icefall support?
+Both Docker and Podman. Set `runtime = "podman"` in `config.toml` to use Podman. See the [container runtime docs](/concepts/container-runtime).
+
+### Can I switch from Docker to Podman on an existing installation?
+Yes. Stop Icefall, update `config.toml`, install Podman, start Icefall. Your apps will need to be redeployed since containers are runtime-specific. See the [Podman reference](/reference/podman).
+
+### Does Icefall support multi-server deployments?
+Yes. Add worker servers via the dashboard. Each worker runs an agent binary that communicates with the control plane over WebSocket. See [multi-server concepts](/concepts/multi-server).
+
+### How do I update Icefall?
+Icefall self-updates atomically. Go to **Settings > Updates** or run `icefall update` from the CLI. Updates include automatic rollback if the new version fails.
+
+## Deployment
+
+### Can I deploy a Docker image without a git repo?
+Yes. Choose "Deploy Docker Image" in the app creation wizard. Enter the image URL and tag.
+
+### Can I deploy multiple services from one repo?
+Yes. Use Docker Compose mode — add your `docker-compose.yml` content in app settings.
+
+### How do I deploy from a monorepo subdirectory?
+Set the **Base directory** in app settings (e.g., `apps/frontend`). Icefall runs framework detection and builds from that subdirectory.
+
+### Can I schedule a deploy for later?
+Yes. When triggering a deploy, choose "Schedule for later" and pick a date/time.
+
+## Databases
+
+### Which databases are supported?
+PostgreSQL, MySQL, MariaDB, MongoDB, Redis, Valkey, KeyDB, DragonFly, ClickHouse, CockroachDB, and Cassandra.
+
+### Can I connect to my database from outside?
+Enable **Public access** in database settings. This allocates a TCP port and optionally restricts by IP whitelist.
+
+## Networking
+
+### Does Icefall handle SSL certificates?
+Yes. Caddy automatically provisions Let's Encrypt certificates for all configured domains.
+
+### Can I use Icefall behind a firewall / NAT?
+Yes. Configure a Cloudflare Tunnel to expose apps without opening ports.

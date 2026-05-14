@@ -1,0 +1,31 @@
+---
+title: Networking issues
+description: Fix domain, SSL, and connectivity problems
+---
+
+## 502 Bad Gateway
+
+**Cause**: Caddy can't reach the app container.
+
+**Checklist**:
+1. Is the container running? Check app status in the dashboard
+2. Is the port correct? Check the detected port in app overview
+3. Restart the app and check if the route updates
+
+## SSL certificate errors
+
+**Symptom**: Browser shows security warning or `ERR_CERT_AUTHORITY_INVALID`.
+
+**Fix**:
+1. Verify DNS points to your server: `dig your-domain.com`
+2. Wait for DNS propagation (up to 48 hours)
+3. Check Caddy logs for ACME errors
+4. Ensure ports 80 and 443 are open on your firewall
+
+## Can't reach app from internet
+
+**Checklist**:
+1. Firewall: ensure ports 80, 443, and 8443 are open
+2. DNS: verify A record points to your server's public IP
+3. Caddy: check if the route exists (`icefall domains list`)
+4. Container: verify it's running and healthy

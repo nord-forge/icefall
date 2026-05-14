@@ -1,0 +1,29 @@
+---
+title: Multi-server issues
+description: Fix agent connection and remote deployment problems
+---
+
+## Agent won't connect
+
+**Checklist**:
+1. Run the setup command on the worker server
+2. Verify the enrollment token hasn't expired (15 min TTL)
+3. Check that the worker can reach the control plane on port 443
+4. Verify Docker/Podman is running on the worker
+
+## Server shows offline
+
+**Cause**: Heartbeat timeout (45 seconds without a heartbeat).
+
+**Fix**:
+1. Check network connectivity between worker and control plane
+2. SSH into the worker and check `systemctl status icefall-agent`
+3. Check agent logs: `journalctl -u icefall-agent -n 50`
+
+## Deploy to remote server fails
+
+**Checklist**:
+1. Is the agent connected? Check server status in dashboard
+2. Is Docker/Podman running on the worker?
+3. Does the worker have enough disk space for the build?
+4. Check agent logs on the worker for detailed errors
