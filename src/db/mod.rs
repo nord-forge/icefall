@@ -120,6 +120,38 @@ pub trait Database: Send + Sync + 'static {
     // Search
     async fn search(&self, query: &str) -> Result<serde_json::Value, DbError>;
 
+    // SSH keys
+    async fn list_ssh_keys(&self, user_id: &str) -> Result<Vec<SshKey>, DbError>;
+    async fn create_ssh_key(&self, key: &NewSshKey) -> Result<SshKey, DbError>;
+    async fn delete_ssh_key(&self, id: &str) -> Result<(), DbError>;
+    async fn get_ssh_key(&self, id: &str) -> Result<Option<SshKey>, DbError>;
+
+    // Container registries
+    async fn list_registries(&self) -> Result<Vec<Registry>, DbError>;
+    async fn create_registry(&self, reg: &NewRegistry) -> Result<Registry, DbError>;
+    async fn delete_registry(&self, id: &str) -> Result<(), DbError>;
+
+    // Public ports
+    async fn allocate_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        port: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError>;
+    async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError>;
+    async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError>;
+
+    // GitHub installations
+    async fn create_github_installation(
+        &self,
+        installation_id: i64,
+        account_login: &str,
+        account_type: &str,
+    ) -> Result<GitHubInstallation, DbError>;
+    async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError>;
+    async fn delete_github_installation(&self, id: &str) -> Result<(), DbError>;
+
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;

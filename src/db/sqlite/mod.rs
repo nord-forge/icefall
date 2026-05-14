@@ -5,15 +5,19 @@ mod databases;
 mod deploys;
 mod domains;
 mod environments;
+mod github;
 mod health;
 mod maintenance;
 mod notifications;
 mod oauth;
 mod onboarding;
 mod projects;
+mod public_ports;
+mod registries;
 mod search;
 mod servers;
 mod sessions;
+mod ssh_keys;
 mod updates;
 mod users;
 mod webhooks;
@@ -313,6 +317,85 @@ impl Database for SqliteDatabase {
 
     async fn search(&self, query: &str) -> Result<serde_json::Value, DbError> {
         search::search(&self.pool, query).await
+    }
+
+    // --- SSH keys ---
+
+    async fn list_ssh_keys(&self, user_id: &str) -> Result<Vec<SshKey>, DbError> {
+        ssh_keys::list_ssh_keys(&self.pool, user_id).await
+    }
+
+    async fn create_ssh_key(&self, key: &NewSshKey) -> Result<SshKey, DbError> {
+        ssh_keys::create_ssh_key(&self.pool, key).await
+    }
+
+    async fn delete_ssh_key(&self, id: &str) -> Result<(), DbError> {
+        ssh_keys::delete_ssh_key(&self.pool, id).await
+    }
+
+    async fn get_ssh_key(&self, id: &str) -> Result<Option<SshKey>, DbError> {
+        ssh_keys::get_ssh_key(&self.pool, id).await
+    }
+
+    // --- Container registries ---
+
+    async fn list_registries(&self) -> Result<Vec<Registry>, DbError> {
+        registries::list_registries(&self.pool, &self.encryptor).await
+    }
+
+    async fn create_registry(&self, reg: &NewRegistry) -> Result<Registry, DbError> {
+        registries::create_registry(&self.pool, &self.encryptor, reg).await
+    }
+
+    async fn delete_registry(&self, id: &str) -> Result<(), DbError> {
+        registries::delete_registry(&self.pool, id).await
+    }
+
+    // --- Public ports ---
+
+    async fn allocate_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        port: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError> {
+        public_ports::allocate_public_port(
+            &self.pool,
+            resource_type,
+            resource_id,
+            port,
+            ip_whitelist,
+        )
+        .await
+    }
+
+    async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError> {
+        public_ports::release_public_port(&self.pool, resource_id).await
+    }
+
+    async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError> {
+        public_ports::get_public_port(&self.pool, resource_id).await
+    }
+
+    // --- GitHub installations ---
+
+    async fn create_github_installation(
+        &self,
+        installation_id: i64,
+        account_login: &str,
+        account_type: &str,
+    ) -> Result<GitHubInstallation, DbError> {
+        github::create_github_installation(&self.pool, installation_id, account_login, account_type)
+            .await
+    }
+
+    async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError> {
+        github::list_github_installations(&self.pool).await
+    }
+
+    async fn delete_github_installation(&self, id: &str) -> Result<(), DbError> {
+        github::delete_github_installation(&self.pool, id).await
     }
 
     // --- Users ---

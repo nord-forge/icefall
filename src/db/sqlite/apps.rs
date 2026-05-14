@@ -155,6 +155,14 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.pre_deploy_commands.as_deref(),
     };
+    let post_deploy_commands = match &update.post_deploy_commands {
+        Some(v) => v.as_deref(),
+        None => existing.post_deploy_commands.as_deref(),
+    };
+    let ssh_key_id = match &update.ssh_key_id {
+        Some(v) => v.as_deref(),
+        None => existing.ssh_key_id.as_deref(),
+    };
     let now = now_iso8601();
 
     sqlx::query(
@@ -165,6 +173,7 @@ pub(super) async fn update_app(
          base_directory = ?, disable_build_cache = ?, git_submodules_enabled = ?,
          git_lfs_enabled = ?, git_shallow_clone = ?, basic_auth_enabled = ?,
          basic_auth_username = ?, basic_auth_password_hash = ?, pre_deploy_commands = ?,
+         post_deploy_commands = ?, ssh_key_id = ?,
          updated_at = ? WHERE id = ?",
     )
     .bind(name)
@@ -191,6 +200,8 @@ pub(super) async fn update_app(
     .bind(basic_auth_username)
     .bind(basic_auth_password_hash)
     .bind(pre_deploy_commands)
+    .bind(post_deploy_commands)
+    .bind(ssh_key_id)
     .bind(&now)
     .bind(id)
     .execute(pool)

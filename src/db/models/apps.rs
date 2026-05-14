@@ -28,6 +28,8 @@ pub struct App {
     pub basic_auth_username: Option<String>,
     pub basic_auth_password_hash: Option<String>,
     pub pre_deploy_commands: Option<String>,
+    pub post_deploy_commands: Option<String>,
+    pub ssh_key_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -69,4 +71,6 @@ pub struct UpdateApp {
     pub basic_auth_username: Option<Option<String>>,
     pub basic_auth_password_hash: Option<Option<String>>,
     pub pre_deploy_commands: Option<Option<String>>,
+    pub post_deploy_commands: Option<Option<String>>,
+    pub ssh_key_id: Option<Option<String>>,
 }
