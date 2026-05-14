@@ -33,6 +33,11 @@ pub struct App {
     pub last_request_at: Option<String>,
     pub exempt_from_inactivity: bool,
     pub require_deploy_approval: bool,
+    pub canary_enabled: bool,
+    pub canary_config: Option<String>,
+    pub drift_monitoring_enabled: bool,
+    pub log_noise_patterns: Option<String>,
+    pub log_highlight_patterns: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -4,6 +4,7 @@ pub mod apps;
 pub mod audit;
 pub mod auth;
 pub mod backups;
+pub mod bundles;
 pub mod config_history;
 pub mod databases;
 pub mod db_browser;
@@ -11,6 +12,7 @@ pub mod deploys;
 pub mod domains;
 pub mod env_vars;
 pub mod events;
+pub mod forecast;
 pub mod health;
 pub mod instance_backup;
 pub mod logs;
@@ -87,6 +89,18 @@ pub fn api_routes() -> Router<AppState> {
         .route(
             "/deploys/{id}/approve",
             axum::routing::post(config_history::approve_deploy),
+        )
+        .route(
+            "/servers/{id}/forecast",
+            axum::routing::get(forecast::server_forecast),
+        )
+        .route(
+            "/apps/{id}/export",
+            axum::routing::get(bundles::export_bundle),
+        )
+        .route(
+            "/bundles/import",
+            axum::routing::post(bundles::import_bundle),
         )
         .route(
             "/notifications/webhooks",

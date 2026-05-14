@@ -2,13 +2,16 @@ mod analytics;
 mod apps;
 mod audit;
 mod backups;
+mod canary;
 mod config_history;
 mod databases;
 mod deploy_approvals;
 mod deploy_events;
 mod deploys;
 mod domains;
+mod drift;
 mod environments;
+mod forecast;
 mod github;
 mod health;
 mod maintenance;
@@ -467,6 +470,60 @@ impl Database for SqliteDatabase {
         deploy_id: &str,
     ) -> Result<Option<DeployApproval>, DbError> {
         deploy_approvals::get_deploy_approval(&self.pool, deploy_id).await
+    }
+
+    // --- Canary results ---
+
+    async fn store_canary_result(
+        &self,
+        deploy_id: &str,
+        p50: f64,
+        p95: f64,
+        p99: f64,
+        errors: i32,
+        total: i32,
+        verdict: &str,
+    ) -> Result<CanaryResult, DbError> {
+        canary::store_canary_result(&self.pool, deploy_id, p50, p95, p99, errors, total, verdict)
+            .await
+    }
+
+    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError> {
+        canary::get_canary_baseline(&self.pool, app_id).await
+    }
+
+    // --- Drift events ---
+
+    async fn record_drift_event(
+        &self,
+        app_id: &str,
+        drifted_fields: &str,
+        declared: Option<&str>,
+        actual: Option<&str>,
+    ) -> Result<DriftEvent, DbError> {
+        drift::record_drift_event(&self.pool, app_id, drifted_fields, declared, actual).await
+    }
+
+    async fn list_drift_events(
+        &self,
+        app_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DriftEvent>, DbError> {
+        drift::list_drift_events(&self.pool, app_id, limit).await
+    }
+
+    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError> {
+        drift::resolve_drift_event(&self.pool, id).await
+    }
+
+    // --- Resource forecasting ---
+
+    async fn get_server_metrics_for_forecast(
+        &self,
+        server_id: &str,
+        days: i64,
+    ) -> Result<Vec<(f64, f64, f64)>, DbError> {
+        forecast::get_server_metrics_for_forecast(&self.pool, server_id, days).await
     }
 
     // --- Deploy analytics ---

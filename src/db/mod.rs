@@ -189,6 +189,39 @@ pub trait Database: Send + Sync + 'static {
     async fn get_deploy_approval(&self, deploy_id: &str)
         -> Result<Option<DeployApproval>, DbError>;
 
+    // Canary results
+    #[allow(clippy::too_many_arguments)]
+    async fn store_canary_result(
+        &self,
+        deploy_id: &str,
+        p50: f64,
+        p95: f64,
+        p99: f64,
+        errors: i32,
+        total: i32,
+        verdict: &str,
+    ) -> Result<CanaryResult, DbError>;
+    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError>;
+
+    // Drift events
+    async fn record_drift_event(
+        &self,
+        app_id: &str,
+        drifted_fields: &str,
+        declared: Option<&str>,
+        actual: Option<&str>,
+    ) -> Result<DriftEvent, DbError>;
+    async fn list_drift_events(&self, app_id: &str, limit: i64)
+        -> Result<Vec<DriftEvent>, DbError>;
+    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError>;
+
+    // Resource forecasting
+    async fn get_server_metrics_for_forecast(
+        &self,
+        server_id: &str,
+        days: i64,
+    ) -> Result<Vec<(f64, f64, f64)>, DbError>;
+
     // Deploy analytics
     async fn get_deploy_analytics(
         &self,

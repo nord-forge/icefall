@@ -84,6 +84,11 @@ mod tests {
             last_request_at: None,
             exempt_from_inactivity: false,
             require_deploy_approval: false,
+            canary_enabled: false,
+            canary_config: None,
+            drift_monitoring_enabled: true,
+            log_noise_patterns: None,
+            log_highlight_patterns: None,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }
