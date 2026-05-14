@@ -73,11 +73,10 @@ pub(super) async fn delete_scheduled_task(pool: &SqlitePool, id: &str) -> Result
 pub(super) async fn list_all_enabled_scheduled_tasks(
     pool: &SqlitePool,
 ) -> Result<Vec<ScheduledTask>, DbError> {
-    let tasks = sqlx::query_as::<_, ScheduledTask>(
-        "SELECT * FROM scheduled_tasks WHERE enabled = TRUE",
-    )
-    .fetch_all(pool)
-    .await?;
+    let tasks =
+        sqlx::query_as::<_, ScheduledTask>("SELECT * FROM scheduled_tasks WHERE enabled = TRUE")
+            .fetch_all(pool)
+            .await?;
     Ok(tasks)
 }
 

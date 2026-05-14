@@ -76,7 +76,8 @@ pub(super) async fn resolve_shared_variables(
         return Ok(Vec::new());
     };
 
-    let mut result: std::collections::HashMap<String, (String, String)> = std::collections::HashMap::new();
+    let mut result: std::collections::HashMap<String, (String, String)> =
+        std::collections::HashMap::new();
 
     // Server-level variables (lowest priority)
     if let Some(ref server_id) = app.server_id {

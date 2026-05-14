@@ -21,10 +21,7 @@ pub fn routes() -> Router<AppState> {
             "/apps/{id}/scheduled-tasks/{task_id}/toggle",
             post(toggle_task),
         )
-        .route(
-            "/apps/{id}/scheduled-tasks/{task_id}/run",
-            post(run_task),
-        )
+        .route("/apps/{id}/scheduled-tasks/{task_id}/run", post(run_task))
         .route(
             "/apps/{id}/scheduled-tasks/{task_id}/executions",
             get(list_executions),

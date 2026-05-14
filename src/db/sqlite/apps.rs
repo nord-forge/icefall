@@ -196,6 +196,64 @@ pub(super) async fn update_app(
         .ok_or_else(|| DbError::NotFound(id.to_string()))
 }
 
+pub(super) async fn clone_app(
+    pool: &SqlitePool,
+    source_app_id: &str,
+    new_name: &str,
+    target_project_id: Option<&str>,
+    target_server_id: Option<&str>,
+) -> Result<App, DbError> {
+    let source = get_app(pool, source_app_id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(format!("app {source_app_id}")))?;
+
+    let id = new_id();
+    let now = now_iso8601();
+    let server_id = target_server_id.unwrap_or_else(|| {
+        source
+            .server_id
+            .as_deref()
+            .unwrap_or(CONTROL_PLANE_SERVER_ID)
+    });
+    let project_id = target_project_id.or(source.project_id.as_deref());
+
+    sqlx::query(
+        "INSERT INTO apps (id, name, git_repo, git_branch, framework, build_config, resource_limits,
+         preview_enabled, preview_branch_pattern, volumes, image_ref, compose_content,
+         project_id, deploy_mode, server_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(new_name)
+    .bind(&source.git_repo)
+    .bind(&source.git_branch)
+    .bind(&source.framework)
+    .bind(&source.build_config)
+    .bind(&source.resource_limits)
+    .bind(source.preview_enabled)
+    .bind(&source.preview_branch_pattern)
+    .bind(&source.volumes)
+    .bind(&source.image_ref)
+    .bind(&source.compose_content)
+    .bind(project_id)
+    .bind(&source.deploy_mode)
+    .bind(server_id)
+    .bind(&now)
+    .bind(&now)
+    .execute(pool)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::Database(ref db_err) if db_err.message().contains("UNIQUE") => {
+            DbError::Duplicate(format!("app '{new_name}' already exists"))
+        }
+        other => DbError::Sqlx(other),
+    })?;
+
+    get_app(pool, &id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(id))
+}
+
 pub(super) async fn delete_app(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
     let result = sqlx::query("DELETE FROM apps WHERE id = ?")
         .bind(id)

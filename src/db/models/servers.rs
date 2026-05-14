@@ -28,6 +28,7 @@ pub struct Server {
     pub cleanup_unused_networks: bool,
     pub cleanup_dangling_only: bool,
     pub force_container_cleanup: bool,
+    pub terminal_enabled: bool,
     pub created_at: String,
     pub updated_at: String,
 }

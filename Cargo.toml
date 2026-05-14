@@ -45,6 +45,7 @@ rand = "0.9"
 base64 = "0.22"
 argon2 = "0.5"
 bcrypt = "0.16"
+rcgen = "0.13"
 
 # TOTP / 2FA
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
@@ -148,6 +149,7 @@ rand = { workspace = true }
 base64 = { workspace = true }
 argon2 = { workspace = true }
 bcrypt = { workspace = true }
+rcgen = { workspace = true }
 
 # TOTP / 2FA
 totp-rs = { workspace = true }

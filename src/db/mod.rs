@@ -126,11 +126,7 @@ pub trait Database: Send + Sync + 'static {
         &self,
         task: &NewScheduledTask,
     ) -> Result<ScheduledTask, DbError>;
-    async fn update_scheduled_task_enabled(
-        &self,
-        id: &str,
-        enabled: bool,
-    ) -> Result<(), DbError>;
+    async fn update_scheduled_task_enabled(&self, id: &str, enabled: bool) -> Result<(), DbError>;
     async fn delete_scheduled_task(&self, id: &str) -> Result<(), DbError>;
     async fn list_all_enabled_scheduled_tasks(&self) -> Result<Vec<ScheduledTask>, DbError>;
     async fn create_task_execution(
@@ -186,6 +182,50 @@ pub trait Database: Send + Sync + 'static {
         server_id: &str,
         limit: i64,
     ) -> Result<Vec<ContainerCleanupExecution>, DbError>;
+
+    // App cloning
+    async fn clone_app(
+        &self,
+        source_app_id: &str,
+        new_name: &str,
+        target_project_id: Option<&str>,
+        target_server_id: Option<&str>,
+    ) -> Result<App, DbError>;
+
+    // Database restore
+    async fn create_restore_record(
+        &self,
+        database_id: &str,
+        source_type: &str,
+        source_ref: Option<&str>,
+    ) -> Result<DatabaseRestoreRecord, DbError>;
+    async fn update_restore_record(
+        &self,
+        id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_restore_history(
+        &self,
+        database_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DatabaseRestoreRecord>, DbError>;
+
+    // Database SSL
+    async fn update_database_ssl(
+        &self,
+        id: &str,
+        ssl_enabled: bool,
+        ssl_mode: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn store_database_certs(
+        &self,
+        id: &str,
+        ca_cert: &str,
+        cert: &str,
+        key: &str,
+        expires_at: &str,
+    ) -> Result<(), DbError>;
 
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;

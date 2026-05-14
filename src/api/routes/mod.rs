@@ -3,8 +3,11 @@ pub mod apps;
 pub mod audit;
 pub mod auth;
 pub mod backups;
+pub mod clone;
 pub mod databases;
 pub mod db_browser;
+pub mod db_restore;
+pub mod db_ssl;
 pub mod deploys;
 pub mod domains;
 pub mod env_vars;
@@ -74,6 +77,28 @@ pub fn api_routes() -> Router<AppState> {
         .merge(scheduled_tasks::routes())
         .merge(shared_variables::routes())
         .route("/search", axum::routing::get(search::search))
+        .route("/apps/{id}/clone", axum::routing::post(clone::clone_app))
+        .route("/apps/{id}/move", axum::routing::post(clone::move_app))
+        .route(
+            "/databases/{id}/restore",
+            axum::routing::post(db_restore::restore_database),
+        )
+        .route(
+            "/databases/{id}/restore/history",
+            axum::routing::get(db_restore::list_restore_history),
+        )
+        .route(
+            "/databases/{id}/ssl",
+            axum::routing::put(db_ssl::update_database_ssl),
+        )
+        .route(
+            "/databases/{id}/certificate",
+            axum::routing::get(db_ssl::get_database_certificate),
+        )
+        .route(
+            "/databases/{id}/certificate/regenerate",
+            axum::routing::post(db_ssl::regenerate_certificate),
+        )
         .route(
             "/notifications/webhooks",
             axum::routing::get(webhook_endpoints::list_endpoints)

@@ -17,10 +17,7 @@ pub fn routes() -> Router<AppState> {
             "/shared-variables/{id}",
             axum::routing::delete(delete_variable),
         )
-        .route(
-            "/apps/{app_id}/resolved-variables",
-            get(resolve_variables),
-        )
+        .route("/apps/{app_id}/resolved-variables", get(resolve_variables))
 }
 
 async fn list_variables(

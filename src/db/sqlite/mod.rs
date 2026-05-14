@@ -12,6 +12,7 @@ mod notifications;
 mod oauth;
 mod onboarding;
 mod projects;
+mod restore;
 mod scheduled_tasks;
 mod search;
 mod servers;
@@ -433,6 +434,75 @@ impl Database for SqliteDatabase {
         limit: i64,
     ) -> Result<Vec<ContainerCleanupExecution>, DbError> {
         cleanup::list_cleanup_executions(&self.pool, server_id, limit).await
+    }
+
+    // --- App cloning ---
+
+    async fn clone_app(
+        &self,
+        source_app_id: &str,
+        new_name: &str,
+        target_project_id: Option<&str>,
+        target_server_id: Option<&str>,
+    ) -> Result<App, DbError> {
+        apps::clone_app(
+            &self.pool,
+            source_app_id,
+            new_name,
+            target_project_id,
+            target_server_id,
+        )
+        .await
+    }
+
+    // --- Database restore ---
+
+    async fn create_restore_record(
+        &self,
+        database_id: &str,
+        source_type: &str,
+        source_ref: Option<&str>,
+    ) -> Result<DatabaseRestoreRecord, DbError> {
+        restore::create_restore_record(&self.pool, database_id, source_type, source_ref).await
+    }
+
+    async fn update_restore_record(
+        &self,
+        id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<(), DbError> {
+        restore::update_restore_record(&self.pool, id, status, output).await
+    }
+
+    async fn list_restore_history(
+        &self,
+        database_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DatabaseRestoreRecord>, DbError> {
+        restore::list_restore_history(&self.pool, database_id, limit).await
+    }
+
+    // --- Database SSL ---
+
+    async fn update_database_ssl(
+        &self,
+        id: &str,
+        ssl_enabled: bool,
+        ssl_mode: Option<&str>,
+    ) -> Result<(), DbError> {
+        databases::update_database_ssl(&self.pool, id, ssl_enabled, ssl_mode).await
+    }
+
+    async fn store_database_certs(
+        &self,
+        id: &str,
+        ca_cert: &str,
+        cert: &str,
+        key: &str,
+        expires_at: &str,
+    ) -> Result<(), DbError> {
+        databases::store_database_certs(&self.pool, id, ca_cert, cert, key, expires_at).await
     }
 
     // --- Users ---
