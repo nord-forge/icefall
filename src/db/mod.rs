@@ -130,6 +130,7 @@ pub trait Database: Send + Sync + 'static {
     async fn delete_server(&self, id: &str) -> Result<(), DbError>;
     async fn update_server_heartbeat(&self, id: &str) -> Result<(), DbError>;
     async fn update_server_status(&self, id: &str, status: &str) -> Result<(), DbError>;
+    async fn update_server_disk_alert_state(&self, id: &str, state: &str) -> Result<(), DbError>;
 
     // Server Metrics History (multi-server)
     async fn insert_server_metrics_record(

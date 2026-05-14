@@ -149,6 +149,7 @@ impl DaemonRunner {
             server_metrics.clone(),
             server_metrics_history.clone(),
             db.clone(),
+            event_bus.clone(),
         );
         spawn_health_runner(db.clone(), docker.clone(), event_bus.clone());
         spawn_container_metrics(

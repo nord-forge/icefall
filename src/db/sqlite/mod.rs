@@ -828,6 +828,10 @@ impl Database for SqliteDatabase {
         servers::update_server_status(&self.pool, id, status).await
     }
 
+    async fn update_server_disk_alert_state(&self, id: &str, state: &str) -> Result<(), DbError> {
+        servers::update_server_disk_alert_state(&self.pool, id, state).await
+    }
+
     // --- Server Metrics History ---
 
     async fn insert_server_metrics_record(

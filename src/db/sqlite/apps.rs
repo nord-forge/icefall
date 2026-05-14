@@ -129,12 +129,39 @@ pub(super) async fn update_app(
     let disable_build_cache = update
         .disable_build_cache
         .unwrap_or(existing.disable_build_cache);
+    let git_submodules_enabled = update
+        .git_submodules_enabled
+        .unwrap_or(existing.git_submodules_enabled);
+    let git_lfs_enabled = update.git_lfs_enabled.unwrap_or(existing.git_lfs_enabled);
+    let git_shallow_clone = update
+        .git_shallow_clone
+        .unwrap_or(existing.git_shallow_clone);
+    let basic_auth_enabled = update
+        .basic_auth_enabled
+        .unwrap_or(existing.basic_auth_enabled);
+    let basic_auth_username = match &update.basic_auth_username {
+        Some(v) => v.as_deref(),
+        None => existing.basic_auth_username.as_deref(),
+    };
+    let basic_auth_password_hash = match &update.basic_auth_password_hash {
+        Some(v) => v.as_deref(),
+        None => existing.basic_auth_password_hash.as_deref(),
+    };
+    let pre_deploy_commands = match &update.pre_deploy_commands {
+        Some(v) => v.as_deref(),
+        None => existing.pre_deploy_commands.as_deref(),
+    };
     let now = now_iso8601();
 
     sqlx::query(
         "UPDATE apps SET name = ?, git_repo = ?, git_branch = ?, framework = ?,
          build_config = ?, resource_limits = ?, preview_enabled = ?,
-         preview_branch_pattern = ?, tags = ?, volumes = ?, image_ref = ?, compose_content = ?, project_id = ?, deploy_mode = ?, server_id = ?, disable_build_cache = ?, updated_at = ? WHERE id = ?",
+         preview_branch_pattern = ?, tags = ?, volumes = ?, image_ref = ?,
+         compose_content = ?, project_id = ?, deploy_mode = ?, server_id = ?,
+         disable_build_cache = ?, git_submodules_enabled = ?, git_lfs_enabled = ?,
+         git_shallow_clone = ?, basic_auth_enabled = ?, basic_auth_username = ?,
+         basic_auth_password_hash = ?, pre_deploy_commands = ?,
+         updated_at = ? WHERE id = ?",
     )
     .bind(name)
     .bind(git_repo)
@@ -152,6 +179,13 @@ pub(super) async fn update_app(
     .bind(deploy_mode)
     .bind(server_id)
     .bind(disable_build_cache)
+    .bind(git_submodules_enabled)
+    .bind(git_lfs_enabled)
+    .bind(git_shallow_clone)
+    .bind(basic_auth_enabled)
+    .bind(basic_auth_username)
+    .bind(basic_auth_password_hash)
+    .bind(pre_deploy_commands)
     .bind(&now)
     .bind(id)
     .execute(pool)

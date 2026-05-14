@@ -71,6 +71,13 @@ mod tests {
             deploy_mode: "auto".into(),
             server_id: None,
             disable_build_cache: false,
+            git_submodules_enabled: false,
+            git_lfs_enabled: false,
+            git_shallow_clone: true,
+            basic_auth_enabled: false,
+            basic_auth_username: None,
+            basic_auth_password_hash: None,
+            pre_deploy_commands: None,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }
