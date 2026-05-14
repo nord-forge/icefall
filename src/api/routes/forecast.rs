@@ -1,13 +1,19 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::Json;
 
 use crate::api::error::ApiError;
+use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
 
 pub async fn server_forecast(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(server_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
     let data = state
         .db
         .get_server_metrics_for_forecast(&server_id, 30)

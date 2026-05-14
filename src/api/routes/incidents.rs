@@ -1,9 +1,11 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
 use crate::db::models::NewIncident;
 
@@ -16,7 +18,12 @@ pub fn routes() -> Router<AppState> {
 
 async fn list_incidents(
     State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
     let incidents = state.db.list_incidents(50).await?;
     Ok(Json(serde_json::json!({ "data": incidents })))
 }
@@ -31,8 +38,19 @@ struct CreateIncidentRequest {
 
 async fn create_incident(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<CreateIncidentRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    if user.role == "viewer" {
+        return Err(ApiError::Forbidden(
+            "Deployer or admin role required to create incidents".into(),
+        ));
+    }
+
     let incident = state
         .db
         .create_incident(&NewIncident {
@@ -52,9 +70,20 @@ struct UpdateStatusRequest {
 
 async fn update_status(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<UpdateStatusRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    if user.role == "viewer" {
+        return Err(ApiError::Forbidden(
+            "Deployer or admin role required to update incidents".into(),
+        ));
+    }
+
     state.db.update_incident_status(&id, &body.status).await?;
     Ok(Json(serde_json::json!({ "message": "updated" })))
 }
@@ -62,17 +91,21 @@ async fn update_status(
 #[derive(Deserialize)]
 struct AddNoteRequest {
     content: String,
-    author_id: Option<String>,
 }
 
 async fn add_note(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<AddNoteRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
     let note = state
         .db
-        .add_incident_note(&id, &body.content, body.author_id.as_deref())
+        .add_incident_note(&id, &body.content, Some(&user.id))
         .await?;
     Ok(Json(serde_json::json!({ "data": note })))
 }

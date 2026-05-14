@@ -69,6 +69,10 @@ pub fn build_router(state: AppState) -> Router {
 
     let router = Router::new()
         .nest("/api/v1", api_routes)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ))
         .fallback_service(ServeDir::new("dashboard/dist").append_index_html_on_directories(true));
 
     middleware::apply_middleware(router, &state.config).with_state(state)

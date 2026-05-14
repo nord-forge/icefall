@@ -1,14 +1,21 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::Json;
 
 use crate::api::error::ApiError;
+use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
 use crate::db::models::now_iso8601;
 
 pub async fn export_bundle(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(app_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
     let app = state
         .db
         .get_app(&app_id)
@@ -70,8 +77,19 @@ pub async fn export_bundle(
 
 pub async fn import_bundle(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(bundle): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    if user.role == "viewer" {
+        return Err(ApiError::Forbidden(
+            "Deployer or admin role required to import bundles".into(),
+        ));
+    }
+
     let app_config = bundle
         .get("app")
         .ok_or_else(|| ApiError::BadRequest("Bundle missing 'app' field".into()))?;
