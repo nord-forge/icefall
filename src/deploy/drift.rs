@@ -89,6 +89,12 @@ mod tests {
             drift_monitoring_enabled: true,
             log_noise_patterns: None,
             log_highlight_patterns: None,
+            ghost_mode_enabled: false,
+            ghost_mode_idle_minutes: 30,
+            ghost_mode_status: "active".into(),
+            status_page_enabled: false,
+            power_nap_priority: "standard".into(),
+            power_nap_custom_schedule: None,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }

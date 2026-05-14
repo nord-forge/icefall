@@ -222,6 +222,17 @@ pub trait Database: Send + Sync + 'static {
         days: i64,
     ) -> Result<Vec<(f64, f64, f64)>, DbError>;
 
+    // Incidents
+    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError>;
+    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError>;
+    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError>;
+    async fn add_incident_note(
+        &self,
+        incident_id: &str,
+        content: &str,
+        author_id: Option<&str>,
+    ) -> Result<IncidentNote, DbError>;
+
     // Deploy analytics
     async fn get_deploy_analytics(
         &self,

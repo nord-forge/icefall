@@ -38,6 +38,12 @@ pub struct App {
     pub drift_monitoring_enabled: bool,
     pub log_noise_patterns: Option<String>,
     pub log_highlight_patterns: Option<String>,
+    pub ghost_mode_enabled: bool,
+    pub ghost_mode_idle_minutes: i32,
+    pub ghost_mode_status: String,
+    pub status_page_enabled: bool,
+    pub power_nap_priority: String,
+    pub power_nap_custom_schedule: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

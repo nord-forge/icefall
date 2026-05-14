@@ -17,6 +17,8 @@ pub struct Deploy {
     pub tag: Option<String>,
     pub no_cache: bool,
     pub config_hash: Option<String>,
+    pub scheduled_at: Option<String>,
+    pub screenshot_path: Option<String>,
     pub created_at: String,
 }
 

@@ -14,6 +14,7 @@ pub mod env_vars;
 pub mod events;
 pub mod forecast;
 pub mod health;
+pub mod incidents;
 pub mod instance_backup;
 pub mod logs;
 pub mod mcp;
@@ -65,6 +66,7 @@ pub fn api_routes() -> Router<AppState> {
         .merge(onboarding::routes())
         .merge(mcp::routes())
         .merge(instance_backup::routes())
+        .merge(incidents::routes())
         .merge(terminal::routes())
         .merge(two_factor::routes())
         .merge(oauth::routes())

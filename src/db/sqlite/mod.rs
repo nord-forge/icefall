@@ -14,6 +14,7 @@ mod environments;
 mod forecast;
 mod github;
 mod health;
+mod incidents;
 mod maintenance;
 mod notifications;
 mod oauth;
@@ -524,6 +525,29 @@ impl Database for SqliteDatabase {
         days: i64,
     ) -> Result<Vec<(f64, f64, f64)>, DbError> {
         forecast::get_server_metrics_for_forecast(&self.pool, server_id, days).await
+    }
+
+    // --- Incidents ---
+
+    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError> {
+        incidents::create_incident(&self.pool, incident).await
+    }
+
+    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError> {
+        incidents::list_incidents(&self.pool, limit).await
+    }
+
+    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError> {
+        incidents::update_incident_status(&self.pool, id, status).await
+    }
+
+    async fn add_incident_note(
+        &self,
+        incident_id: &str,
+        content: &str,
+        author_id: Option<&str>,
+    ) -> Result<IncidentNote, DbError> {
+        incidents::add_incident_note(&self.pool, incident_id, content, author_id).await
     }
 
     // --- Deploy analytics ---
