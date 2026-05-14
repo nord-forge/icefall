@@ -95,6 +95,12 @@ mod tests {
             status_page_enabled: false,
             power_nap_priority: "standard".into(),
             power_nap_custom_schedule: None,
+            project_environment_id: None,
+            template_id: None,
+            template_version: None,
+            has_custom_proxy_config: false,
+            proxy_presets: None,
+            tunnel_enabled: false,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }
