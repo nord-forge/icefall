@@ -560,6 +560,17 @@ impl Database for SqliteDatabase {
         analytics::get_deploy_analytics(&self.pool, from, to).await
     }
 
+    // --- Service templates ---
+
+    async fn list_service_templates(&self) -> Result<Vec<ServiceTemplate>, DbError> {
+        let templates = sqlx::query_as::<_, ServiceTemplate>(
+            "SELECT * FROM service_templates ORDER BY name ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(templates)
+    }
+
     // --- Users ---
 
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError> {

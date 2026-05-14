@@ -1,0 +1,8 @@
+.stat { display: flex; flex-direction: column; gap: var(--space-1); }
+.label { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: var(--weight-medium); }
+.value { font-size: var(--text-2xl); font-weight: var(--weight-semibold); color: var(--color-text); display: flex; align-items: center; gap: var(--space-2); }
+.detail { font-size: var(--text-xs); color: var(--color-text-muted); }
+.trend { display: inline-block; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }
+.up { border-bottom: 6px solid oklch(0.55 0.15 145); }
+.down { border-top: 6px solid oklch(0.55 0.15 25); }
+.flat { width: 8px; height: 2px; background: var(--color-text-muted); border: none; }

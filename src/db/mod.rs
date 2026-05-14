@@ -240,6 +240,9 @@ pub trait Database: Send + Sync + 'static {
         to: &str,
     ) -> Result<serde_json::Value, DbError>;
 
+    // Service templates
+    async fn list_service_templates(&self) -> Result<Vec<ServiceTemplate>, DbError>;
+
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;

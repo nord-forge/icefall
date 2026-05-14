@@ -13,7 +13,11 @@ const navItems = [
   { href: '/', label: 'Apps', icon: 'grid' },
   { href: '/projects', label: 'Projects', icon: 'folder' },
   { href: '/databases', label: 'Databases', icon: 'database' },
+  { href: '/services', label: 'Services', icon: 'package' },
   { href: '/servers', label: 'Servers', icon: 'server' },
+  { href: '/shared-variables', label: 'Variables', icon: 'key' },
+  { href: '/analytics', label: 'Analytics', icon: 'chart' },
+  { href: '/incidents', label: 'Incidents', icon: 'alert' },
   { href: '/users', label: 'Users', icon: 'users' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
   { href: '/settings', label: 'Settings', icon: 'settings' },
@@ -68,6 +72,10 @@ function isActive(href: string): boolean {
           {item.icon === 'users' && <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>}
           {item.icon === 'profile' && <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>}
           {item.icon === 'settings' && <><path d="M20 7h-9" /><path d="M14 17H5" /><circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" /></>}
+          {item.icon === 'package' && <><path d="M12.89 1.45l8 4A2 2 0 0 1 22 7.24v9.53a2 2 0 0 1-1.11 1.79l-8 4a2 2 0 0 1-1.79 0l-8-4A2 2 0 0 1 2 16.76V7.24a2 2 0 0 1 1.11-1.79l8-4a2 2 0 0 1 1.79 0z" /><path d="M2.32 6.16L12 11l9.68-4.84" /><path d="M12 22.76V11" /></>}
+          {item.icon === 'key' && <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></>}
+          {item.icon === 'chart' && <><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></>}
+          {item.icon === 'alert' && <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>}
           {item.icon === 'book' && <><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14" /><path d="M4 19h16" /><path d="M12 3v16" /></>}
         </svg>
         {item.label}
