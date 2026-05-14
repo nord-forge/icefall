@@ -16,6 +16,10 @@ pub struct Server {
     pub public_key: Option<String>,
     pub last_heartbeat_at: Option<String>,
     pub registered_at: Option<String>,
+    pub disk_alert_enabled: bool,
+    pub disk_alert_warning_threshold: i32,
+    pub disk_alert_critical_threshold: i32,
+    pub disk_alert_state: String,
     pub created_at: String,
     pub updated_at: String,
 }

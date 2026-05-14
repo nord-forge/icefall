@@ -42,6 +42,14 @@ pub(super) struct UpdateAppRequest {
     project_id: Option<Option<String>>,
     deploy_mode: Option<String>,
     base_directory: Option<Option<String>>,
+    disable_build_cache: Option<bool>,
+    git_submodules_enabled: Option<bool>,
+    git_lfs_enabled: Option<bool>,
+    git_shallow_clone: Option<bool>,
+    basic_auth_enabled: Option<bool>,
+    basic_auth_username: Option<Option<String>>,
+    basic_auth_password: Option<String>,
+    pre_deploy_commands: Option<Option<String>>,
 }
 
 pub(super) async fn list_apps(
@@ -198,6 +206,16 @@ pub(super) async fn update_app(
                 deploy_mode: body.deploy_mode,
                 server_id: None,
                 base_directory: body.base_directory,
+                disable_build_cache: body.disable_build_cache,
+                git_submodules_enabled: body.git_submodules_enabled,
+                git_lfs_enabled: body.git_lfs_enabled,
+                git_shallow_clone: body.git_shallow_clone,
+                basic_auth_enabled: body.basic_auth_enabled,
+                basic_auth_username: body.basic_auth_username,
+                basic_auth_password_hash: body
+                    .basic_auth_password
+                    .map(|pw| Some(bcrypt::hash(pw, bcrypt::DEFAULT_COST).unwrap_or_default())),
+                pre_deploy_commands: body.pre_deploy_commands,
             },
         )
         .await?;

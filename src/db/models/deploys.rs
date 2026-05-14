@@ -15,6 +15,8 @@ pub struct Deploy {
     pub env_snapshot: Option<String>,
     pub server_id: Option<String>,
     pub tag: Option<String>,
+    pub no_cache: bool,
+    pub config_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -24,4 +26,5 @@ pub struct NewDeploy {
     pub git_sha: Option<String>,
     pub server_id: Option<String>,
     pub tag: Option<String>,
+    pub no_cache: bool,
 }

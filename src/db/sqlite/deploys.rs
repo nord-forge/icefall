@@ -11,8 +11,8 @@ pub(super) async fn create_deploy(
     let now = now_iso8601();
 
     sqlx::query(
-        "INSERT INTO deploys (id, app_id, environment_id, status, git_sha, server_id, tag, started_at, created_at)
-         VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
+        "INSERT INTO deploys (id, app_id, environment_id, status, git_sha, server_id, tag, no_cache, started_at, created_at)
+         VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&deploy.app_id)
@@ -20,6 +20,7 @@ pub(super) async fn create_deploy(
     .bind(&deploy.git_sha)
     .bind(&deploy.server_id)
     .bind(&deploy.tag)
+    .bind(deploy.no_cache)
     .bind(&now)
     .bind(&now)
     .execute(pool)
@@ -139,6 +140,19 @@ pub(super) async fn update_deploy_env_snapshot(
 ) -> Result<(), DbError> {
     sqlx::query("UPDATE deploys SET env_snapshot = ? WHERE id = ?")
         .bind(env_snapshot)
+        .bind(deploy_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub(super) async fn update_deploy_config_hash(
+    pool: &SqlitePool,
+    deploy_id: &str,
+    config_hash: &str,
+) -> Result<(), DbError> {
+    sqlx::query("UPDATE deploys SET config_hash = ? WHERE id = ?")
+        .bind(config_hash)
         .bind(deploy_id)
         .execute(pool)
         .await?;

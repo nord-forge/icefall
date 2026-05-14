@@ -1,5 +1,6 @@
 use axum::extract::{Path, State};
 use axum::Json;
+use serde::Deserialize;
 
 use crate::api::error::ApiError;
 use crate::api::AppState;
@@ -10,9 +11,15 @@ use crate::deploy::compose::ComposeDeployer;
 use crate::deploy::manager::DeployManager;
 use crate::deploy::native::NativeDeployer;
 
+#[derive(Deserialize, Default)]
+pub(super) struct CreateDeployRequest {
+    pub no_cache: Option<bool>,
+}
+
 pub(super) async fn create_deploy(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    body: Option<Json<CreateDeployRequest>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let app = state
         .db
@@ -29,6 +36,9 @@ pub(super) async fn create_deploy(
             .ok_or_else(|| ApiError::BadRequest("app has no git_repo configured".into()))?;
     }
 
+    let request_no_cache = body.as_ref().and_then(|b| b.no_cache).unwrap_or(false);
+    let no_cache = request_no_cache || app.disable_build_cache;
+
     let envs = state.db.list_environments(&id).await?;
     let env = envs
         .first()
@@ -42,6 +52,7 @@ pub(super) async fn create_deploy(
             git_sha: None,
             server_id: None,
             tag: None,
+            no_cache,
         })
         .await?;
 
@@ -161,6 +172,9 @@ pub(super) async fn create_deploy(
                     sha: None,
                     ssh_key_path: None,
                     token: None,
+                    submodules: app_clone.git_submodules_enabled,
+                    lfs: app_clone.git_lfs_enabled,
+                    shallow: app_clone.git_shallow_clone,
                 };
 
                 match crate::build::git::clone_repo(&clone_opts, &work_dir).await {
@@ -281,7 +295,7 @@ pub(super) async fn create_deploy(
                     );
 
                     match orchestrator
-                        .build(&deploy_id, &app_clone, build_config)
+                        .build(&deploy_id, &app_clone, build_config, no_cache)
                         .await
                     {
                         Ok(result) => result.image_ref,
@@ -346,6 +360,7 @@ pub(super) async fn rollback_deploy(
             git_sha: target_deploy.git_sha.clone(),
             server_id: None,
             tag: None,
+            no_cache: false,
         })
         .await?;
 
@@ -380,4 +395,44 @@ pub(super) async fn rollback_deploy(
     });
 
     Ok(Json(serde_json::json!({ "data": rollback_deploy })))
+}
+
+pub(super) async fn cancel_deploy(
+    State(state): State<AppState>,
+    Path(deploy_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let deploy = state
+        .db
+        .get_deploy(&deploy_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    match deploy.status.as_str() {
+        "pending" | "building" | "deploying" => {}
+        other => {
+            return Err(ApiError::BadRequest(format!(
+                "Cannot cancel deploy with status '{other}'"
+            )));
+        }
+    }
+
+    state
+        .db
+        .update_deploy_status(&deploy_id, "cancelled", Some("Cancelled by user"))
+        .await?;
+
+    state.event_bus.emit(
+        crate::events::EventType::DeployStatus,
+        Some(&deploy.app_id),
+        Some(&deploy_id),
+        serde_json::json!({"status": "cancelled"}),
+    );
+
+    let updated = state
+        .db
+        .get_deploy(&deploy_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    Ok(Json(serde_json::json!({ "data": updated })))
 }

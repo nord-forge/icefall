@@ -11,10 +11,12 @@ mod notifications;
 mod oauth;
 mod onboarding;
 mod projects;
+mod search;
 mod servers;
 mod sessions;
 mod updates;
 mod users;
+mod webhooks;
 
 use std::sync::Arc;
 
@@ -248,6 +250,71 @@ impl Database for SqliteDatabase {
         domains::delete_domain(&self.pool, id).await
     }
 
+    async fn list_all_domains(&self) -> Result<Vec<Domain>, DbError> {
+        domains::list_all_domains(&self.pool).await
+    }
+
+    async fn update_domain_ssl_info(
+        &self,
+        id: &str,
+        issuer: Option<&str>,
+        expires_at: Option<&str>,
+    ) -> Result<(), DbError> {
+        domains::update_domain_ssl_info(&self.pool, id, issuer, expires_at).await
+    }
+
+    // --- Webhook endpoints ---
+
+    async fn list_webhook_endpoints(&self) -> Result<Vec<WebhookEndpoint>, DbError> {
+        webhooks::list_webhook_endpoints(&self.pool).await
+    }
+
+    async fn create_webhook_endpoint(
+        &self,
+        endpoint: &NewWebhookEndpoint,
+    ) -> Result<WebhookEndpoint, DbError> {
+        webhooks::create_webhook_endpoint(&self.pool, endpoint).await
+    }
+
+    async fn delete_webhook_endpoint(&self, id: &str) -> Result<(), DbError> {
+        webhooks::delete_webhook_endpoint(&self.pool, id).await
+    }
+
+    async fn create_webhook_delivery(
+        &self,
+        endpoint_id: &str,
+        event: &str,
+        status_code: Option<i32>,
+        response_time_ms: Option<i32>,
+        attempt: i32,
+        error: Option<&str>,
+    ) -> Result<(), DbError> {
+        webhooks::create_webhook_delivery(
+            &self.pool,
+            endpoint_id,
+            event,
+            status_code,
+            response_time_ms,
+            attempt,
+            error,
+        )
+        .await
+    }
+
+    async fn list_webhook_deliveries(
+        &self,
+        endpoint_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WebhookDelivery>, DbError> {
+        webhooks::list_webhook_deliveries(&self.pool, endpoint_id, limit).await
+    }
+
+    // --- Search ---
+
+    async fn search(&self, query: &str) -> Result<serde_json::Value, DbError> {
+        search::search(&self.pool, query).await
+    }
+
     // --- Users ---
 
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError> {
@@ -418,6 +485,14 @@ impl Database for SqliteDatabase {
         env_snapshot: &str,
     ) -> Result<(), DbError> {
         deploys::update_deploy_env_snapshot(&self.pool, deploy_id, env_snapshot).await
+    }
+
+    async fn update_deploy_config_hash(
+        &self,
+        deploy_id: &str,
+        config_hash: &str,
+    ) -> Result<(), DbError> {
+        deploys::update_deploy_config_hash(&self.pool, deploy_id, config_hash).await
     }
 
     // --- Env var extras ---
@@ -820,6 +895,10 @@ impl Database for SqliteDatabase {
         servers::update_server_status(&self.pool, id, status).await
     }
 
+    async fn update_server_disk_alert_state(&self, id: &str, state: &str) -> Result<(), DbError> {
+        servers::update_server_disk_alert_state(&self.pool, id, state).await
+    }
+
     // --- Server Metrics History ---
 
     async fn insert_server_metrics_record(
@@ -875,5 +954,97 @@ impl Database for SqliteDatabase {
 
     async fn run_migrations(&self) -> Result<(), DbError> {
         maintenance::run_migrations(&self.pool).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_strips_https() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/user/repo"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_strips_http() {
+        assert_eq!(
+            normalize_repo_url("http://github.com/user/repo"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_strips_git_suffix() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/user/repo.git"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_strips_trailing_slash() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/user/repo/"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_converts_ssh_to_path() {
+        assert_eq!(
+            normalize_repo_url("git@github.com:user/repo.git"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_lowercases() {
+        assert_eq!(
+            normalize_repo_url("https://GitHub.COM/User/Repo"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_trims_whitespace() {
+        assert_eq!(
+            normalize_repo_url("  https://github.com/user/repo  "),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_handles_combined() {
+        assert_eq!(
+            normalize_repo_url("git@gitlab.com:org/project.git/"),
+            "gitlab.com/org/project"
+        );
+    }
+
+    #[test]
+    fn normalize_ssh_and_https_produce_same_result() {
+        let https = normalize_repo_url("https://github.com/org/repo.git");
+        let ssh = normalize_repo_url("git@github.com:org/repo.git");
+        assert_eq!(https, ssh);
+    }
+
+    #[test]
+    fn normalize_self_hosted_gitlab_url() {
+        assert_eq!(
+            normalize_repo_url("https://git.example.com/team/project"),
+            "git.example.com/team/project"
+        );
+    }
+
+    #[test]
+    fn normalize_deeply_nested_repo_path() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/org/sub-group/repo.git"),
+            "github.com/org/sub-group/repo"
+        );
     }
 }

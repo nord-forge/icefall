@@ -112,3 +112,147 @@ impl From<DeployError> for ApiError {
         ApiError::internal(err)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+
+    async fn response_json(resp: Response) -> serde_json::Value {
+        let (parts, body) = resp.into_parts();
+        let bytes = to_bytes(body, 1024 * 1024).await.unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        serde_json::json!({ "status": parts.status.as_u16(), "body": val })
+    }
+
+    #[tokio::test]
+    async fn not_found_returns_404_with_code() {
+        let err = ApiError::NotFound("app xyz".into());
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        assert_eq!(json["status"], 404);
+        assert_eq!(json["body"]["error"], "not_found");
+        assert_eq!(json["body"]["message"], "app xyz");
+    }
+
+    #[tokio::test]
+    async fn bad_request_returns_400_with_code() {
+        let err = ApiError::BadRequest("missing field".into());
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        assert_eq!(json["status"], 400);
+        assert_eq!(json["body"]["error"], "bad_request");
+        assert_eq!(json["body"]["message"], "missing field");
+    }
+
+    #[tokio::test]
+    async fn forbidden_returns_403_with_code() {
+        let err = ApiError::Forbidden("admin only".into());
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        assert_eq!(json["status"], 403);
+        assert_eq!(json["body"]["error"], "forbidden");
+    }
+
+    #[tokio::test]
+    async fn conflict_returns_409_with_code() {
+        let err = ApiError::Conflict("already exists".into());
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        assert_eq!(json["status"], 409);
+        assert_eq!(json["body"]["error"], "conflict");
+    }
+
+    #[tokio::test]
+    async fn internal_returns_500_and_hides_details() {
+        let err = ApiError::internal(std::io::Error::other("secret db password in error"));
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        assert_eq!(json["status"], 500);
+        assert_eq!(json["body"]["error"], "internal_error");
+        assert_eq!(json["body"]["message"], "Internal server error");
+        assert!(!json["body"]["message"].as_str().unwrap().contains("secret"));
+    }
+
+    #[tokio::test]
+    async fn service_unavailable_returns_503() {
+        let err = ApiError::ServiceUnavailable("Docker unreachable".into());
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        assert_eq!(json["status"], 503);
+        assert_eq!(json["body"]["error"], "service_unavailable");
+    }
+
+    #[test]
+    fn from_db_not_found_maps_to_404() {
+        let db_err = DbError::NotFound("user 123".into());
+        let api_err: ApiError = db_err.into();
+        assert!(matches!(api_err, ApiError::NotFound(msg) if msg == "user 123"));
+    }
+
+    #[test]
+    fn from_db_duplicate_maps_to_conflict() {
+        let db_err = DbError::Duplicate("email taken".into());
+        let api_err: ApiError = db_err.into();
+        assert!(matches!(api_err, ApiError::Conflict(msg) if msg == "email taken"));
+    }
+
+    #[test]
+    fn from_db_sqlx_maps_to_internal() {
+        let db_err = DbError::Sqlx(sqlx::Error::RowNotFound);
+        let api_err: ApiError = db_err.into();
+        assert!(matches!(api_err, ApiError::Internal(_)));
+    }
+
+    #[test]
+    fn from_docker_container_not_found_maps_to_404() {
+        let err = DockerError::ContainerNotFound("abc123".into());
+        let api_err: ApiError = err.into();
+        assert!(matches!(api_err, ApiError::NotFound(_)));
+    }
+
+    #[test]
+    fn from_docker_unavailable_maps_to_503() {
+        let err = DockerError::Unavailable("socket missing".into());
+        let api_err: ApiError = err.into();
+        assert!(matches!(api_err, ApiError::ServiceUnavailable(_)));
+    }
+
+    #[test]
+    fn from_caddy_unreachable_maps_to_503() {
+        let err = CaddyError::Unreachable("connection refused".into());
+        let api_err: ApiError = err.into();
+        assert!(matches!(api_err, ApiError::ServiceUnavailable(_)));
+    }
+
+    #[test]
+    fn from_caddy_route_not_found_maps_to_404() {
+        let err = CaddyError::RouteNotFound("example.com".into());
+        let api_err: ApiError = err.into();
+        assert!(matches!(api_err, ApiError::NotFound(_)));
+    }
+
+    #[test]
+    fn from_io_error_maps_to_internal() {
+        let err = std::io::Error::other("disk full");
+        let api_err: ApiError = err.into();
+        assert!(matches!(api_err, ApiError::Internal(_)));
+    }
+
+    #[test]
+    fn internal_helper_wraps_error() {
+        let err = ApiError::internal(std::io::Error::other("test"));
+        assert!(matches!(err, ApiError::Internal(_)));
+    }
+
+    #[tokio::test]
+    async fn response_body_has_error_and_message_fields() {
+        let err = ApiError::BadRequest("test".into());
+        let resp = err.into_response();
+        let json = response_json(resp).await;
+        let body = &json["body"];
+        assert!(body.get("error").is_some());
+        assert!(body.get("message").is_some());
+        assert!(body.get("data").is_none());
+    }
+}

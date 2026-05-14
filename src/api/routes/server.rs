@@ -10,7 +10,9 @@ use tracing::warn;
 
 use crate::api::error::ApiError;
 use crate::api::AppState;
+use crate::db::models::CONTROL_PLANE_SERVER_ID;
 use crate::db::Database;
+use crate::events::{EventBus, EventType};
 
 const SERVER_HISTORY_CAPACITY: usize = 120;
 const COLLECT_INTERVAL_SECS: u64 = 2;
@@ -83,6 +85,7 @@ pub fn spawn_metrics_collector(
     metrics: Arc<RwLock<ServerMetrics>>,
     history: Arc<ServerMetricsHistory>,
     db: Arc<dyn Database>,
+    event_bus: Arc<EventBus>,
 ) {
     tokio::spawn(async move {
         let mut tick: u64 = 0;
@@ -120,7 +123,60 @@ pub fn spawn_metrics_collector(
             };
 
             let snap = history.record(&snapshot).await;
-            *metrics.write().await = snapshot;
+            *metrics.write().await = snapshot.clone();
+
+            // IF-216: Disk usage alert evaluation
+            if tick % 30 == 0 {
+                if let Ok(Some(server)) = db.get_server(CONTROL_PLANE_SERVER_ID).await {
+                    if server.disk_alert_enabled && snapshot.disk_total_bytes > 0 {
+                        let usage_pct = (snapshot.disk_used_bytes as f64
+                            / snapshot.disk_total_bytes as f64
+                            * 100.0) as i32;
+                        let prev_state = server.disk_alert_state.as_str();
+
+                        let new_state = if usage_pct >= server.disk_alert_critical_threshold {
+                            "critical"
+                        } else if usage_pct >= server.disk_alert_warning_threshold {
+                            "warning"
+                        } else {
+                            "normal"
+                        };
+
+                        if new_state != prev_state {
+                            let event_name = match (prev_state, new_state) {
+                                (_, "critical") => Some("server.disk.critical"),
+                                (_, "warning") if prev_state == "normal" => {
+                                    Some("server.disk.warning")
+                                }
+                                ("warning" | "critical", "normal") => Some("server.disk.recovered"),
+                                _ => None,
+                            };
+
+                            if let Some(event) = event_name {
+                                event_bus.emit(
+                                    EventType::DiskAlert,
+                                    None,
+                                    Some(CONTROL_PLANE_SERVER_ID),
+                                    serde_json::json!({
+                                        "event": event,
+                                        "server": server.name,
+                                        "disk_usage_percent": usage_pct,
+                                        "threshold": if new_state == "critical" {
+                                            server.disk_alert_critical_threshold
+                                        } else {
+                                            server.disk_alert_warning_threshold
+                                        },
+                                    }),
+                                );
+                            }
+
+                            let _ = db
+                                .update_server_disk_alert_state(CONTROL_PLANE_SERVER_ID, new_state)
+                                .await;
+                        }
+                    }
+                }
+            }
 
             tick += 1;
 

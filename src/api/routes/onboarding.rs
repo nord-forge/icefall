@@ -287,6 +287,7 @@ async fn create_first_app(
                     git_sha: None,
                     server_id: None,
                     tag: None,
+                    no_cache: false,
                 })
                 .await?,
         )

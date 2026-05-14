@@ -37,13 +37,14 @@ bollard = "0.21"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 
 # Email
-lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
+lettre = { version = "0.11.22", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
 
 # Encryption
 aes-gcm = "0.10"
 rand = "0.9"
 base64 = "0.22"
 argon2 = "0.5"
+bcrypt = "0.16"
 
 # TOTP / 2FA
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
@@ -146,6 +147,7 @@ aes-gcm = { workspace = true }
 rand = { workspace = true }
 base64 = { workspace = true }
 argon2 = { workspace = true }
+bcrypt = { workspace = true }
 
 # TOTP / 2FA
 totp-rs = { workspace = true }

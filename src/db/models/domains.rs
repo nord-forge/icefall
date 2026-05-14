@@ -9,6 +9,9 @@ pub struct Domain {
     pub verified: bool,
     pub ssl_status: String,
     pub is_primary: bool,
+    pub ssl_issuer: Option<String>,
+    pub ssl_expires_at: Option<String>,
+    pub ssl_last_checked_at: Option<String>,
     pub created_at: String,
 }
 
