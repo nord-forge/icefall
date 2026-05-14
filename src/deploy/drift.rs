@@ -79,6 +79,8 @@ mod tests {
             basic_auth_username: None,
             basic_auth_password_hash: None,
             pre_deploy_commands: None,
+            post_deploy_commands: None,
+            ssh_key_id: None,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }

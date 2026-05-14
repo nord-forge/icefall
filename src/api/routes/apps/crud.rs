@@ -50,6 +50,8 @@ pub(super) struct UpdateAppRequest {
     basic_auth_username: Option<Option<String>>,
     basic_auth_password: Option<String>,
     pre_deploy_commands: Option<Option<String>>,
+    post_deploy_commands: Option<Option<String>>,
+    ssh_key_id: Option<Option<String>>,
 }
 
 pub(super) async fn list_apps(
@@ -216,6 +218,8 @@ pub(super) async fn update_app(
                     .basic_auth_password
                     .map(|pw| Some(bcrypt::hash(pw, bcrypt::DEFAULT_COST).unwrap_or_default())),
                 pre_deploy_commands: body.pre_deploy_commands,
+                post_deploy_commands: body.post_deploy_commands,
+                ssh_key_id: body.ssh_key_id,
             },
         )
         .await?;
