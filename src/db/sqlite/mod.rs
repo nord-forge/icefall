@@ -11,10 +11,12 @@ mod notifications;
 mod oauth;
 mod onboarding;
 mod projects;
+mod search;
 mod servers;
 mod sessions;
 mod updates;
 mod users;
+mod webhooks;
 
 use std::sync::Arc;
 
@@ -246,6 +248,71 @@ impl Database for SqliteDatabase {
 
     async fn delete_domain(&self, id: &str) -> Result<(), DbError> {
         domains::delete_domain(&self.pool, id).await
+    }
+
+    async fn list_all_domains(&self) -> Result<Vec<Domain>, DbError> {
+        domains::list_all_domains(&self.pool).await
+    }
+
+    async fn update_domain_ssl_info(
+        &self,
+        id: &str,
+        issuer: Option<&str>,
+        expires_at: Option<&str>,
+    ) -> Result<(), DbError> {
+        domains::update_domain_ssl_info(&self.pool, id, issuer, expires_at).await
+    }
+
+    // --- Webhook endpoints ---
+
+    async fn list_webhook_endpoints(&self) -> Result<Vec<WebhookEndpoint>, DbError> {
+        webhooks::list_webhook_endpoints(&self.pool).await
+    }
+
+    async fn create_webhook_endpoint(
+        &self,
+        endpoint: &NewWebhookEndpoint,
+    ) -> Result<WebhookEndpoint, DbError> {
+        webhooks::create_webhook_endpoint(&self.pool, endpoint).await
+    }
+
+    async fn delete_webhook_endpoint(&self, id: &str) -> Result<(), DbError> {
+        webhooks::delete_webhook_endpoint(&self.pool, id).await
+    }
+
+    async fn create_webhook_delivery(
+        &self,
+        endpoint_id: &str,
+        event: &str,
+        status_code: Option<i32>,
+        response_time_ms: Option<i32>,
+        attempt: i32,
+        error: Option<&str>,
+    ) -> Result<(), DbError> {
+        webhooks::create_webhook_delivery(
+            &self.pool,
+            endpoint_id,
+            event,
+            status_code,
+            response_time_ms,
+            attempt,
+            error,
+        )
+        .await
+    }
+
+    async fn list_webhook_deliveries(
+        &self,
+        endpoint_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WebhookDelivery>, DbError> {
+        webhooks::list_webhook_deliveries(&self.pool, endpoint_id, limit).await
+    }
+
+    // --- Search ---
+
+    async fn search(&self, query: &str) -> Result<serde_json::Value, DbError> {
+        search::search(&self.pool, query).await
     }
 
     // --- Users ---

@@ -20,6 +20,7 @@ pub mod onboarding;
 pub mod openapi;
 pub mod profile;
 pub mod projects;
+pub mod search;
 pub mod server;
 pub mod servers;
 pub mod settings;
@@ -28,6 +29,7 @@ pub mod two_factor;
 pub mod update;
 pub mod users;
 pub mod volumes;
+pub mod webhook_endpoints;
 pub mod webhooks;
 
 use axum::Router;
@@ -67,4 +69,22 @@ pub fn api_routes() -> Router<AppState> {
         .merge(update::routes())
         .merge(audit::routes())
         .merge(openapi::routes())
+        .route("/search", axum::routing::get(search::search))
+        .route(
+            "/notifications/webhooks",
+            axum::routing::get(webhook_endpoints::list_endpoints)
+                .post(webhook_endpoints::create_endpoint),
+        )
+        .route(
+            "/notifications/webhooks/{id}",
+            axum::routing::delete(webhook_endpoints::delete_endpoint),
+        )
+        .route(
+            "/notifications/webhooks/{id}/deliveries",
+            axum::routing::get(webhook_endpoints::list_deliveries),
+        )
+        .route(
+            "/notifications/webhooks/{id}/test",
+            axum::routing::post(webhook_endpoints::test_endpoint),
+        )
 }
