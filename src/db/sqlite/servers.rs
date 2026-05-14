@@ -150,6 +150,19 @@ pub(super) async fn update_server_status(
     Ok(())
 }
 
+pub(super) async fn update_server_disk_alert_state(
+    pool: &SqlitePool,
+    id: &str,
+    state: &str,
+) -> Result<(), DbError> {
+    sqlx::query("UPDATE servers SET disk_alert_state = ? WHERE id = ?")
+        .bind(state)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 // --- Server Metrics (legacy single-server) ---
 
 pub(super) async fn insert_server_metric(

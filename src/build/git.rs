@@ -8,6 +8,9 @@ pub struct GitCloneOptions {
     pub sha: Option<String>,
     pub ssh_key_path: Option<PathBuf>,
     pub token: Option<String>,
+    pub submodules: bool,
+    pub lfs: bool,
+    pub shallow: bool,
 }
 
 pub struct CloneResult {
@@ -22,7 +25,11 @@ pub async fn clone_repo(
     tokio::fs::create_dir_all(work_dir).await?;
 
     let mut cmd = tokio::process::Command::new("git");
-    cmd.arg("clone").arg("--depth").arg("1");
+    cmd.arg("clone");
+
+    if opts.shallow {
+        cmd.arg("--depth").arg("1");
+    }
 
     if let Some(ref branch) = opts.branch {
         cmd.arg("--branch").arg(branch);
@@ -47,6 +54,57 @@ pub async fn clone_repo(
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(BuildError::GitClone(stderr.trim().to_string()));
+    }
+
+    if opts.submodules {
+        let mut sub_cmd = tokio::process::Command::new("git");
+        sub_cmd.args(["submodule", "update", "--init", "--recursive"]);
+        if opts.shallow {
+            sub_cmd.arg("--depth").arg("1");
+        }
+        sub_cmd.current_dir(work_dir);
+        if let Some(ref key_path) = opts.ssh_key_path {
+            sub_cmd.env(
+                "GIT_SSH_COMMAND",
+                format!("ssh -i {} -o StrictHostKeyChecking=no", key_path.display()),
+            );
+        }
+        let output = sub_cmd.output().await?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(BuildError::GitClone(format!(
+                "submodule init failed: {}",
+                stderr.trim()
+            )));
+        }
+    }
+
+    if opts.lfs {
+        let install = tokio::process::Command::new("git")
+            .args(["lfs", "install"])
+            .current_dir(work_dir)
+            .output()
+            .await?;
+        if !install.status.success() {
+            let stderr = String::from_utf8_lossy(&install.stderr);
+            return Err(BuildError::GitClone(format!(
+                "git lfs install failed: {} (is git-lfs installed?)",
+                stderr.trim()
+            )));
+        }
+
+        let pull = tokio::process::Command::new("git")
+            .args(["lfs", "pull"])
+            .current_dir(work_dir)
+            .output()
+            .await?;
+        if !pull.status.success() {
+            let stderr = String::from_utf8_lossy(&pull.stderr);
+            return Err(BuildError::GitClone(format!(
+                "git lfs pull failed: {}",
+                stderr.trim()
+            )));
+        }
     }
 
     if let Some(ref sha) = opts.sha {
@@ -176,6 +234,9 @@ mod tests {
             sha: None,
             ssh_key_path: None,
             token: None,
+            submodules: false,
+            lfs: false,
+            shallow: true,
         };
 
         let result = clone_repo(&opts, &work_dir).await.unwrap();
@@ -194,6 +255,9 @@ mod tests {
             sha: None,
             ssh_key_path: None,
             token: None,
+            submodules: false,
+            lfs: false,
+            shallow: true,
         };
 
         assert!(clone_repo(&opts, &work_dir).await.is_err());

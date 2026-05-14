@@ -256,6 +256,64 @@ impl DeployManager {
             return Err(e);
         }
 
+        // IF-211: Run pre-deploy commands if configured
+        if let Some(ref commands) = app.pre_deploy_commands {
+            let cmd_lines: Vec<&str> = commands
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .collect();
+
+            if !cmd_lines.is_empty() {
+                for cmd_line in &cmd_lines {
+                    let cmd_parts: Vec<String> =
+                        vec!["sh".to_string(), "-c".to_string(), cmd_line.to_string()];
+
+                    let exec_result = match &remote {
+                        Some(exec) => exec.exec_in_container(&container_id, &cmd_parts).await,
+                        None => self
+                            .docker
+                            .exec_in_container(&container_id, &cmd_parts)
+                            .await
+                            .map_err(|e| DeployError::ContainerCreate(e.to_string())),
+                    };
+
+                    match exec_result {
+                        Ok(output) => {
+                            let msg = format!(
+                                "Pre-deploy command '{}' succeeded:\n{}",
+                                cmd_line,
+                                output.trim()
+                            );
+                            let _ = self
+                                .db
+                                .update_deploy_status(&deploy.id, "deploying", Some(&msg))
+                                .await;
+                        }
+                        Err(e) => {
+                            let msg = format!("Pre-deploy command '{}' failed: {}", cmd_line, e);
+                            tracing::error!("{msg}");
+                            match &remote {
+                                Some(exec) => {
+                                    let _ = exec.stop_container(&container_id, 5).await;
+                                    let _ = exec.remove_container(&container_id).await;
+                                }
+                                None => {
+                                    let _ =
+                                        self.docker.stop_container(&container_id, Some(5)).await;
+                                    let _ = self.docker.remove_container(&container_id, true).await;
+                                }
+                            }
+                            self.db
+                                .update_deploy_status(&deploy.id, "failed", Some(&msg))
+                                .await?;
+                            return Err(DeployError::ContainerCreate(msg));
+                        }
+                    }
+                }
+            }
+        }
+
         let domains = self.resolve_domains(app, env).await?;
 
         match &remote {

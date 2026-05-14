@@ -80,6 +80,9 @@ impl NativeDeployer {
             sha: None,
             ssh_key_path: None,
             token: None,
+            submodules: app.git_submodules_enabled,
+            lfs: app.git_lfs_enabled,
+            shallow: app.git_shallow_clone,
         };
 
         let clone_result = clone_repo(&clone_opts, &build_dir)

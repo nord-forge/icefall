@@ -171,6 +171,9 @@ pub(super) async fn create_deploy(
                     sha: None,
                     ssh_key_path: None,
                     token: None,
+                    submodules: app_clone.git_submodules_enabled,
+                    lfs: app_clone.git_lfs_enabled,
+                    shallow: app_clone.git_shallow_clone,
                 };
 
                 match crate::build::git::clone_repo(&clone_opts, &work_dir).await {
