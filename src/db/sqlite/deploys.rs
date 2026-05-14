@@ -11,14 +11,15 @@ pub(super) async fn create_deploy(
     let now = now_iso8601();
 
     sqlx::query(
-        "INSERT INTO deploys (id, app_id, environment_id, status, git_sha, server_id, started_at, created_at)
-         VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)",
+        "INSERT INTO deploys (id, app_id, environment_id, status, git_sha, server_id, tag, started_at, created_at)
+         VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&deploy.app_id)
     .bind(&deploy.environment_id)
     .bind(&deploy.git_sha)
     .bind(&deploy.server_id)
+    .bind(&deploy.tag)
     .bind(&now)
     .bind(&now)
     .execute(pool)

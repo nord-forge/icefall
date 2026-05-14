@@ -8,6 +8,7 @@ pub struct Domain {
     pub path: Option<String>,
     pub verified: bool,
     pub ssl_status: String,
+    pub is_primary: bool,
     pub created_at: String,
 }
 

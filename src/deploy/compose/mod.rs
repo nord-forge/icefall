@@ -157,6 +157,7 @@ impl ComposeDeployer {
                 restart_policy: Some(restart_policy),
                 labels,
                 network: None,
+                hostname: None,
             };
 
             // Remove any existing containers for this service in this app

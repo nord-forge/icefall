@@ -41,6 +41,7 @@ pub(super) async fn create_deploy(
             environment_id: env.id.clone(),
             git_sha: None,
             server_id: None,
+            tag: None,
         })
         .await?;
 
@@ -344,6 +345,7 @@ pub(super) async fn rollback_deploy(
             environment_id: env.id.clone(),
             git_sha: target_deploy.git_sha.clone(),
             server_id: None,
+            tag: None,
         })
         .await?;
 

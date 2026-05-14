@@ -138,6 +138,7 @@ pub(super) async fn create_database(
             .app_id
             .as_ref()
             .map(|_| format!("icefall-{}", body.name)),
+        hostname: Some(format!("{}.icefall.internal", body.name)),
     };
 
     state

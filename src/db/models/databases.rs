@@ -10,6 +10,7 @@ pub struct ManagedDatabase {
     pub backup_schedule: Option<String>,
     pub app_id: Option<String>,
     pub project_id: Option<String>,
+    pub backup_retention_count: i32,
     pub created_at: String,
 }
 

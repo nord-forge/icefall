@@ -214,6 +214,7 @@ async fn trigger_deploy(
             environment_id: env.id.clone(),
             git_sha: Some(sha.to_string()),
             server_id: None,
+            tag: None,
         })
         .await
     {

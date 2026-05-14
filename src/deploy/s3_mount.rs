@@ -215,6 +215,7 @@ pub async fn create_s3_sidecar(
         restart_policy: Some("unless-stopped".to_string()),
         labels,
         network: None,
+        hostname: None,
     };
 
     // We need to create the container manually to inject privileged settings

@@ -41,6 +41,7 @@ pub(super) struct UpdateAppRequest {
     compose_content: Option<Option<String>>,
     project_id: Option<Option<String>>,
     deploy_mode: Option<String>,
+    base_directory: Option<Option<String>>,
 }
 
 pub(super) async fn list_apps(
@@ -133,21 +134,8 @@ pub(super) async fn create_app(
             .update_app(
                 &app.id,
                 &UpdateApp {
-                    name: None,
-                    git_repo: None,
-                    git_branch: None,
-                    framework: None,
                     build_config: Some(build_config),
-                    resource_limits: None,
-                    preview_enabled: None,
-                    preview_branch_pattern: None,
-                    tags: None,
-                    volumes: None,
-                    image_ref: None,
-                    compose_content: None,
-                    project_id: None,
-                    deploy_mode: None,
-                    server_id: None,
+                    ..Default::default()
                 },
             )
             .await;
@@ -209,6 +197,7 @@ pub(super) async fn update_app(
                 project_id: body.project_id,
                 deploy_mode: body.deploy_mode,
                 server_id: None,
+                base_directory: body.base_directory,
             },
         )
         .await?;

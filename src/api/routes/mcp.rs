@@ -100,6 +100,7 @@ async fn call_tool(
                     environment_id: env.id.clone(),
                     git_sha: None,
                     server_id: None,
+                    tag: None,
                 })
                 .await?;
             serde_json::json!({ "deploy_id": deploy.id, "status": deploy.status, "message": format!("Deploy triggered for {}", app.name) })
