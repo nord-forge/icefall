@@ -126,6 +126,10 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.server_id.as_deref(),
     };
+    let base_directory = match &update.base_directory {
+        Some(v) => v.as_deref(),
+        None => existing.base_directory.as_deref(),
+    };
     let disable_build_cache = update
         .disable_build_cache
         .unwrap_or(existing.disable_build_cache);
@@ -158,9 +162,9 @@ pub(super) async fn update_app(
          build_config = ?, resource_limits = ?, preview_enabled = ?,
          preview_branch_pattern = ?, tags = ?, volumes = ?, image_ref = ?,
          compose_content = ?, project_id = ?, deploy_mode = ?, server_id = ?,
-         disable_build_cache = ?, git_submodules_enabled = ?, git_lfs_enabled = ?,
-         git_shallow_clone = ?, basic_auth_enabled = ?, basic_auth_username = ?,
-         basic_auth_password_hash = ?, pre_deploy_commands = ?,
+         base_directory = ?, disable_build_cache = ?, git_submodules_enabled = ?,
+         git_lfs_enabled = ?, git_shallow_clone = ?, basic_auth_enabled = ?,
+         basic_auth_username = ?, basic_auth_password_hash = ?, pre_deploy_commands = ?,
          updated_at = ? WHERE id = ?",
     )
     .bind(name)
@@ -178,6 +182,7 @@ pub(super) async fn update_app(
     .bind(project_id)
     .bind(deploy_mode)
     .bind(server_id)
+    .bind(base_directory)
     .bind(disable_build_cache)
     .bind(git_submodules_enabled)
     .bind(git_lfs_enabled)

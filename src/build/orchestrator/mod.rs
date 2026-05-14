@@ -94,6 +94,21 @@ impl BuildOrchestrator {
         }
         steps.push(step);
 
+        let effective_dir = if let Some(ref base_dir) = app.base_directory {
+            let sub = work_dir.join(base_dir);
+            if !sub.exists() {
+                let msg = format!("Base directory '{base_dir}' not found in repository");
+                all_output.push(msg);
+                self.fail_deploy(deploy_id, &all_output).await;
+                return Err(BuildError::GitClone(format!(
+                    "base directory '{base_dir}' not found"
+                )));
+            }
+            all_output.push(format!("Using base directory: {base_dir}"));
+            sub
+        } else {
+            work_dir.clone()
+        };
         if self.is_cancelled(deploy_id).await {
             let _ = tokio::fs::remove_dir_all(&work_dir).await;
             return Err(BuildError::Cancelled);
@@ -101,7 +116,7 @@ impl BuildOrchestrator {
 
         // Step 2: Detect
         let mut step = new_step("Detecting framework");
-        let detection = match detect(&work_dir, build_config.as_ref()) {
+        let detection = match detect(&effective_dir, build_config.as_ref()) {
             Ok(det) => {
                 let msg = format!(
                     "Detected {} with {} (node {})",
@@ -139,7 +154,8 @@ impl BuildOrchestrator {
                     let dockerignore = generate_dockerignore(&detection);
 
                     if let Err(e) =
-                        tokio::fs::write(work_dir.join("Dockerfile"), &dockerfile_content).await
+                        tokio::fs::write(effective_dir.join("Dockerfile"), &dockerfile_content)
+                            .await
                     {
                         let msg = format!("Failed to write Dockerfile: {e}");
                         step.output.push(msg.clone());
@@ -149,7 +165,8 @@ impl BuildOrchestrator {
                         self.fail_deploy(deploy_id, &all_output).await;
                         return Err(BuildError::Io(e));
                     }
-                    let _ = tokio::fs::write(work_dir.join(".dockerignore"), &dockerignore).await;
+                    let _ =
+                        tokio::fs::write(effective_dir.join(".dockerignore"), &dockerignore).await;
 
                     let msg = format!("Generated Dockerfile for {}", detection.framework);
                     step.output.push(msg.clone());
@@ -182,7 +199,7 @@ impl BuildOrchestrator {
         let mut step = new_step("Building container image");
         let image_tag = format!("icefall/{}:{}", app.name, deploy_id);
 
-        let context = match create_build_context(&work_dir) {
+        let context = match create_build_context(&effective_dir) {
             Ok(ctx) => ctx,
             Err(e) => {
                 let msg = format!("Failed to create build context: {e}");

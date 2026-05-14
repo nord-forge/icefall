@@ -121,6 +121,8 @@ impl DeployManager {
                     }
                 }
 
+                let internal_hostname = format!("{}.icefall.internal", app.name);
+
                 let container_config = ContainerConfig {
                     name: container_name,
                     image: image_ref.to_string(),
@@ -137,6 +139,7 @@ impl DeployManager {
                     restart_policy: Some("unless-stopped".to_string()),
                     labels,
                     network: Some(network_name),
+                    hostname: Some(internal_hostname),
                 };
 
                 self.docker
@@ -234,6 +237,7 @@ impl DeployManager {
                                 environment_id: env.id.clone(),
                                 git_sha: prev.git_sha.clone(),
                                 server_id: None,
+                                tag: None,
                                 no_cache: false,
                             })
                             .await

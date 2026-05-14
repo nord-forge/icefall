@@ -24,6 +24,7 @@ pub struct ContainerConfig {
     pub restart_policy: Option<String>,
     pub labels: HashMap<String, String>,
     pub network: Option<String>,
+    pub hostname: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +110,7 @@ impl DockerClient {
             exposed_ports: Some(exposed_ports),
             host_config: Some(host_config),
             labels: Some(config.labels.clone()),
+            hostname: config.hostname.clone(),
             ..Default::default()
         };
 

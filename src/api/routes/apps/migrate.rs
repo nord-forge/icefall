@@ -69,6 +69,7 @@ pub(super) async fn migrate_app(
             environment_id: env.id.clone(),
             git_sha: None,
             server_id: Some(body.target_server_id.clone()),
+            tag: None,
             no_cache: false,
         })
         .await?;

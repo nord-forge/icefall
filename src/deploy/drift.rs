@@ -70,6 +70,7 @@ mod tests {
             project_id: None,
             deploy_mode: "auto".into(),
             server_id: None,
+            base_directory: None,
             disable_build_cache: false,
             git_submodules_enabled: false,
             git_lfs_enabled: false,
