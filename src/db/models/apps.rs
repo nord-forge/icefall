@@ -93,4 +93,13 @@ pub struct UpdateApp {
     pub pre_deploy_commands: Option<Option<String>>,
     pub post_deploy_commands: Option<Option<String>>,
     pub ssh_key_id: Option<Option<String>>,
+    pub ghost_mode_enabled: Option<bool>,
+    pub ghost_mode_idle_minutes: Option<i32>,
+    pub canary_enabled: Option<bool>,
+    pub canary_config: Option<Option<String>>,
+    pub log_noise_patterns: Option<Option<String>>,
+    pub log_highlight_patterns: Option<Option<String>>,
+    pub tunnel_enabled: Option<bool>,
+    pub require_deploy_approval: Option<bool>,
+    pub project_environment_id: Option<Option<String>>,
 }

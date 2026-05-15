@@ -20,6 +20,7 @@ pub fn routes() -> Router<AppState> {
         .route("/apps/{id}/start", post(lifecycle::start_app))
         .route("/apps/{id}/stop", post(lifecycle::stop_app))
         .route("/apps/{id}/restart", post(lifecycle::restart_app))
+        .route("/apps/{id}/wake", post(lifecycle::wake_app))
         .route("/apps/{id}/migrate", put(migrate::migrate_app))
         .route("/apps/{id}/drift", get(drift::check_drift))
 }

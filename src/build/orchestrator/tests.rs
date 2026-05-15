@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod orchestrator_tests {
     use crate::build::orchestrator::context::{create_build_context, redact_secrets};
     use std::fs;
     use tempfile::TempDir;

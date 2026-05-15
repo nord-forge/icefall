@@ -419,9 +419,11 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     fn env_override_runtime_docker() {
         let _lock = ENV_LOCK.lock().unwrap();
         clear_icefall_env_vars();
-        let mut config = IcefallConfig::default();
-        config.runtime = ContainerRuntime::Podman;
-        config.container_socket = defaults::container_socket();
+        let mut config = IcefallConfig {
+            runtime: ContainerRuntime::Podman,
+            container_socket: defaults::container_socket(),
+            ..Default::default()
+        };
 
         std::env::set_var("ICEFALL_RUNTIME", "docker");
         config.apply_env_overrides();

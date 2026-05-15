@@ -1,3 +1,4 @@
+import Input from '@islands/shared/Input/Input';
 import styles from '../settings-tab.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -23,32 +24,28 @@ export default function ResourceLimitsCard({
         </div>
       )}
       <div class={formStyles.fieldRow}>
-        <div>
-          <label htmlFor="settings-memory" class={formStyles.label}>Memory Limit (MB)</label>
-          <input
-            id="settings-memory"
-            class={formStyles.input}
-            type="number"
-            min="64"
-            placeholder="No limit"
-            value={memoryMb}
-            onInput={(e) => onMemoryMbChange((e.target as HTMLInputElement).value)}
-          />
-          <span class={styles.fieldHint}>Minimum 64 MB. Leave empty for no limit.</span>
-        </div>
-        <div>
-          <label htmlFor="settings-cpu" class={formStyles.label}>CPU Shares</label>
-          <input
-            id="settings-cpu"
-            class={formStyles.input}
-            type="number"
-            min="1"
-            placeholder="1024 (default)"
-            value={cpuShares}
-            onInput={(e) => onCpuSharesChange((e.target as HTMLInputElement).value)}
-          />
-          <span class={styles.fieldHint}>Relative weight. Default is 1024. Higher = more CPU time.</span>
-        </div>
+        <Input
+          label="Memory Limit (MB)"
+          name="memory"
+          id="settings-memory"
+          type="number"
+          min={64}
+          placeholder="No limit"
+          value={memoryMb}
+          onChange={onMemoryMbChange}
+          helpText="Minimum 64 MB. Leave empty for no limit."
+        />
+        <Input
+          label="CPU Shares"
+          name="cpu"
+          id="settings-cpu"
+          type="number"
+          min={1}
+          placeholder="1024 (default)"
+          value={cpuShares}
+          onChange={onCpuSharesChange}
+          helpText="Relative weight. Default is 1024. Higher = more CPU time."
+        />
       </div>
       <p class={styles.settingsNote}>Changes take effect on next deployment.</p>
     </div>

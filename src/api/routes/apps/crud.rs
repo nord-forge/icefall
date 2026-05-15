@@ -52,6 +52,15 @@ pub(super) struct UpdateAppRequest {
     pre_deploy_commands: Option<Option<String>>,
     post_deploy_commands: Option<Option<String>>,
     ssh_key_id: Option<Option<String>>,
+    ghost_mode_enabled: Option<bool>,
+    ghost_mode_idle_minutes: Option<i32>,
+    canary_enabled: Option<bool>,
+    canary_config: Option<Option<String>>,
+    log_noise_patterns: Option<Option<String>>,
+    log_highlight_patterns: Option<Option<String>>,
+    tunnel_enabled: Option<bool>,
+    require_deploy_approval: Option<bool>,
+    project_environment_id: Option<Option<String>>,
 }
 
 pub(super) async fn list_apps(
@@ -220,6 +229,15 @@ pub(super) async fn update_app(
                 pre_deploy_commands: body.pre_deploy_commands,
                 post_deploy_commands: body.post_deploy_commands,
                 ssh_key_id: body.ssh_key_id,
+                ghost_mode_enabled: body.ghost_mode_enabled,
+                ghost_mode_idle_minutes: body.ghost_mode_idle_minutes,
+                canary_enabled: body.canary_enabled,
+                canary_config: body.canary_config,
+                log_noise_patterns: body.log_noise_patterns,
+                log_highlight_patterns: body.log_highlight_patterns,
+                tunnel_enabled: body.tunnel_enabled,
+                require_deploy_approval: body.require_deploy_approval,
+                project_environment_id: body.project_environment_id,
             },
         )
         .await?;

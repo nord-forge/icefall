@@ -1,8 +1,8 @@
 import type { RegistrationSettings as RegistrationSettingsType } from '@lib/types';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import styles from '../users-page.module.css';
-import formStyles from '@styles/form.module.css';
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
@@ -68,18 +68,14 @@ export default function RegistrationSettings({
 
             {settings.allow_registration && (
               <div class={styles.regRow}>
-                <label htmlFor="allowed-domains" class={styles.regLabel}>
-                  Allowed domains
-                </label>
-                <input
+                <Input
+                  label="Allowed domains"
+                  name="allowed-domains"
                   id="allowed-domains"
-                  class={`${formStyles.input} ${styles.regInput}`}
-                  type="text"
                   value={domainsInput}
-                  onInput={e =>
-                    onDomainsChange((e.target as HTMLInputElement).value)
-                  }
+                  onChange={onDomainsChange}
                   placeholder="company.com, example.org"
+                  className={styles.regInput}
                 />
               </div>
             )}

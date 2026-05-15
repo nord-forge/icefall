@@ -1,4 +1,4 @@
-import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult } from './types';
+import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -12,7 +12,7 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+export async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase();
 
   // Serve GET requests from cache when a fresh entry exists
@@ -542,6 +542,128 @@ export const api = {
 
   rollbackUpdate: () =>
     request<{ message: string }>('/system/update/rollback', { method: 'POST' }),
+
+  // Wake (ghost mode)
+  wakeApp: (id: string) =>
+    request<{ message: string; containers: number }>(`/apps/${id}/wake`, { method: 'POST' }),
+
+  // Deploy approval
+  approveDeploy: (deployId: string, comment?: string) =>
+    request<{ data: DeployApproval }>(`/deploys/${deployId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve', comment }),
+    }),
+
+  rejectDeploy: (deployId: string, comment?: string) =>
+    request<{ data: DeployApproval }>(`/deploys/${deployId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reject', comment }),
+    }),
+
+  // Project environments
+  listProjectEnvironments: (projectId: string) =>
+    request<{ data: ProjectEnvironment[] }>(`/projects/${projectId}/environments`),
+
+  createProjectEnvironment: (projectId: string, body: { name: string; color?: string }) =>
+    request<{ data: ProjectEnvironment }>(`/projects/${projectId}/environments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateProjectEnvironment: (projectId: string, envId: string, body: { name: string; color?: string }) =>
+    request<{ data: ProjectEnvironment }>(`/projects/${projectId}/environments/${envId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteProjectEnvironment: (projectId: string, envId: string) =>
+    request<{ message: string }>(`/projects/${projectId}/environments/${envId}`, {
+      method: 'DELETE',
+    }),
+
+  // Environment variables
+  listEnvironmentVariables: (envId: string) =>
+    request<{ data: EnvironmentVariable[] }>(`/environments/${envId}/variables`),
+
+  setEnvironmentVariable: (envId: string, body: { key: string; value: string; is_secret?: boolean }) =>
+    request<{ data: EnvironmentVariable }>(`/environments/${envId}/variables`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteEnvironmentVariable: (envId: string, varId: string) =>
+    request<{ message: string }>(`/environments/${envId}/variables/${varId}`, {
+      method: 'DELETE',
+    }),
+
+  // Log drains
+  listLogDrains: (appId: string) =>
+    request<{ data: LogDrain[] }>(`/apps/${appId}/log-drains`),
+
+  listGlobalLogDrains: () =>
+    request<{ data: LogDrain[] }>('/log-drains'),
+
+  createLogDrain: (appId: string, body: { name: string; drain_type: string; config: Record<string, unknown>; enabled?: boolean }) =>
+    request<{ data: LogDrain }>(`/apps/${appId}/log-drains`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateLogDrain: (drainId: string, body: { name: string; drain_type: string; config: Record<string, unknown>; enabled?: boolean }) =>
+    request<{ data: LogDrain }>(`/log-drains/${drainId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteLogDrain: (drainId: string) =>
+    request<{ message: string }>(`/log-drains/${drainId}`, { method: 'DELETE' }),
+
+  testLogDrain: (drainId: string) =>
+    request<{ data: { success: boolean; message: string } }>(`/log-drains/${drainId}/test`, {
+      method: 'POST',
+    }),
+
+  // Git sources
+  listGitSources: () =>
+    request<{ data: GitHubInstallation[] }>('/git-sources'),
+
+  deleteGitSource: (id: string) =>
+    request<{ message: string }>(`/git-sources/${id}`, { method: 'DELETE' }),
+
+  listGitSourceRepos: (id: string) =>
+    request<{ data: GitHubRepo[] }>(`/git-sources/${id}/repos`),
+
+  // Cleanup
+  getCleanupSchedule: () =>
+    request<{ data: CleanupSchedule }>('/cleanup-schedule'),
+
+  updateCleanupSchedule: (body: Partial<CleanupSchedule>) =>
+    request<{ data: CleanupSchedule; message: string }>('/cleanup-schedule', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  runCleanup: () =>
+    request<{ data: { status: string; message: string } }>('/cleanup-schedule/run', {
+      method: 'POST',
+    }),
+
+  listCleanupHistory: () =>
+    request<{ data: CleanupRun[] }>('/cleanup-schedule/history'),
+
+  // Server forecast
+  getServerForecast: (serverId: string) =>
+    request<{ data: ServerForecast }>(`/servers/${serverId}/forecast`),
+
+  // Bundles
+  exportBundle: (appId: string) =>
+    request<{ data: Record<string, unknown> }>(`/apps/${appId}/export`),
+
+  importBundle: (bundle: Record<string, unknown>) =>
+    request<{ data: App }>('/bundles/import', {
+      method: 'POST',
+      body: JSON.stringify(bundle),
+    }),
 };
 
 export { ApiError };

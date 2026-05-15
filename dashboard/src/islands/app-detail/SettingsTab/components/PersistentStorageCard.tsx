@@ -1,4 +1,5 @@
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { HardDrive, Cloud, X, Plus, Search } from 'lucide-preact';
 import styles from '../settings-tab.module.css';
@@ -74,111 +75,90 @@ export default function PersistentStorageCard({
 
                 {vol.type === 'local' ? (
                   <>
-                    <div>
-                      <label htmlFor={`vol-source-${index}`} class={formStyles.label}>Source</label>
-                      <input
-                        id={`vol-source-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.source}
-                        onInput={(e) => onUpdateVolume(index, 'source', (e.target as HTMLInputElement).value)}
-                        placeholder="myapp-data"
-                      />
-                      <span class={styles.fieldHint}>Volume name or host path</span>
-                    </div>
-                    <div>
-                      <label htmlFor={`vol-target-${index}`} class={formStyles.label}>Container Path</label>
-                      <input
-                        id={`vol-target-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.target}
-                        onInput={(e) => onUpdateVolume(index, 'target', (e.target as HTMLInputElement).value)}
-                        placeholder="/app/data"
-                        aria-invalid={!!volumeErrors[index]}
-                        aria-describedby={volumeErrors[index] ? `vol-error-${index}` : undefined}
-                      />
-                      {volumeErrors[index] ? (
-                        <span id={`vol-error-${index}`} class={styles.volumeError} role="alert">{volumeErrors[index]}</span>
-                      ) : (
-                        <span class={styles.fieldHint}>Must start with /</span>
-                      )}
-                    </div>
+                    <Input
+                      label="Source"
+                      name={`vol-source-${index}`}
+                      id={`vol-source-${index}`}
+                      mono
+                      value={vol.source}
+                      onChange={(v) => onUpdateVolume(index, 'source', v)}
+                      placeholder="myapp-data"
+                      helpText="Volume name or host path"
+                    />
+                    <Input
+                      label="Container Path"
+                      name={`vol-target-${index}`}
+                      id={`vol-target-${index}`}
+                      mono
+                      value={vol.target}
+                      onChange={(v) => onUpdateVolume(index, 'target', v)}
+                      placeholder="/app/data"
+                      error={volumeErrors[index]}
+                      helpText={!volumeErrors[index] ? 'Must start with /' : undefined}
+                    />
                   </>
                 ) : (
                   <>
-                    <div>
-                      <label htmlFor={`vol-bucket-${index}`} class={formStyles.label}>
-                        <Cloud size={14} style={{ verticalAlign: 'text-bottom', marginRight: '4px' }} />
-                        Bucket Name
-                      </label>
-                      <input
-                        id={`vol-bucket-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.bucket}
-                        onInput={(e) => onUpdateVolume(index, 'bucket', (e.target as HTMLInputElement).value)}
-                        placeholder="my-bucket"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor={`vol-endpoint-${index}`} class={formStyles.label}>Endpoint URL</label>
-                      <input
-                        id={`vol-endpoint-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.endpoint}
-                        onInput={(e) => onUpdateVolume(index, 'endpoint', (e.target as HTMLInputElement).value)}
-                        placeholder="https://s3.amazonaws.com"
-                      />
-                      <span class={styles.fieldHint}>S3-compatible endpoint (R2, MinIO, etc.)</span>
-                    </div>
-                    <div>
-                      <label htmlFor={`vol-accesskey-${index}`} class={formStyles.label}>Access Key</label>
-                      <input
-                        id={`vol-accesskey-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.access_key}
-                        onInput={(e) => onUpdateVolume(index, 'access_key', (e.target as HTMLInputElement).value)}
-                        placeholder="AKIA..."
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor={`vol-secretkey-${index}`} class={formStyles.label}>Secret Key</label>
-                      <input
-                        id={`vol-secretkey-${index}`}
-                        class={formStyles.inputMono}
-                        type="password"
-                        value={vol.secret_key}
-                        onInput={(e) => onUpdateVolume(index, 'secret_key', (e.target as HTMLInputElement).value)}
-                        placeholder="Secret key"
-                        autocomplete="off"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor={`vol-region-${index}`} class={formStyles.label}>Region</label>
-                      <input
-                        id={`vol-region-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.region}
-                        onInput={(e) => onUpdateVolume(index, 'region', (e.target as HTMLInputElement).value)}
-                        placeholder="auto"
-                      />
-                      <span class={styles.fieldHint}>Use "auto" for most S3-compatible providers.</span>
-                    </div>
-                    <div>
-                      <label htmlFor={`vol-target-${index}`} class={formStyles.label}>Container Path</label>
-                      <input
-                        id={`vol-target-${index}`}
-                        class={formStyles.inputMono}
-                        value={vol.target}
-                        onInput={(e) => onUpdateVolume(index, 'target', (e.target as HTMLInputElement).value)}
-                        placeholder="/app/s3"
-                        aria-invalid={!!volumeErrors[index]}
-                        aria-describedby={volumeErrors[index] ? `vol-error-${index}` : undefined}
-                      />
-                      {volumeErrors[index] ? (
-                        <span id={`vol-error-${index}`} class={styles.volumeError} role="alert">{volumeErrors[index]}</span>
-                      ) : (
-                        <span class={styles.fieldHint}>Must start with /</span>
-                      )}
-                    </div>
+                    <Input
+                      label="Bucket Name"
+                      name={`vol-bucket-${index}`}
+                      id={`vol-bucket-${index}`}
+                      mono
+                      value={vol.bucket}
+                      onChange={(v) => onUpdateVolume(index, 'bucket', v)}
+                      placeholder="my-bucket"
+                    />
+                    <Input
+                      label="Endpoint URL"
+                      name={`vol-endpoint-${index}`}
+                      id={`vol-endpoint-${index}`}
+                      mono
+                      value={vol.endpoint}
+                      onChange={(v) => onUpdateVolume(index, 'endpoint', v)}
+                      placeholder="https://s3.amazonaws.com"
+                      helpText="S3-compatible endpoint (R2, MinIO, etc.)"
+                    />
+                    <Input
+                      label="Access Key"
+                      name={`vol-accesskey-${index}`}
+                      id={`vol-accesskey-${index}`}
+                      mono
+                      value={vol.access_key}
+                      onChange={(v) => onUpdateVolume(index, 'access_key', v)}
+                      placeholder="AKIA..."
+                    />
+                    <Input
+                      label="Secret Key"
+                      name={`vol-secretkey-${index}`}
+                      id={`vol-secretkey-${index}`}
+                      mono
+                      type="password"
+                      revealable
+                      value={vol.secret_key}
+                      onChange={(v) => onUpdateVolume(index, 'secret_key', v)}
+                      placeholder="Secret key"
+                    />
+                    <Input
+                      label="Region"
+                      name={`vol-region-${index}`}
+                      id={`vol-region-${index}`}
+                      mono
+                      value={vol.region}
+                      onChange={(v) => onUpdateVolume(index, 'region', v)}
+                      placeholder="auto"
+                      helpText={'Use "auto" for most S3-compatible providers.'}
+                    />
+                    <Input
+                      label="Container Path"
+                      name={`vol-target-${index}`}
+                      id={`vol-target-${index}`}
+                      mono
+                      value={vol.target}
+                      onChange={(v) => onUpdateVolume(index, 'target', v)}
+                      placeholder="/app/s3"
+                      error={volumeErrors[index]}
+                      helpText={!volumeErrors[index] ? 'Must start with /' : undefined}
+                    />
                   </>
                 )}
               </div>

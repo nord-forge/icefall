@@ -4,6 +4,7 @@ import { createSSEClient } from '@lib/sse';
 import type { Server } from '@lib/types';
 import Button from '@islands/shared/Button/Button';
 import { X, Copy, Check, RefreshCw, ExternalLink, Loader } from 'lucide-preact';
+import Input from '@islands/shared/Input/Input';
 import formStyles from '@styles/form.module.css';
 import styles from './add-server-panel.module.css';
 
@@ -170,16 +171,15 @@ export default function AddServerPanel({ onClose, onServerAdded }: Props) {
                 placeholder="production-worker-01"
               />
             </div>
-            <div>
-              <label htmlFor="server-host" class={formStyles.label}>Host IP or hostname</label>
-              <input
-                id="server-host"
-                class={formStyles.inputMono}
-                value={host}
-                onInput={(e) => setHost((e.target as HTMLInputElement).value)}
-                placeholder="203.0.113.42"
-              />
-            </div>
+            <Input
+              label="Host IP or hostname"
+              name="server-host"
+              id="server-host"
+              mono
+              value={host}
+              onChange={setHost}
+              placeholder="203.0.113.42"
+            />
           </div>
 
           {error && <p role="alert" class={styles.error}>{error}</p>}

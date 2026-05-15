@@ -3,8 +3,8 @@ import { api } from '@lib/api';
 import Button from '@islands/shared/Button/Button';
 import Select from '@islands/shared/Select/Select';
 import { Table, Play, ArrowUpDown, ChevronLeft, ChevronRight, Terminal, ChevronsUpDown, ChevronsDownUp } from 'lucide-preact';
+import Textarea from '@islands/shared/Textarea/Textarea';
 import styles from './database-browser.module.css';
-import formStyles from '@styles/form.module.css';
 
 type Props = {
   dbId: string;
@@ -203,14 +203,12 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
 
       {showCustom && (
         <div class={styles.queryCard}>
-          <label htmlFor="custom-query" class={formStyles.label}>
-            {dbType === 'redis' ? 'Redis command (read-only)' : dbType === 'mongo' ? 'MongoDB query (read-only)' : 'SQL query (read-only)'}
-          </label>
-          <textarea
+          <Textarea
+            label={dbType === 'redis' ? 'Redis command (read-only)' : dbType === 'mongo' ? 'MongoDB query (read-only)' : 'SQL query (read-only)'}
+            name="custom-query"
             id="custom-query"
-            class={formStyles.textarea}
             value={customQuery}
-            onInput={e => setCustomQuery((e.target as HTMLTextAreaElement).value)}
+            onChange={setCustomQuery}
             placeholder={labels.placeholder}
             rows={3}
           />

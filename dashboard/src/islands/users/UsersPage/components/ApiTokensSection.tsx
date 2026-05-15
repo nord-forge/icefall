@@ -2,9 +2,9 @@ import { useState } from 'preact/hooks';
 import type { ApiToken } from '@lib/types';
 import { formatRelativeTime } from '@lib/format';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import { Key, Trash2, Copy } from 'lucide-preact';
 import styles from '../users-page.module.css';
-import formStyles from '@styles/form.module.css';
 
 type Props = {
   tokens: ApiToken[];
@@ -58,8 +58,14 @@ export default function ApiTokensSection({
 
       {showCreateToken && (
         <div class={styles.card}>
-          <label htmlFor="token-name" class={formStyles.label}>Token Name</label>
-          <input id="token-name" class={formStyles.input} value={tokenName} onInput={e => setTokenName((e.target as HTMLInputElement).value)} placeholder="CI/CD pipeline" />
+          <Input
+            label="Token Name"
+            name="token-name"
+            id="token-name"
+            value={tokenName}
+            onChange={setTokenName}
+            placeholder="CI/CD pipeline"
+          />
           <div class={styles.cardActions}>
             <Button variant="ghost" onClick={() => setShowCreateToken(false)}>Cancel</Button>
             <Button variant="primary" onClick={handleCreate} loading={submitting} disabled={!tokenName.trim()}>Create</Button>

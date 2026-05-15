@@ -1,4 +1,4 @@
-import styles from '../app-create.module.css';
+import Input from '@islands/shared/Input/Input';
 import formStyles from '@styles/form.module.css';
 
 type Props = {
@@ -18,51 +18,39 @@ export default function ImageStep({
 }: Props) {
   return (
     <div class={formStyles.fieldGroup}>
-      <div>
-        <label htmlFor="create-app-name" class={formStyles.label}>App Name</label>
-        <input id="create-app-name" class={formStyles.input} value={name} onInput={(e) => onUpdate('name', (e.target as HTMLInputElement).value)} placeholder="my-ghost-blog" aria-invalid={!!validationErrors.name} aria-describedby={validationErrors.name ? 'err-name' : undefined} />
-        {validationErrors.name && <p id="err-name" role="alert" class={styles.fieldError}>{validationErrors.name}</p>}
-      </div>
-      <div>
-        <label htmlFor="create-image-ref" class={formStyles.label}>Docker Image</label>
-        <input
-          id="create-image-ref"
-          class={formStyles.inputMono}
-          value={imageRef}
-          onInput={(e) => onUpdate('image_ref', (e.target as HTMLInputElement).value)}
-          placeholder="ghost:5-alpine"
-          aria-invalid={!!validationErrors.image_ref}
-          aria-describedby={validationErrors.image_ref ? 'err-image-ref' : 'hint-image-ref'}
-        />
-        {validationErrors.image_ref ? (
-          <p id="err-image-ref" role="alert" class={styles.fieldError}>{validationErrors.image_ref}</p>
-        ) : (
-          <span id="hint-image-ref" class={formStyles.hint}>
-            Image name from Docker Hub or a full registry URL.
-          </span>
-        )}
-      </div>
-      <div>
-        <label htmlFor="create-image-port" class={formStyles.label}>Container Port</label>
-        <input
-          id="create-image-port"
-          class={formStyles.inputMono}
-          type="number"
-          min="1"
-          max="65535"
-          value={port}
-          onInput={(e) => onUpdate('port', (e.target as HTMLInputElement).value)}
-          aria-invalid={!!validationErrors.port}
-          aria-describedby={validationErrors.port ? 'err-port' : 'hint-port'}
-        />
-        {validationErrors.port ? (
-          <p id="err-port" role="alert" class={styles.fieldError}>{validationErrors.port}</p>
-        ) : (
-          <span id="hint-port" class={formStyles.hint}>
-            The port the container listens on internally.
-          </span>
-        )}
-      </div>
+      <Input
+        label="App Name"
+        name="app-name"
+        id="create-app-name"
+        value={name}
+        onChange={(v) => onUpdate('name', v)}
+        placeholder="my-ghost-blog"
+        error={validationErrors.name}
+      />
+      <Input
+        label="Docker Image"
+        name="image-ref"
+        id="create-image-ref"
+        mono
+        value={imageRef}
+        onChange={(v) => onUpdate('image_ref', v)}
+        placeholder="ghost:5-alpine"
+        error={validationErrors.image_ref}
+        helpText={!validationErrors.image_ref ? 'Image name from Docker Hub or a full registry URL.' : undefined}
+      />
+      <Input
+        label="Container Port"
+        name="image-port"
+        id="create-image-port"
+        mono
+        type="number"
+        min={1}
+        max={65535}
+        value={port}
+        onChange={(v) => onUpdate('port', v)}
+        error={validationErrors.port}
+        helpText={!validationErrors.port ? 'The port the container listens on internally.' : undefined}
+      />
     </div>
   );
 }

@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
-import type { Deploy } from '@lib/types';
+import type { App, Deploy } from '@lib/types';
 import { formatRelativeTime, formatDuration, shortSha } from '@lib/format';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import Button from '@islands/shared/Button/Button';
 import { RotateCcw, X } from 'lucide-preact';
+import ApprovalBadge from './components/ApprovalBadge';
+import CanaryResultsSection from './components/CanaryResultsSection';
 import styles from './deploys-tab.module.css';
 
 type Props = {
   appId: string;
+  requireDeployApproval?: boolean;
+  canaryEnabled?: boolean;
 }
 
-export default function DeploysTab({ appId }: Props) {
+export default function DeploysTab({ appId, requireDeployApproval = false, canaryEnabled = false }: Props) {
   const [deploys, setDeploys] = useState<Deploy[]>([]);
   const [loading, setLoading] = useState(true);
   const [rollingBack, setRollingBack] = useState('');
@@ -94,7 +98,12 @@ export default function DeploysTab({ appId }: Props) {
                   {d.git_sha ? shortSha(d.git_sha) : '-'}
                 </td>
                 <td class={`${styles.cell} ${styles.mono}`}>main</td>
-                <td class={styles.cell}><StatusDot status={d.status} /></td>
+                <td class={styles.cell}>
+                  <StatusDot status={d.status} />
+                  {requireDeployApproval && d.status === 'pending' && (
+                    <ApprovalBadge deployId={d.id} status={d.status} requiresApproval={requireDeployApproval} />
+                  )}
+                </td>
                 <td class={`${styles.cell} ${styles.duration}`}>
                   {duration ? formatDuration(duration) : '-'}
                 </td>
@@ -128,6 +137,9 @@ export default function DeploysTab({ appId }: Props) {
           })}
         </tbody>
       </table>
+      {canaryEnabled && latestRunning && (
+        <CanaryResultsSection deployId={latestRunning.id} canaryEnabled={canaryEnabled} />
+      )}
     </div>
   );
 }

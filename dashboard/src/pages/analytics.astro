@@ -1,0 +1,8 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import AnalyticsPage from '@islands/analytics/AnalyticsPage/AnalyticsPage';
+---
+
+<DashboardLayout title="Analytics">
+  <AnalyticsPage client:only="preact" />
+</DashboardLayout>

@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { User } from '@lib/types';
 import { formatRelativeTime } from '@lib/format';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import { UserPlus, Trash2, ShieldCheck, ShieldOff, RotateCcw, KeyRound } from 'lucide-preact';
@@ -57,10 +58,15 @@ export default function TeamMembersSection({
       {showInvite && (
         <div class={styles.card}>
           <div class={formStyles.fieldRow}>
-            <div>
-              <label htmlFor="invite-email" class={formStyles.label}>Email</label>
-              <input id="invite-email" class={formStyles.input} type="email" autoComplete="email" value={inviteEmail} onInput={e => setInviteEmail((e.target as HTMLInputElement).value)} placeholder="colleague@example.com" />
-            </div>
+            <Input
+              label="Email"
+              name="invite-email"
+              id="invite-email"
+              type="email"
+              value={inviteEmail}
+              onChange={setInviteEmail}
+              placeholder="colleague@example.com"
+            />
             <div>
               <label htmlFor="invite-role" class={formStyles.label}>Role</label>
               <Select

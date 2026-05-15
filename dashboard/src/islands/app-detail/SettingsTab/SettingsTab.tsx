@@ -13,6 +13,11 @@ import AutoDeployCard from './components/AutoDeployCard';
 import PreviewDeploymentsCard from './components/PreviewDeploymentsCard';
 import PersistentStorageCard from './components/PersistentStorageCard';
 import ServerPlacementCard from './components/ServerPlacementCard';
+import EnvironmentAssignmentCard from './components/EnvironmentAssignmentCard';
+import DeployApprovalCard from './components/DeployApprovalCard';
+import TunnelCard from './components/TunnelCard';
+import CanaryProbeCard from './components/CanaryProbeCard';
+import ExportBundleCard from './components/ExportBundleCard';
 import DangerZoneCard from './components/DangerZoneCard';
 import styles from './settings-tab.module.css';
 
@@ -329,6 +334,8 @@ export default function SettingsTab({ app, servers = [] }: Props) {
         onProjectChange={setSelectedProjectId}
       />
 
+      <EnvironmentAssignmentCard app={app} projectId={selectedProjectId || null} />
+
       <DeployModeCard
         deployMode={deployMode}
         onDeployModeChange={setDeployMode}
@@ -368,6 +375,10 @@ export default function SettingsTab({ app, servers = [] }: Props) {
         onPreviewBranchPatternChange={(v) => setForm({ ...form, preview_branch_pattern: v })}
       />
 
+      <DeployApprovalCard app={app} />
+
+      <TunnelCard app={app} />
+
       <PersistentStorageCard
         volumes={volumes}
         volumeErrors={volumeErrors}
@@ -405,6 +416,10 @@ export default function SettingsTab({ app, servers = [] }: Props) {
           onMigrate={handleMigrate}
         />
       )}
+
+      <CanaryProbeCard app={app} />
+
+      <ExportBundleCard app={app} />
 
       <DangerZoneCard
         confirmDelete={confirmDelete}

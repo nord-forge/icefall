@@ -1,0 +1,6 @@
+.loading, .empty { color: var(--color-text-muted); font-size: var(--text-sm); }
+.field { font-family: var(--font-mono); font-size: var(--text-sm); }
+.old { color: var(--color-error); font-family: var(--font-mono); font-size: var(--text-xs); text-decoration: line-through; }
+.new { color: oklch(0.55 0.15 145); font-family: var(--font-mono); font-size: var(--text-xs); }
+.arrow { color: var(--color-text-muted); }
+.author { font-size: var(--text-xs); color: var(--color-text-muted); }

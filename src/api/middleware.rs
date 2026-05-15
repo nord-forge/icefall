@@ -20,6 +20,7 @@ const PUBLIC_PATHS: &[&str] = &[
     "/api/v1/auth/reset-password",
     "/api/v1/health",
     "/api/v1/servers/setup",
+    "/api/v1/settings/oauth/providers",
 ];
 
 const PUBLIC_PREFIXES: &[&str] = &[
@@ -38,8 +39,8 @@ fn is_public_path(path: &str) -> bool {
     if PUBLIC_PREFIXES.iter().any(|p| path.starts_with(p)) {
         return true;
     }
-    // Terminal endpoints handle their own auth via query token
-    if path.contains("/terminal") {
+    // Terminal and SSE endpoints handle their own auth
+    if path.contains("/terminal") || path.contains("/events") {
         return true;
     }
     // Non-API paths (dashboard static files)
@@ -93,7 +94,7 @@ pub async fn require_auth(
         if let Ok(cookie_str) = cookie.to_str() {
             for part in cookie_str.split(';') {
                 let part = part.trim();
-                if let Some(session_id) = part.strip_prefix("session_id=") {
+                if let Some(session_id) = part.strip_prefix("icefall_session=") {
                     if let Ok(Some(session)) = state.db.get_session(session_id).await {
                         if session.expires_at >= crate::db::models::now_iso8601() {
                             return next.run(req).await;

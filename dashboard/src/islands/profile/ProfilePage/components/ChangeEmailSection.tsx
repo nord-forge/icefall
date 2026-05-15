@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Mail } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import styles from '../profile-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -50,30 +51,23 @@ export default function ChangeEmailSection({ onChangeEmail }: Props) {
       {msg && <p class={styles.feedbackSuccess} role="status">{msg}</p>}
 
       <div class={formStyles.fieldGroup}>
-        <div>
-          <label htmlFor="new-email" class={formStyles.label}>New email address</label>
-          <input
-            id="new-email"
-            class={formStyles.input}
-            type="email"
-            autoComplete="email"
-            value={newEmail}
-            onInput={e => setNewEmail((e.target as HTMLInputElement).value)}
-            placeholder="new@example.com"
-          />
-        </div>
-        <div>
-          <label htmlFor="email-confirm-password" class={formStyles.label}>Current password</label>
-          <input
-            id="email-confirm-password"
-            class={formStyles.input}
-            type="password"
-            autoComplete="current-password"
-            value={emailPassword}
-            onInput={e => setEmailPassword((e.target as HTMLInputElement).value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-          />
-        </div>
+        <Input
+          label="New email address"
+          name="new-email"
+          id="new-email"
+          type="email"
+          value={newEmail}
+          onChange={setNewEmail}
+          placeholder="new@example.com"
+        />
+        <Input
+          label="Current password"
+          name="email-confirm-password"
+          id="email-confirm-password"
+          type="password"
+          value={emailPassword}
+          onChange={setEmailPassword}
+        />
       </div>
       <div class={styles.formActions}>
         <Button

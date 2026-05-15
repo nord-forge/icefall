@@ -45,27 +45,79 @@ Build a template system that lets users deploy popular self-hosted services in o
 - [ ] Bundled catalog: templates compiled into the binary as embedded assets (or shipped alongside in a `templates/` directory)
 - [ ] Remote catalog refresh: `GET /api/v1/templates/refresh` fetches the latest catalog from a configurable URL (default: Icefall's GitHub repo releases)
 - [ ] Catalog stores: template metadata + last_updated timestamp in SQLite
-- [ ] Initial set of 20 templates (alphabetical):
-  1. Actual Budget
-  2. Appsmith
-  3. Directus
-  4. Ghost
-  5. Gitea
-  6. Grafana
-  7. Jellyfin
-  8. Meilisearch
-  9. Metabase
-  10. MinIO
-  11. n8n
-  12. Nextcloud
-  13. Plausible
-  14. Portainer
-  15. Supabase (self-hosted)
-  16. Umami
-  17. Uptime Kuma
-  18. Vaultwarden
-  19. Vikunja
-  20. WikiJS
+- [x] Initial set of 50 templates seeded via migration `20260520000007_seed_service_templates.sql`:
+
+  **DevTools (13)**
+  1. Gitea — lightweight Git hosting
+  2. Portainer — Docker management UI
+  3. Woodpecker CI — CI/CD with YAML pipelines
+  4. Traefik — reverse proxy with auto-SSL
+  5. Docker Registry — private container registry
+  6. Mailpit — email testing SMTP + web UI
+  7. Unleash — feature flag management
+  8. Hoppscotch — API development platform
+  9. PrivateBin — zero-knowledge encrypted pastebin
+  10. Verdaccio — private npm registry
+  11. Appsmith — low-code internal tools
+  12. Forgejo — community-governed Git forge
+  13. Gitness — Git + CI in one platform
+
+  **Productivity (8)**
+  14. n8n — workflow automation
+  15. Wiki.js — team wiki with markdown
+  16. Outline — modern team knowledge base
+  17. Shlink — URL shortener with analytics
+  18. Cal.com — scheduling (Calendly alternative)
+  19. Vikunja — kanban / task management
+  20. Rallly — meeting scheduling (Doodle alternative)
+  21. Actual Budget — personal finance tracking
+
+  **Monitoring (6)**
+  22. Uptime Kuma — uptime monitoring + status pages
+  23. Grafana — observability dashboards
+  24. Prometheus — metrics collection + alerting
+  25. GlitchTip — Sentry-compatible error tracking
+  26. Grafana Loki — log aggregation
+  27. Gatus — health dashboard + status page
+
+  **Database (5)**
+  28. Meilisearch — typo-tolerant search engine
+  29. Supabase — open-source Firebase alternative
+  30. pgAdmin — PostgreSQL admin GUI
+  31. Adminer — universal lightweight DB admin
+  32. DbGate — modern multi-database GUI
+
+  **Storage (4)**
+  33. MinIO — S3-compatible object storage
+  34. Nextcloud — file sync + collaboration
+  35. PicoShare — minimal file sharing
+  36. Duplicati — encrypted cloud backups
+
+  **Security (4)**
+  37. Vaultwarden — Bitwarden-compatible password manager
+  38. Infisical — secrets management platform
+  39. Authentik — SSO / identity provider
+  40. CrowdSec — collaborative intrusion prevention
+
+  **Analytics (3)**
+  41. Plausible — privacy-friendly web analytics
+  42. Metabase — BI with visual query builder
+  43. Umami — lightweight privacy analytics
+
+  **Communication (2)**
+  44. Ntfy — push notifications via HTTP
+  45. Listmonk — newsletter + mailing list manager
+
+  **CMS (2)**
+  46. Directus — headless CMS with REST + GraphQL
+  47. Ghost — blog + newsletter + membership
+
+  **AI/ML (2)**
+  48. Ollama — run LLMs locally
+  49. Open WebUI — ChatGPT-like UI for Ollama
+
+  **Media (1)**
+  50. Immich — photo/video backup with ML
 
 ### API Endpoints
 
@@ -82,7 +134,7 @@ Build a template system that lets users deploy popular self-hosted services in o
 ### Dashboard UI
 
 - [ ] Template browser: grid of cards with icon, name, description, category badge
-- [ ] Category filter sidebar/chips: All, Analytics, CMS, Database, DevTools, Media, Monitoring, Productivity, Storage
+- [ ] Category filter sidebar/chips: All, AI/ML, Analytics, CMS, Communication, Database, DevTools, Media, Monitoring, Productivity, Security, Storage
 - [ ] Search by name
 - [ ] Template detail drawer/modal: description, README content, resource requirements, version info
 - [ ] Deploy form: auto-generated from `required_inputs` — each input renders as the appropriate form field (text, email, url, password, number)

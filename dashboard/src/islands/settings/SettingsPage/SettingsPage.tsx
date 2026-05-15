@@ -8,6 +8,10 @@ import EventSubscriptionsSection from './components/EventSubscriptionsSection';
 import BackupLocationsSection from './components/BackupLocationsSection';
 import InstanceBackupSection from './components/InstanceBackupSection';
 import OAuthProvidersSection from './components/OAuthProvidersSection';
+import GitIntegrationsSection from './components/GitIntegrationsSection';
+import GlobalLogDrainsSection from './components/GlobalLogDrainsSection';
+import CloudflareTunnelSection from './components/CloudflareTunnelSection';
+import ContainerCleanupSection from './components/ContainerCleanupSection';
 import McpServerSection from './components/McpServerSection';
 import styles from './settings-page.module.css';
 
@@ -39,6 +43,14 @@ export default function SettingsPage() {
       <InstanceBackupSection onSaveMessage={setSaveMessage} />
 
       <OAuthProvidersSection onSaveMessage={setSaveMessage} />
+
+      <GitIntegrationsSection onSaveMessage={setSaveMessage} />
+
+      <GlobalLogDrainsSection onSaveMessage={setSaveMessage} />
+
+      <CloudflareTunnelSection onSaveMessage={setSaveMessage} />
+
+      <ContainerCleanupSection onSaveMessage={setSaveMessage} />
 
       <TwoFactorSection />
 

@@ -9,6 +9,7 @@ import DatabaseBrowser from '@islands/databases/DatabaseBrowser/DatabaseBrowser'
 import { formatRelativeTime, formatBytes } from '@lib/format';
 import { Plus, Database, Trash2, Copy, Eye, EyeOff, RefreshCw, Download, RotateCcw } from 'lucide-preact';
 import { SkeletonCard } from '@islands/shared/Skeleton/Skeleton';
+import Input from '@islands/shared/Input/Input';
 import styles from './databases-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -285,10 +286,14 @@ export default function DatabasesPage() {
         <div class={styles.createCard}>
           <h3 class={styles.createTitle}>Create Database</h3>
           <div class={formStyles.fieldRow}>
-            <div>
-              <label htmlFor="db-create-name" class={formStyles.label}>Name</label>
-              <input id="db-create-name" class={formStyles.input} value={newDb.name} onInput={(e) => setNewDb({ ...newDb, name: (e.target as HTMLInputElement).value })} placeholder="my-database" />
-            </div>
+            <Input
+              label="Name"
+              name="db-create-name"
+              id="db-create-name"
+              value={newDb.name}
+              onChange={(v) => setNewDb({ ...newDb, name: v })}
+              placeholder="my-database"
+            />
             <div>
               <label htmlFor="db-create-type" class={formStyles.label}>Type</label>
               <Select
