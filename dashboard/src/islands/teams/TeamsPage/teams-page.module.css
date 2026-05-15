@@ -1,0 +1,132 @@
+.container {
+  max-width: 1200px;
+  padding: var(--space-6);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 640px) {
+  .header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.card:hover {
+  border-color: var(--color-primary);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.cardName {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-1);
+}
+
+.cardSlug {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.cardMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cardMetaItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .createForm {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+}
+
+.emptyState {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+}
+
+.emptyIcon {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.emptyTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.emptyDescription {
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-4);
+}
+
+.loadingState {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

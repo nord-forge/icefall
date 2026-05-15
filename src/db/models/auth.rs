@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct Session {
     pub id: String,
     pub user_id: String,
+    pub active_team_id: Option<String>,
     pub expires_at: String,
     pub created_at: String,
 }
@@ -14,6 +15,7 @@ pub struct ApiToken {
     pub user_id: String,
     pub name: String,
     pub token_hash: String,
+    pub team_id: Option<String>,
     pub last_used_at: Option<String>,
     pub expires_at: Option<String>,
     pub created_at: String,

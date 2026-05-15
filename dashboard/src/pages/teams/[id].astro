@@ -1,0 +1,10 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import TeamDetail from '@islands/teams/TeamDetail/TeamDetail';
+
+export const prerender = false;
+---
+
+<DashboardLayout title="Team Detail">
+  <TeamDetail client:only="preact" />
+</DashboardLayout>

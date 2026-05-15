@@ -26,6 +26,9 @@ mod search;
 mod servers;
 mod sessions;
 mod ssh_keys;
+mod team_isolation_tests;
+mod team_scoping;
+mod teams;
 mod updates;
 mod users;
 mod webhooks;
@@ -795,8 +798,9 @@ impl Database for SqliteDatabase {
         name: &str,
         token_hash: &str,
         expires_at: Option<&str>,
+        team_id: Option<&str>,
     ) -> Result<ApiToken, DbError> {
-        sessions::create_api_token(&self.pool, user_id, name, token_hash, expires_at).await
+        sessions::create_api_token(&self.pool, user_id, name, token_hash, expires_at, team_id).await
     }
 
     async fn get_api_token_by_hash(&self, token_hash: &str) -> Result<Option<ApiToken>, DbError> {
@@ -1204,6 +1208,181 @@ impl Database for SqliteDatabase {
 
     async fn vacuum_into(&self, path: &str) -> Result<(), DbError> {
         maintenance::vacuum_into(&self.pool, path).await
+    }
+
+    // --- Team-scoped queries ---
+
+    async fn list_apps_by_team(&self, team_id: &str) -> Result<Vec<App>, DbError> {
+        team_scoping::list_apps_by_team(&self.pool, team_id).await
+    }
+
+    async fn list_projects_by_team(&self, team_id: &str) -> Result<Vec<Project>, DbError> {
+        team_scoping::list_projects_by_team(&self.pool, team_id).await
+    }
+
+    async fn list_managed_dbs_by_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<ManagedDatabase>, DbError> {
+        team_scoping::list_managed_dbs_by_team(&self.pool, &self.encryptor, team_id).await
+    }
+
+    async fn list_ssh_keys_by_team(&self, team_id: &str) -> Result<Vec<SshKey>, DbError> {
+        team_scoping::list_ssh_keys_by_team(&self.pool, team_id).await
+    }
+
+    async fn list_registries_by_team(&self, team_id: &str) -> Result<Vec<Registry>, DbError> {
+        team_scoping::list_registries_by_team(&self.pool, &self.encryptor, team_id).await
+    }
+
+    async fn list_notification_channels_by_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<Notification>, DbError> {
+        team_scoping::list_notification_channels_by_team(&self.pool, &self.encryptor, team_id).await
+    }
+
+    async fn list_api_tokens_by_team(&self, team_id: &str) -> Result<Vec<ApiToken>, DbError> {
+        team_scoping::list_api_tokens_by_team(&self.pool, team_id).await
+    }
+
+    async fn set_app_team(&self, app_id: &str, team_id: &str) -> Result<(), DbError> {
+        team_scoping::set_app_team(&self.pool, app_id, team_id).await
+    }
+
+    async fn set_project_team(&self, project_id: &str, team_id: &str) -> Result<(), DbError> {
+        team_scoping::set_project_team(&self.pool, project_id, team_id).await
+    }
+
+    async fn set_database_team(&self, db_id: &str, team_id: &str) -> Result<(), DbError> {
+        team_scoping::set_database_team(&self.pool, db_id, team_id).await
+    }
+
+    // --- Teams ---
+
+    async fn create_team(&self, team: &NewTeam) -> Result<Team, DbError> {
+        teams::create_team(&self.pool, team).await
+    }
+
+    async fn get_team(&self, id: &str) -> Result<Option<Team>, DbError> {
+        teams::get_team(&self.pool, id).await
+    }
+
+    async fn get_team_by_slug(&self, slug: &str) -> Result<Option<Team>, DbError> {
+        teams::get_team_by_slug(&self.pool, slug).await
+    }
+
+    async fn list_teams_for_user(&self, user_id: &str) -> Result<Vec<Team>, DbError> {
+        teams::list_teams_for_user(&self.pool, user_id).await
+    }
+
+    async fn update_team(&self, id: &str, update: &UpdateTeam) -> Result<Team, DbError> {
+        teams::update_team(&self.pool, id, update).await
+    }
+
+    async fn delete_team(&self, id: &str) -> Result<(), DbError> {
+        teams::delete_team(&self.pool, id).await
+    }
+
+    async fn count_team_resources(&self, team_id: &str) -> Result<i64, DbError> {
+        teams::count_team_resources(&self.pool, team_id).await
+    }
+
+    async fn add_team_member(
+        &self,
+        team_id: &str,
+        user_id: &str,
+        role: &str,
+        invited_by: Option<&str>,
+    ) -> Result<TeamMembership, DbError> {
+        teams::add_team_member(&self.pool, team_id, user_id, role, invited_by).await
+    }
+
+    async fn list_team_members(&self, team_id: &str) -> Result<Vec<TeamMember>, DbError> {
+        teams::list_team_members(&self.pool, team_id).await
+    }
+
+    async fn get_team_membership(
+        &self,
+        team_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TeamMembership>, DbError> {
+        teams::get_team_membership(&self.pool, team_id, user_id).await
+    }
+
+    async fn update_team_member_role(
+        &self,
+        team_id: &str,
+        user_id: &str,
+        role: &str,
+    ) -> Result<(), DbError> {
+        teams::update_team_member_role(&self.pool, team_id, user_id, role).await
+    }
+
+    async fn remove_team_member(&self, team_id: &str, user_id: &str) -> Result<(), DbError> {
+        teams::remove_team_member(&self.pool, team_id, user_id).await
+    }
+
+    async fn create_team_invitation(
+        &self,
+        team_id: &str,
+        email: &str,
+        role: &str,
+        token: &str,
+        invited_by: &str,
+        expires_at: &str,
+    ) -> Result<TeamInvitation, DbError> {
+        teams::create_team_invitation(
+            &self.pool, team_id, email, role, token, invited_by, expires_at,
+        )
+        .await
+    }
+
+    async fn get_team_invitation_by_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<TeamInvitation>, DbError> {
+        teams::get_team_invitation_by_token(&self.pool, token).await
+    }
+
+    async fn list_team_invitations(&self, team_id: &str) -> Result<Vec<TeamInvitation>, DbError> {
+        teams::list_team_invitations(&self.pool, team_id).await
+    }
+
+    async fn delete_team_invitation(&self, id: &str) -> Result<(), DbError> {
+        teams::delete_team_invitation(&self.pool, id).await
+    }
+
+    async fn set_session_team(&self, session_id: &str, team_id: &str) -> Result<(), DbError> {
+        teams::set_session_team(&self.pool, session_id, team_id).await
+    }
+
+    // --- Cross-team server sharing ---
+
+    async fn share_server_with_team(
+        &self,
+        server_id: &str,
+        team_id: &str,
+        access_level: &str,
+        granted_by: &str,
+    ) -> Result<ServerTeamAccess, DbError> {
+        teams::share_server_with_team(&self.pool, server_id, team_id, access_level, granted_by)
+            .await
+    }
+
+    async fn revoke_server_share(&self, server_id: &str, team_id: &str) -> Result<(), DbError> {
+        teams::revoke_server_share(&self.pool, server_id, team_id).await
+    }
+
+    async fn list_server_shares(&self, server_id: &str) -> Result<Vec<ServerTeamAccess>, DbError> {
+        teams::list_server_shares(&self.pool, server_id).await
+    }
+
+    async fn list_servers_shared_with_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<(Server, String)>, DbError> {
+        teams::list_servers_shared_with_team(&self.pool, team_id).await
     }
 
     // --- Migrations ---

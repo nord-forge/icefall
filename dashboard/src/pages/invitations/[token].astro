@@ -1,0 +1,10 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import InvitationAcceptPage from '@islands/teams/InvitationAcceptPage/InvitationAcceptPage';
+
+export const prerender = false;
+---
+
+<DashboardLayout title="Team Invitation">
+  <InvitationAcceptPage client:only="preact" />
+</DashboardLayout>

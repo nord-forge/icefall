@@ -33,6 +33,7 @@ pub mod search;
 pub mod server;
 pub mod servers;
 pub mod settings;
+pub mod teams;
 pub mod terminal;
 pub mod two_factor;
 pub mod update;
@@ -82,6 +83,7 @@ pub fn api_routes() -> Router<AppState> {
         .merge(log_drains::routes())
         .merge(git_sources::routes())
         .merge(cleanup::routes())
+        .merge(teams::routes())
         .merge(openapi::routes())
         .route("/search", axum::routing::get(search::search))
         .route(

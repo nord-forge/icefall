@@ -294,3 +294,33 @@ export type CanaryResult = {
   error_rate: number;
   request_count: number;
 }
+
+export type Team = {
+  id: string;
+  name: string;
+  slug: string;
+  owner_id: string;
+  settings: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TeamMember = {
+  id: string;
+  user_id: string;
+  email: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export type TeamInvitation = {
+  id: string;
+  team_id: string;
+  email: string;
+  role: string;
+  token: string;
+  invited_by: string;
+  expires_at: string;
+  created_at: string;
+}

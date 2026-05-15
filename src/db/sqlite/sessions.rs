@@ -22,6 +22,7 @@ pub(super) async fn create_session(
     Ok(Session {
         id,
         user_id: user_id.to_string(),
+        active_team_id: None,
         expires_at: expires_at.to_string(),
         created_at: now,
     })
@@ -88,17 +89,19 @@ pub(super) async fn create_api_token(
     name: &str,
     token_hash: &str,
     expires_at: Option<&str>,
+    team_id: Option<&str>,
 ) -> Result<ApiToken, DbError> {
     let id = new_id();
     let now = now_iso8601();
-    sqlx::query("INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(&id).bind(user_id).bind(name).bind(token_hash).bind(expires_at).bind(&now)
+    sqlx::query("INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, team_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(&id).bind(user_id).bind(name).bind(token_hash).bind(expires_at).bind(team_id).bind(&now)
         .execute(pool).await?;
     Ok(ApiToken {
         id,
         user_id: user_id.to_string(),
         name: name.to_string(),
         token_hash: token_hash.to_string(),
+        team_id: team_id.map(String::from),
         last_used_at: None,
         expires_at: expires_at.map(String::from),
         created_at: now,

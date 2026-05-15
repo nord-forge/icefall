@@ -1,4 +1,4 @@
-import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult } from './types';
+import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -663,6 +663,66 @@ export const api = {
     request<{ data: App }>('/bundles/import', {
       method: 'POST',
       body: JSON.stringify(bundle),
+    }),
+
+  // Teams
+  listTeams: () =>
+    request<{ data: Team[] }>('/teams'),
+
+  createTeam: (name: string) =>
+    request<{ data: Team }>('/teams', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  getTeam: (id: string) =>
+    request<{ data: { team: Team; members: TeamMember[]; resource_count: number } }>(`/teams/${id}`),
+
+  updateTeam: (id: string, body: { name?: string; settings?: Record<string, unknown> }) =>
+    request<{ data: Team }>(`/teams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteTeam: (id: string) =>
+    request<{ message: string }>(`/teams/${id}`, { method: 'DELETE' }),
+
+  switchTeam: (id: string) =>
+    request<{ data: { team_id: string; role: string }; message: string }>(`/teams/${id}/switch`, {
+      method: 'POST',
+    }),
+
+  listTeamMembers: (teamId: string) =>
+    request<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
+
+  updateTeamMemberRole: (teamId: string, userId: string, role: string) =>
+    request<{ message: string }>(`/teams/${teamId}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeTeamMember: (teamId: string, userId: string) =>
+    request<{ message: string }>(`/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  inviteTeamMember: (teamId: string, email: string, role: string) =>
+    request<{ data: TeamInvitation }>(`/teams/${teamId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    }),
+
+  listTeamInvitations: (teamId: string) =>
+    request<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`),
+
+  acceptInvitation: (token: string) =>
+    request<{ data: { team: Team; role: string }; message: string }>(`/invitations/${token}/accept`, {
+      method: 'POST',
+    }),
+
+  declineInvitation: (token: string) =>
+    request<{ message: string }>(`/invitations/${token}`, {
+      method: 'DELETE',
     }),
 };
 
