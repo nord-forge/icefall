@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $settings } from '@stores/settings';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Save, Globe } from 'lucide-preact';
 import { TIMEZONES } from '@lib/timezones';
@@ -49,25 +50,37 @@ export default function GeneralSection({ onSaveMessage }: Props) {
     <div class={styles.section}>
       <h2 class={styles.sectionHeading}><Globe size={18} aria-hidden="true" /> General</h2>
       <div class={formStyles.fieldRow}>
-        <div>
-          <label htmlFor="sp-platform-name" class={formStyles.label}>Platform Name</label>
-          <input id="sp-platform-name" class={formStyles.input} value={platformName} onInput={e => setPlatformName((e.target as HTMLInputElement).value)} placeholder="Icefall" />
-          <p class={formStyles.hint}>Displayed in the dashboard header and emails.</p>
-        </div>
-        <div>
-          <label htmlFor="sp-base-domain" class={formStyles.label}>Base Domain</label>
-          <input id="sp-base-domain" class={formStyles.input} value={baseDomain} onInput={e => setBaseDomain((e.target as HTMLInputElement).value)} placeholder="apps.example.com" />
-          <p class={formStyles.hint}>Used for app subdomains and SSL certificates.</p>
-        </div>
+        <Input
+          label="Platform Name"
+          name="sp-platform-name"
+          id="sp-platform-name"
+          value={platformName}
+          onChange={setPlatformName}
+          placeholder="Icefall"
+          helpText="Displayed in the dashboard header and emails."
+        />
+        <Input
+          label="Base Domain"
+          name="sp-base-domain"
+          id="sp-base-domain"
+          value={baseDomain}
+          onChange={setBaseDomain}
+          placeholder="apps.example.com"
+          helpText="Used for app subdomains and SSL certificates."
+        />
       </div>
       <div class={formStyles.fieldRow}>
+        <Input
+          label="Recovery Email"
+          name="sp-recovery-email"
+          id="sp-recovery-email"
+          type="email"
+          value={recoveryEmail}
+          onChange={setRecoveryEmail}
+          placeholder="recovery@example.com"
+          helpText="Receives password reset links if the admin account is locked out."
+        />
         <div>
-          <label htmlFor="sp-recovery-email" class={formStyles.label}>Recovery Email</label>
-          <input id="sp-recovery-email" class={formStyles.input} type="email" autoComplete="email" value={recoveryEmail} onInput={e => setRecoveryEmail((e.target as HTMLInputElement).value)} placeholder="recovery@example.com" />
-          <p class={formStyles.hint}>Receives password reset links if the admin account is locked out.</p>
-        </div>
-        <div>
-          <label htmlFor="sp-timezone" class={formStyles.label}>Timezone</label>
           <Select
             id="sp-timezone"
             options={TIMEZONES.map(tz => ({ value: tz, label: tz.replace(/_/g, ' ') }))}
@@ -75,7 +88,6 @@ export default function GeneralSection({ onSaveMessage }: Props) {
             onChange={setTimezone}
             fullWidth
           />
-          <p class={formStyles.hint}>Used for log timestamps, backup schedules, and notifications.</p>
         </div>
       </div>
       <div class={styles.saveRow}>

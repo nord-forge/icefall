@@ -5,6 +5,7 @@ import { formatRelativeTime } from '@lib/format';
 import Button from '@islands/shared/Button/Button';
 import { Plus, FolderOpen, Pencil, Trash2, ArrowLeft, Grid2x2, Database } from 'lucide-preact';
 import { SkeletonCard } from '@islands/shared/Skeleton/Skeleton';
+import Input from '@islands/shared/Input/Input';
 import styles from './projects-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -232,31 +233,22 @@ export default function ProjectsPage() {
             {editingProject ? 'Edit Project' : 'New Project'}
           </h2>
           <div class={formStyles.fieldGroup}>
-            <div>
-              <label htmlFor="project-name" class={formStyles.label}>
-                Name
-              </label>
-              <input
-                id="project-name"
-                class={formStyles.input}
-                value={formName}
-                onInput={(e) => setFormName((e.target as HTMLInputElement).value)}
-                placeholder="My Project"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label htmlFor="project-description" class={formStyles.label}>
-                Description
-              </label>
-              <input
-                id="project-description"
-                class={formStyles.input}
-                value={formDescription}
-                onInput={(e) => setFormDescription((e.target as HTMLInputElement).value)}
-                placeholder="Optional description"
-              />
-            </div>
+            <Input
+              label="Name"
+              name="project-name"
+              id="project-name"
+              value={formName}
+              onChange={setFormName}
+              placeholder="My Project"
+            />
+            <Input
+              label="Description"
+              name="project-description"
+              id="project-description"
+              value={formDescription}
+              onChange={setFormDescription}
+              placeholder="Optional description"
+            />
             <div>
               {/* a11y [WCAG 1.3.1]: group label for color selection */}
               <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>

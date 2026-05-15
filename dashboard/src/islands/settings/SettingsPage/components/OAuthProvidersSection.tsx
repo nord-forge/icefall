@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import { Save, Key, CheckCircle, Copy } from 'lucide-preact';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
@@ -103,30 +104,25 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
           </button>
         </div>
         <div class={formStyles.fieldRow}>
-          <div>
-            <label htmlFor="oauth-gh-id" class={formStyles.label}>Client ID</label>
-            <input
-              id="oauth-gh-id"
-              class={formStyles.inputMono}
-              value={githubClientId}
-              onInput={e => setGithubClientId((e.target as HTMLInputElement).value)}
-              placeholder="Iv1.abc123..."
-            />
-          </div>
-          <div>
-            <label htmlFor="oauth-gh-secret" class={formStyles.label}>
-              Client Secret {githubHasSecret && <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>(configured)</span>}
-            </label>
-            <input
-              id="oauth-gh-secret"
-              class={formStyles.inputMono}
-              type="password"
-              autoComplete="off"
-              value={githubClientSecret}
-              onInput={e => setGithubClientSecret((e.target as HTMLInputElement).value)}
-              placeholder={githubHasSecret ? 'Leave blank to keep current' : 'Enter client secret'}
-            />
-          </div>
+          <Input
+            label="Client ID"
+            name="oauth-gh-id"
+            id="oauth-gh-id"
+            mono
+            value={githubClientId}
+            onChange={setGithubClientId}
+            placeholder="Iv1.abc123..."
+          />
+          <Input
+            label={`Client Secret${githubHasSecret ? ' (configured)' : ''}`}
+            name="oauth-gh-secret"
+            id="oauth-gh-secret"
+            type="password"
+            mono
+            value={githubClientSecret}
+            onChange={setGithubClientSecret}
+            placeholder={githubHasSecret ? 'Leave blank to keep current' : 'Enter client secret'}
+          />
         </div>
         {githubCallbackUrl && (
           <div style={{ marginTop: 'var(--space-2)' }}>
@@ -171,30 +167,25 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
           </button>
         </div>
         <div class={formStyles.fieldRow}>
-          <div>
-            <label htmlFor="oauth-gl-id" class={formStyles.label}>Client ID</label>
-            <input
-              id="oauth-gl-id"
-              class={formStyles.inputMono}
-              value={googleClientId}
-              onInput={e => setGoogleClientId((e.target as HTMLInputElement).value)}
-              placeholder="123456789.apps.googleusercontent.com"
-            />
-          </div>
-          <div>
-            <label htmlFor="oauth-gl-secret" class={formStyles.label}>
-              Client Secret {googleHasSecret && <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>(configured)</span>}
-            </label>
-            <input
-              id="oauth-gl-secret"
-              class={formStyles.inputMono}
-              type="password"
-              autoComplete="off"
-              value={googleClientSecret}
-              onInput={e => setGoogleClientSecret((e.target as HTMLInputElement).value)}
-              placeholder={googleHasSecret ? 'Leave blank to keep current' : 'Enter client secret'}
-            />
-          </div>
+          <Input
+            label="Client ID"
+            name="oauth-gl-id"
+            id="oauth-gl-id"
+            mono
+            value={googleClientId}
+            onChange={setGoogleClientId}
+            placeholder="123456789.apps.googleusercontent.com"
+          />
+          <Input
+            label={`Client Secret${googleHasSecret ? ' (configured)' : ''}`}
+            name="oauth-gl-secret"
+            id="oauth-gl-secret"
+            type="password"
+            mono
+            value={googleClientSecret}
+            onChange={setGoogleClientSecret}
+            placeholder={googleHasSecret ? 'Leave blank to keep current' : 'Enter client secret'}
+          />
         </div>
         {googleCallbackUrl && (
           <div style={{ marginTop: 'var(--space-2)' }}>

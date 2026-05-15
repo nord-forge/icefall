@@ -3,8 +3,8 @@ import type { ApiToken } from '@lib/types';
 import { formatRelativeTime } from '@lib/format';
 import { Key, Copy, Plus, Trash2 } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import styles from '../profile-page.module.css';
-import formStyles from '@styles/form.module.css';
 
 type Props = {
   tokens: ApiToken[];
@@ -62,13 +62,12 @@ export default function ProfileTokensSection({ tokens, onCreateToken, onRevokeTo
       {showCreateToken && (
         <div class={styles.card}>
           {/* a11y [1.3.1]: label associated with input */}
-          <label htmlFor="token-name" class={formStyles.label}>Token Name</label>
-          <input
+          <Input
+            label="Token Name"
+            name="token-name"
             id="token-name"
-            class={formStyles.input}
             value={tokenName}
-            onInput={e => setTokenName((e.target as HTMLInputElement).value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleCreateToken(); }}
+            onChange={setTokenName}
             placeholder="CI/CD pipeline"
           />
           <div class={styles.cardActions}>

@@ -163,6 +163,33 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.ssh_key_id.as_deref(),
     };
+    let ghost_mode_enabled = update
+        .ghost_mode_enabled
+        .unwrap_or(existing.ghost_mode_enabled);
+    let ghost_mode_idle_minutes = update
+        .ghost_mode_idle_minutes
+        .unwrap_or(existing.ghost_mode_idle_minutes);
+    let canary_enabled = update.canary_enabled.unwrap_or(existing.canary_enabled);
+    let canary_config = match &update.canary_config {
+        Some(v) => v.as_deref(),
+        None => existing.canary_config.as_deref(),
+    };
+    let log_noise_patterns = match &update.log_noise_patterns {
+        Some(v) => v.as_deref(),
+        None => existing.log_noise_patterns.as_deref(),
+    };
+    let log_highlight_patterns = match &update.log_highlight_patterns {
+        Some(v) => v.as_deref(),
+        None => existing.log_highlight_patterns.as_deref(),
+    };
+    let tunnel_enabled = update.tunnel_enabled.unwrap_or(existing.tunnel_enabled);
+    let require_deploy_approval = update
+        .require_deploy_approval
+        .unwrap_or(existing.require_deploy_approval);
+    let project_environment_id = match &update.project_environment_id {
+        Some(v) => v.as_deref(),
+        None => existing.project_environment_id.as_deref(),
+    };
     let now = now_iso8601();
 
     sqlx::query(
@@ -174,6 +201,11 @@ pub(super) async fn update_app(
          git_lfs_enabled = ?, git_shallow_clone = ?, basic_auth_enabled = ?,
          basic_auth_username = ?, basic_auth_password_hash = ?, pre_deploy_commands = ?,
          post_deploy_commands = ?, ssh_key_id = ?,
+         ghost_mode_enabled = ?, ghost_mode_idle_minutes = ?,
+         canary_enabled = ?, canary_config = ?,
+         log_noise_patterns = ?, log_highlight_patterns = ?,
+         tunnel_enabled = ?, require_deploy_approval = ?,
+         project_environment_id = ?,
          updated_at = ? WHERE id = ?",
     )
     .bind(name)
@@ -202,6 +234,15 @@ pub(super) async fn update_app(
     .bind(pre_deploy_commands)
     .bind(post_deploy_commands)
     .bind(ssh_key_id)
+    .bind(ghost_mode_enabled)
+    .bind(ghost_mode_idle_minutes)
+    .bind(canary_enabled)
+    .bind(canary_config)
+    .bind(log_noise_patterns)
+    .bind(log_highlight_patterns)
+    .bind(tunnel_enabled)
+    .bind(require_deploy_approval)
+    .bind(project_environment_id)
     .bind(&now)
     .bind(id)
     .execute(pool)

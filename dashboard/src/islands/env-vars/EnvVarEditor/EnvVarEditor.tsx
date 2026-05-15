@@ -4,6 +4,8 @@ import type { EnvVar } from '@lib/types';
 import Button from '@islands/shared/Button/Button';
 import Select from '@islands/shared/Select/Select';
 import { Plus, Eye, EyeOff, Trash2, Upload, Save } from 'lucide-preact';
+import Input from '@islands/shared/Input/Input';
+import Textarea from '@islands/shared/Textarea/Textarea';
 import styles from './env-var-editor.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -87,14 +89,15 @@ export default function EnvVarEditor({ appId }: Props) {
       {showImport && (
         <div class={styles.importCard}>
           <h4 class={styles.importTitle}>Import .env file</h4>
-          <label htmlFor="import-env-content" class={formStyles.label}>File content</label>
-          <textarea
+          <Textarea
+            label="File content"
+            name="import-env-content"
             id="import-env-content"
             value={importContent}
-            onInput={(e) => setImportContent((e.target as HTMLTextAreaElement).value)}
+            onChange={setImportContent}
             placeholder="KEY=value&#10;ANOTHER_KEY=another_value"
             rows={8}
-            class={formStyles.textarea}
+            mono
           />
           <div class={styles.importActions}>
             <Button variant="ghost" onClick={() => setShowImport(false)}>Cancel</Button>

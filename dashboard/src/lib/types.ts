@@ -17,6 +17,16 @@ export type App = {
   server_id: string | null;
   deploy_mode: string;
   disable_build_cache: boolean;
+  ghost_mode_enabled: boolean;
+  ghost_mode_idle_minutes: number;
+  ghost_mode_status: string;
+  canary_enabled: boolean;
+  canary_config: string | null;
+  tunnel_enabled: boolean;
+  require_deploy_approval: boolean;
+  log_noise_patterns: string | null;
+  log_highlight_patterns: string | null;
+  project_environment_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -182,4 +192,105 @@ export type HealthCheckResult = {
   current_status: string;
   uptime_percent: number;
   recent_events: HealthCheckEvent[];
+}
+
+export type ProjectEnvironment = {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string | null;
+  created_at: string;
+}
+
+export type EnvironmentVariable = {
+  id: string;
+  key: string;
+  value: string;
+  is_secret: boolean;
+}
+
+export type LogDrain = {
+  id: string;
+  app_id: string | null;
+  name: string;
+  drain_type: 'loki' | 'axiom' | 'http';
+  config: string;
+  enabled: boolean;
+  last_sent_at: string | null;
+  created_at: string;
+}
+
+export type GitHubInstallation = {
+  id: string;
+  account_name: string;
+  account_type: 'user' | 'organization';
+  repo_count: number;
+  status: 'active' | 'suspended';
+  created_at: string;
+}
+
+export type GitHubRepo = {
+  id: string;
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+}
+
+export type CleanupSchedule = {
+  cron: string;
+  disk_threshold_percent: number;
+  dangling_images: boolean;
+  unused_images: boolean;
+  stopped_containers: boolean;
+  stopped_container_age_hours: number;
+  volumes: boolean;
+  networks: boolean;
+  enabled: boolean;
+}
+
+export type CleanupRun = {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'running' | 'completed' | 'failed';
+  freed_bytes: number;
+  removed_items: number;
+  error: string | null;
+}
+
+export type ServerForecast = {
+  disk: {
+    current_ratio: number;
+    daily_growth: number;
+    days_until_full: number | null;
+  };
+  memory: {
+    current_ratio: number;
+    daily_growth: number;
+    days_until_full: number | null;
+  };
+  cpu: {
+    current_percent: number;
+    daily_trend: number;
+  };
+  data_points: number;
+}
+
+export type DeployApproval = {
+  id: string;
+  deploy_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewer: string | null;
+  comment: string | null;
+  decided_at: string | null;
+}
+
+export type CanaryResult = {
+  deploy_id: string;
+  status: 'running' | 'passed' | 'failed';
+  p50_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+  error_rate: number;
+  request_count: number;
 }

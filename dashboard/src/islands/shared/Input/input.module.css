@@ -12,6 +12,7 @@
 .input:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: -1px; border-color: var(--color-primary); }
 .input:disabled { opacity: 0.5; cursor: not-allowed; }
 .inputError { border-color: var(--color-error); }
+.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
 .revealBtn {
   position: absolute; right: var(--space-2); top: 50%; transform: translateY(-50%);
   background: none; border: none; color: var(--color-text-muted); cursor: pointer; padding: var(--space-1);

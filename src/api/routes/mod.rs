@@ -5,17 +5,21 @@ pub mod audit;
 pub mod auth;
 pub mod backups;
 pub mod bundles;
+pub mod cleanup;
 pub mod config_history;
 pub mod databases;
 pub mod db_browser;
 pub mod deploys;
 pub mod domains;
 pub mod env_vars;
+pub mod environments;
 pub mod events;
 pub mod forecast;
+pub mod git_sources;
 pub mod health;
 pub mod incidents;
 pub mod instance_backup;
+pub mod log_drains;
 pub mod logs;
 pub mod mcp;
 pub mod metrics;
@@ -74,6 +78,10 @@ pub fn api_routes() -> Router<AppState> {
         .merge(volumes::routes())
         .merge(update::routes())
         .merge(audit::routes())
+        .merge(environments::routes())
+        .merge(log_drains::routes())
+        .merge(git_sources::routes())
+        .merge(cleanup::routes())
         .merge(openapi::routes())
         .route("/search", axum::routing::get(search::search))
         .route(

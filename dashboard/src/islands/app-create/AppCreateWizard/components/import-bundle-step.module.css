@@ -1,0 +1,128 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.dropZone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-8);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.dropZone:hover {
+  border-color: var(--color-primary);
+}
+
+/* a11y [WCAG 2.4.7]: visible focus ring on dropzone label */
+.dropZone:focus-within {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+}
+
+.dropZoneActive {
+  border-color: var(--color-primary);
+  background: var(--color-surface-alt);
+}
+
+.dropText {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* a11y [WCAG 1.3.1]: visually hidden but accessible file input */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.preview {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.previewTitle {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  flex: 1;
+}
+
+/* a11y [WCAG 2.5.8]: minimum 28x28 target size */
+.clearButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.clearButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/* a11y [WCAG 2.4.7]: visible focus ring */
+.clearButton:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.previewMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.previewActions {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  justify-content: flex-end;
+}
+
+.errorMessage {
+  font-size: var(--text-sm);
+  color: var(--color-error);
+  padding: var(--space-3);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropZone {
+    transition: none;
+  }
+}

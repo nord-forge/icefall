@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import { Database, Plus, Trash2 } from 'lucide-preact';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
@@ -47,34 +48,60 @@ export default function BackupLocationsSection({ onSaveMessage }: Props) {
       {showAddBackup && (
         <div class={styles.addCard}>
           <div class={formStyles.fieldRow}>
-            <div>
-              <label htmlFor="bk-name" class={formStyles.label}>Name</label>
-              <input id="bk-name" class={formStyles.input} value={newBackup.name} onInput={e => setNewBackup(p => ({ ...p, name: (e.target as HTMLInputElement).value }))} placeholder="Primary backups" />
-            </div>
-            <div>
-              <label htmlFor="bk-bucket" class={formStyles.label}>S3/R2 Bucket</label>
-              <input id="bk-bucket" class={formStyles.input} value={newBackup.bucket} onInput={e => setNewBackup(p => ({ ...p, bucket: (e.target as HTMLInputElement).value }))} placeholder="my-backup-bucket" />
-            </div>
+            <Input
+              label="Name"
+              name="bk-name"
+              id="bk-name"
+              value={newBackup.name}
+              onChange={v => setNewBackup(p => ({ ...p, name: v }))}
+              placeholder="Primary backups"
+            />
+            <Input
+              label="S3/R2 Bucket"
+              name="bk-bucket"
+              id="bk-bucket"
+              value={newBackup.bucket}
+              onChange={v => setNewBackup(p => ({ ...p, bucket: v }))}
+              placeholder="my-backup-bucket"
+            />
           </div>
           <div class={formStyles.fieldRow}>
-            <div>
-              <label htmlFor="bk-endpoint" class={formStyles.label}>Endpoint</label>
-              <input id="bk-endpoint" class={formStyles.inputMono} value={newBackup.endpoint} onInput={e => setNewBackup(p => ({ ...p, endpoint: (e.target as HTMLInputElement).value }))} placeholder="https://acct-id.r2.cloudflarestorage.com" />
-            </div>
-            <div>
-              <label htmlFor="bk-region" class={formStyles.label}>Region</label>
-              <input id="bk-region" class={formStyles.input} value={newBackup.region} onInput={e => setNewBackup(p => ({ ...p, region: (e.target as HTMLInputElement).value }))} placeholder="auto" />
-            </div>
+            <Input
+              label="Endpoint"
+              name="bk-endpoint"
+              id="bk-endpoint"
+              mono
+              value={newBackup.endpoint}
+              onChange={v => setNewBackup(p => ({ ...p, endpoint: v }))}
+              placeholder="https://acct-id.r2.cloudflarestorage.com"
+            />
+            <Input
+              label="Region"
+              name="bk-region"
+              id="bk-region"
+              value={newBackup.region}
+              onChange={v => setNewBackup(p => ({ ...p, region: v }))}
+              placeholder="auto"
+            />
           </div>
           <div class={formStyles.fieldRow}>
-            <div>
-              <label htmlFor="bk-access" class={formStyles.label}>Access Key</label>
-              <input id="bk-access" class={formStyles.inputMono} value={newBackup.access_key} onInput={e => setNewBackup(p => ({ ...p, access_key: (e.target as HTMLInputElement).value }))} />
-            </div>
-            <div>
-              <label htmlFor="bk-secret" class={formStyles.label}>Secret Key</label>
-              <input id="bk-secret" class={formStyles.inputMono} type="password" autoComplete="off" value={newBackup.secret_key} onInput={e => setNewBackup(p => ({ ...p, secret_key: (e.target as HTMLInputElement).value }))} />
-            </div>
+            <Input
+              label="Access Key"
+              name="bk-access"
+              id="bk-access"
+              mono
+              value={newBackup.access_key}
+              onChange={v => setNewBackup(p => ({ ...p, access_key: v }))}
+            />
+            <Input
+              label="Secret Key"
+              name="bk-secret"
+              id="bk-secret"
+              type="password"
+              mono
+              value={newBackup.secret_key}
+              onChange={v => setNewBackup(p => ({ ...p, secret_key: v }))}
+            />
           </div>
           <div class={styles.addCardActions}>
             <Button variant="ghost" onClick={() => setShowAddBackup(false)}>Cancel</Button>

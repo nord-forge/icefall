@@ -2,9 +2,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '@lib/api';
 import type { Domain } from '@lib/types';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import { Plus, Trash2, Shield, Globe } from 'lucide-preact';
 import styles from './domains-tab.module.css';
-import formStyles from '@styles/form.module.css';
 
 type Props = {
   appId: string;
@@ -41,23 +41,22 @@ export default function DomainsTab({ appId }: Props) {
     <div>
       <div class={styles.headerActions}>
         <div class={styles.inputGroup}>
-          <label htmlFor="new-domain-input" class="sr-only">New domain</label>
-          <input
+          <Input
+            label="New domain"
+            name="new-domain"
             id="new-domain-input"
-            type="text"
             value={newDomain}
-            onInput={(e) => setNewDomain((e.target as HTMLInputElement).value)}
+            onChange={setNewDomain}
             placeholder="example.com"
-            class={formStyles.input}
           />
-          <label htmlFor="new-path-input" class="sr-only">Path prefix (optional)</label>
-          <input
+          <Input
+            label="Path prefix (optional)"
+            name="new-path"
             id="new-path-input"
-            type="text"
             value={newPath}
-            onInput={(e) => setNewPath((e.target as HTMLInputElement).value)}
+            onChange={setNewPath}
             placeholder="/api (optional)"
-            class={`${formStyles.input} ${styles.pathInput}`}
+            className={styles.pathInput}
           />
           <Button variant="primary" onClick={handleAdd} loading={adding}>
             <Plus size={14} /> Add Domain

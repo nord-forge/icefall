@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $channels, $settingsLoaded } from '@stores/settings';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Bell, Plus, Trash2, Send } from 'lucide-preact';
 import styles from '../settings-page.module.css';
@@ -140,18 +141,16 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
           </div>
           <div class={formStyles.fieldRow}>
             {configFieldsForType(newChannelType).map(f => (
-              <div key={f.key}>
-                <label htmlFor={`ch-${f.key}`} class={formStyles.label}>{f.label}</label>
-                <input
-                  id={`ch-${f.key}`}
-                  class={formStyles.input}
-                  type={f.key === 'password' ? 'password' : 'text'}
-                  autoComplete={f.key === 'password' ? 'off' : undefined}
-                  value={newChannelConfig[f.key] || ''}
-                  onInput={e => setNewChannelConfig(prev => ({ ...prev, [f.key]: (e.target as HTMLInputElement).value }))}
-                  placeholder={f.placeholder}
-                />
-              </div>
+              <Input
+                key={f.key}
+                label={f.label}
+                name={`ch-${f.key}`}
+                id={`ch-${f.key}`}
+                type={f.key === 'password' ? 'password' : 'text'}
+                value={newChannelConfig[f.key] || ''}
+                onChange={v => setNewChannelConfig(prev => ({ ...prev, [f.key]: v }))}
+                placeholder={f.placeholder}
+              />
             ))}
           </div>
           <div class={styles.addCardActions}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Save, HardDrive, Play, CheckCircle, XCircle, Clock } from 'lucide-preact';
 import styles from '../settings-page.module.css';
@@ -154,22 +155,20 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
             fullWidth
           />
         </div>
-        <div>
-          <label htmlFor="ib-retention" class={formStyles.label}>Retention Count</label>
-          <input
-            id="ib-retention"
-            class={formStyles.input}
-            type="number"
-            min={1}
-            max={365}
-            value={ibRetention}
-            onInput={e => {
-              const val = parseInt((e.target as HTMLInputElement).value, 10);
-              if (!isNaN(val)) setIbRetention(val);
-            }}
-          />
-          <p class={formStyles.hint}>Number of backups to keep before old ones are removed.</p>
-        </div>
+        <Input
+          label="Retention Count"
+          name="ib-retention"
+          id="ib-retention"
+          type="number"
+          min={1}
+          max={365}
+          value={String(ibRetention)}
+          onChange={(v) => {
+            const val = parseInt(v, 10);
+            if (!isNaN(val)) setIbRetention(val);
+          }}
+          helpText="Number of backups to keep before old ones are removed."
+        />
       </div>
 
       <div class={styles.saveRow}>
