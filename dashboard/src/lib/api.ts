@@ -183,6 +183,18 @@ export const api = {
   }) =>
     request<{ data: any }>(`/apps/${appId}/health`, { method: 'PUT', body: JSON.stringify(body) }),
 
+  createHealthCheck: (appId: string, body: {
+    check_type: string;
+    interval_secs: number;
+    failure_threshold: number;
+    auto_restart: boolean;
+    config?: string;
+  }) =>
+    request<{ data: any }>(`/apps/${appId}/health`, { method: 'POST', body: JSON.stringify(body) }),
+
+  deleteHealthCheck: (appId: string, checkId: string) =>
+    request<{ message: string }>(`/health-checks/${checkId}`, { method: 'DELETE' }),
+
   getServerStatus: () => request<ServerStatus>('/server/status'),
 
   deleteDomain: (appId: string, domainId: string) =>

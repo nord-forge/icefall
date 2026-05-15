@@ -16,6 +16,7 @@ export default function GitIntegrationsSection({ onSaveMessage }: Props) {
   const [loading, setLoading] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     api.listGitSources()
@@ -29,8 +30,25 @@ export default function GitIntegrationsSection({ onSaveMessage }: Props) {
       });
   }, []);
 
-  function handleConnect() {
-    addToast('info', 'GitHub OAuth flow will be configured in platform settings');
+  async function handleConnect() {
+    setConnecting(true);
+    try {
+      const setup = await api.getGitHubSetup();
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = setup.form_action;
+      form.target = '_self';
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'manifest';
+      input.value = JSON.stringify(setup.manifest);
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to start GitHub setup');
+      setConnecting(false);
+    }
   }
 
   async function handleDisconnect(id: string) {
@@ -52,7 +70,7 @@ export default function GitIntegrationsSection({ onSaveMessage }: Props) {
         <h2 class={styles.sectionHeading}>
           <GitBranch size={18} aria-hidden="true" /> Git Integrations
         </h2>
-        <Button variant="secondary" onClick={handleConnect}>
+        <Button variant="secondary" onClick={handleConnect} loading={connecting}>
           <Plus size={14} aria-hidden="true" /> Connect GitHub
         </Button>
       </div>

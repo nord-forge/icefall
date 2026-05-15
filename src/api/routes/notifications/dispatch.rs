@@ -13,6 +13,7 @@ pub async fn dispatch_notification(
     match channel_type {
         "webhook" => dispatch_webhook(config, event, summary, details).await,
         "smtp" => dispatch_smtp(config, event, summary, details).await,
+        "ntfy" => dispatch_ntfy(config, event, summary, details).await,
         "plunk" => dispatch_plunk(config, event, summary, details).await,
         "slack" => dispatch_slack(config, event, summary, details).await,
         "discord" => dispatch_discord(config, event, summary, details).await,
@@ -210,6 +211,77 @@ async fn dispatch_plunk(
     }
 
     tracing::info!("Plunk notification sent: [{event}] {summary}");
+    Ok(())
+}
+
+async fn dispatch_ntfy(
+    config: &str,
+    event: &str,
+    summary: &str,
+    details: &serde_json::Value,
+) -> Result<(), String> {
+    let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
+    let topic = parsed
+        .get("topic")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let server = parsed
+        .get("server")
+        .and_then(|v| v.as_str())
+        .unwrap_or("https://ntfy.sh");
+
+    if topic.is_empty() {
+        return Err("ntfy: topic is required".to_string());
+    }
+
+    let url = format!("{}/{}", server.trim_end_matches('/'), topic);
+
+    let priority = match event {
+        "deploy.failed" | "health.down" | "backup.failure" => "high",
+        "deploy.success" | "health.recovered" | "backup.success" => "default",
+        _ => "default",
+    };
+
+    let tags = match event {
+        "deploy.success" => "white_check_mark",
+        "deploy.failed" => "x",
+        "health.down" => "warning",
+        "health.recovered" => "green_heart",
+        "backup.success" => "package",
+        "backup.failure" => "rotating_light",
+        _ => "bell",
+    };
+
+    let app_name = details
+        .get("app_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    let body = format!("{summary}\nApp: {app_name}");
+
+    let client = reqwest::Client::new();
+    let mut req = client
+        .post(&url)
+        .header("Title", format!("[Icefall] {event}"))
+        .header("Priority", priority)
+        .header("Tags", tags)
+        .body(body)
+        .timeout(std::time::Duration::from_secs(10));
+
+    if let Some(token) = parsed.get("token").and_then(|v| v.as_str()) {
+        if !token.is_empty() {
+            req = req.bearer_auth(token);
+        }
+    }
+
+    let resp = req.send().await.map_err(|e| format!("ntfy error: {e}"))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("ntfy returned error: {text}"));
+    }
+
+    tracing::info!("ntfy notification sent to {topic}: [{event}] {summary}");
     Ok(())
 }
 

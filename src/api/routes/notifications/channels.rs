@@ -52,9 +52,11 @@ pub(super) async fn create_channel(
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
 
-    if !["smtp", "webhook", "plunk", "slack", "discord"].contains(&body.channel_type.as_str()) {
+    if !["smtp", "webhook", "ntfy", "plunk", "slack", "discord"]
+        .contains(&body.channel_type.as_str())
+    {
         return Err(ApiError::BadRequest(
-            "channel_type must be smtp, webhook, plunk, slack, or discord".into(),
+            "channel_type must be smtp, webhook, ntfy, plunk, slack, or discord".into(),
         ));
     }
 

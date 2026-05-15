@@ -14,12 +14,8 @@ pub struct NetworkInfo {
 
 impl DockerClient {
     pub async fn list_networks(&self) -> Result<Vec<NetworkInfo>, DockerError> {
-        let networks = self
-            .inner()
-            .list_networks(Some(ListNetworksOptions::<&str> {
-                ..Default::default()
-            }))
-            .await?;
+        let options = ListNetworksOptionsBuilder::default().build();
+        let networks = self.inner().list_networks(Some(options)).await?;
         Ok(networks
             .into_iter()
             .map(|n| NetworkInfo {

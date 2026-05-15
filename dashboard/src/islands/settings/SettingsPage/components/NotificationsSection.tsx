@@ -20,6 +20,8 @@ const CHANNEL_TYPES = [
   { value: 'smtp', label: 'Email (SMTP)' },
   { value: 'slack', label: 'Slack' },
   { value: 'discord', label: 'Discord' },
+  { value: 'ntfy', label: 'ntfy' },
+  { value: 'plunk', label: 'Plunk' },
 ];
 
 function configFieldsForType(type: string) {
@@ -35,6 +37,15 @@ function configFieldsForType(type: string) {
     ];
     case 'slack': return [{ key: 'url', label: 'Slack Webhook URL', placeholder: 'https://hooks.slack.com/services/...' }];
     case 'discord': return [{ key: 'url', label: 'Discord Webhook URL', placeholder: 'https://discord.com/api/webhooks/...' }];
+    case 'ntfy': return [
+      { key: 'topic', label: 'Topic', placeholder: 'my-alerts', required: true },
+      { key: 'server', label: 'Server', placeholder: 'https://ntfy.sh' },
+      { key: 'token', label: 'Access Token', placeholder: '', inputType: 'password' as const },
+    ];
+    case 'plunk': return [
+      { key: 'api_key', label: 'API Key', placeholder: '', required: true, inputType: 'password' as const },
+      { key: 'to_email', label: 'To Email', placeholder: 'team@example.com', required: true, inputType: 'email' as const },
+    ];
     default: return [{ key: 'url', label: 'URL', placeholder: '' }];
   }
 }
@@ -49,6 +60,8 @@ function channelSummary(ch: NotificationChannel) {
   if (ch.channel_type === 'smtp') return ch.config.host ? `${ch.config.host}:${ch.config.port || '587'}` : '';
   if (ch.channel_type === 'slack') return ch.config.channel || ch.config.url || '';
   if (ch.channel_type === 'discord') return ch.config.url || '';
+  if (ch.channel_type === 'ntfy') return ch.config.topic ? `${ch.config.server || 'https://ntfy.sh'}/${ch.config.topic}` : '';
+  if (ch.channel_type === 'plunk') return ch.config.to_email || '';
   return JSON.stringify(ch.config);
 }
 
@@ -146,7 +159,7 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
                 label={f.label}
                 name={`ch-${f.key}`}
                 id={`ch-${f.key}`}
-                type={f.key === 'password' ? 'password' : 'text'}
+                type={'inputType' in f ? f.inputType : f.key === 'password' ? 'password' : 'text'}
                 value={newChannelConfig[f.key] || ''}
                 onChange={v => setNewChannelConfig(prev => ({ ...prev, [f.key]: v }))}
                 placeholder={f.placeholder}
