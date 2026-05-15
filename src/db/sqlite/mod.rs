@@ -3,6 +3,7 @@ mod apps;
 mod audit;
 mod backups;
 mod canary;
+mod cleanup_schedule;
 mod config_history;
 mod databases;
 mod deploy_approvals;
@@ -15,10 +16,12 @@ mod forecast;
 mod github;
 mod health;
 mod incidents;
+mod log_drains;
 mod maintenance;
 mod notifications;
 mod oauth;
 mod onboarding;
+mod project_environments;
 mod projects;
 mod public_ports;
 mod registries;
@@ -407,6 +410,39 @@ impl Database for SqliteDatabase {
 
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError> {
         github::delete_github_installation(&self.pool, id).await
+    }
+
+    // --- GitHub Apps ---
+
+    async fn create_github_app(&self, app: &GitHubApp) -> Result<GitHubApp, DbError> {
+        github::create_github_app(&self.pool, &self.encryptor, app).await
+    }
+
+    async fn get_github_app(&self, id: &str) -> Result<Option<GitHubApp>, DbError> {
+        github::get_github_app(&self.pool, &self.encryptor, id).await
+    }
+
+    async fn list_github_apps(&self) -> Result<Vec<GitHubApp>, DbError> {
+        github::list_github_apps(&self.pool, &self.encryptor).await
+    }
+
+    async fn delete_github_app(&self, id: &str) -> Result<(), DbError> {
+        github::delete_github_app(&self.pool, id).await
+    }
+
+    async fn update_github_installation_app_id(
+        &self,
+        installation_id: i64,
+        github_app_id: &str,
+    ) -> Result<(), DbError> {
+        github::update_github_installation_app_id(&self.pool, installation_id, github_app_id).await
+    }
+
+    async fn get_github_app_for_installation(
+        &self,
+        installation_id: i64,
+    ) -> Result<Option<GitHubApp>, DbError> {
+        github::get_github_app_for_installation(&self.pool, &self.encryptor, installation_id).await
     }
 
     // --- Config history ---
@@ -1208,6 +1244,81 @@ impl Database for SqliteDatabase {
 
     async fn vacuum_into(&self, path: &str) -> Result<(), DbError> {
         maintenance::vacuum_into(&self.pool, path).await
+    }
+
+    // --- Log Drains ---
+
+    async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
+        log_drains::create_log_drain(&self.pool, drain).await
+    }
+
+    async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError> {
+        log_drains::list_log_drains_for_app(&self.pool, app_id).await
+    }
+
+    async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError> {
+        log_drains::list_global_log_drains(&self.pool).await
+    }
+
+    async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
+        log_drains::update_log_drain(&self.pool, id, drain).await
+    }
+
+    async fn delete_log_drain(&self, id: &str) -> Result<(), DbError> {
+        log_drains::delete_log_drain(&self.pool, id).await
+    }
+
+    async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError> {
+        log_drains::get_log_drain(&self.pool, id).await
+    }
+
+    // --- Project Environments ---
+
+    async fn create_project_environment(
+        &self,
+        env: &NewProjectEnvironment,
+    ) -> Result<ProjectEnvironment, DbError> {
+        project_environments::create_project_environment(&self.pool, env).await
+    }
+
+    async fn list_project_environments(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectEnvironment>, DbError> {
+        project_environments::list_project_environments(&self.pool, project_id).await
+    }
+
+    async fn update_project_environment(
+        &self,
+        id: &str,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<ProjectEnvironment, DbError> {
+        project_environments::update_project_environment(&self.pool, id, name, color).await
+    }
+
+    async fn delete_project_environment(&self, id: &str) -> Result<(), DbError> {
+        project_environments::delete_project_environment(&self.pool, id).await
+    }
+
+    async fn get_project_environment(
+        &self,
+        id: &str,
+    ) -> Result<Option<ProjectEnvironment>, DbError> {
+        project_environments::get_project_environment(&self.pool, id).await
+    }
+
+    // --- Cleanup Schedule ---
+
+    async fn get_cleanup_schedule(&self) -> Result<Option<CleanupSchedule>, DbError> {
+        cleanup_schedule::get_cleanup_schedule(&self.pool).await
+    }
+
+    async fn upsert_cleanup_schedule(
+        &self,
+        schedule: &CleanupSchedule,
+    ) -> Result<CleanupSchedule, DbError> {
+        cleanup_schedule::upsert_cleanup_schedule(&self.pool, schedule).await
     }
 
     // --- Team-scoped queries ---

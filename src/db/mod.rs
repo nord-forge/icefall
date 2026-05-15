@@ -152,6 +152,21 @@ pub trait Database: Send + Sync + 'static {
     async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError>;
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError>;
 
+    // GitHub Apps
+    async fn create_github_app(&self, app: &GitHubApp) -> Result<GitHubApp, DbError>;
+    async fn get_github_app(&self, id: &str) -> Result<Option<GitHubApp>, DbError>;
+    async fn list_github_apps(&self) -> Result<Vec<GitHubApp>, DbError>;
+    async fn delete_github_app(&self, id: &str) -> Result<(), DbError>;
+    async fn update_github_installation_app_id(
+        &self,
+        installation_id: i64,
+        github_app_id: &str,
+    ) -> Result<(), DbError>;
+    async fn get_github_app_for_installation(
+        &self,
+        installation_id: i64,
+    ) -> Result<Option<GitHubApp>, DbError>;
+
     // Config history
     async fn record_config_change(
         &self,
@@ -549,6 +564,42 @@ pub trait Database: Send + Sync + 'static {
 
     // Backup
     async fn vacuum_into(&self, path: &str) -> Result<(), DbError>;
+
+    // Log drains
+    async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError>;
+    async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError>;
+    async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError>;
+    async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError>;
+    async fn delete_log_drain(&self, id: &str) -> Result<(), DbError>;
+    async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError>;
+
+    // Project environments
+    async fn create_project_environment(
+        &self,
+        env: &NewProjectEnvironment,
+    ) -> Result<ProjectEnvironment, DbError>;
+    async fn list_project_environments(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectEnvironment>, DbError>;
+    async fn update_project_environment(
+        &self,
+        id: &str,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<ProjectEnvironment, DbError>;
+    async fn delete_project_environment(&self, id: &str) -> Result<(), DbError>;
+    async fn get_project_environment(
+        &self,
+        id: &str,
+    ) -> Result<Option<ProjectEnvironment>, DbError>;
+
+    // Cleanup schedule
+    async fn get_cleanup_schedule(&self) -> Result<Option<CleanupSchedule>, DbError>;
+    async fn upsert_cleanup_schedule(
+        &self,
+        schedule: &CleanupSchedule,
+    ) -> Result<CleanupSchedule, DbError>;
 
     // Team-scoped queries
     async fn list_apps_by_team(&self, team_id: &str) -> Result<Vec<App>, DbError>;

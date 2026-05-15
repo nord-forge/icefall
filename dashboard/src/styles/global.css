@@ -137,6 +137,61 @@ h2 {
   }
 }
 
+/* Layout shell — loaded early to prevent FOUC */
+.ice-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.ice-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 220px;
+  height: 100vh;
+  z-index: 100;
+  transform: translateX(-100%);
+}
+
+.ice-sidebar._sidebarOpen {
+  transform: translateX(0);
+}
+
+#sidebar-backdrop._backdropVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ice-main {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+}
+
+@media (min-width: 641px) {
+  .ice-sidebar {
+    transform: translateX(0);
+  }
+
+  .ice-main {
+    padding: 24px;
+    margin-left: 220px;
+  }
+}
+
+/* View Transitions */
+::view-transition-old(root) {
+  animation-duration: 0.15s;
+}
+
+::view-transition-new(root) {
+  animation-duration: 0.15s;
+}
+
+[data-astro-transition-fallback="animate"] {
+  animation: none !important;
+}
+
 /* Inline links in hint/description/empty-state text */
 .ice-main p a,
 .ice-main dd a {

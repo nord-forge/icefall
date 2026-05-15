@@ -21,17 +21,21 @@ async fn list_sources(
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({ "data": [] })))
+
+    let installations = state.db.list_github_installations().await?;
+    Ok(Json(serde_json::json!({ "data": installations })))
 }
 
 async fn delete_source(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_id): Path<String>,
+    Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    state.db.delete_github_installation(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }
 
@@ -43,5 +47,12 @@ async fn list_repos(
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({ "data": [] })))
+
+    // TODO: Call the GitHub API with the installation token to list repos.
+    // This requires a GitHub API client that exchanges the installation ID
+    // for an access token and queries the /installation/repositories endpoint.
+    Ok(Json(serde_json::json!({
+        "data": [],
+        "note": "GitHub API integration pending"
+    })))
 }
