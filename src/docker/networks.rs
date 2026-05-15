@@ -1,10 +1,35 @@
 use bollard::models::{
     EndpointSettings, NetworkConnectRequest, NetworkCreateRequest, NetworkDisconnectRequest,
 };
+use bollard::query_parameters::ListNetworksOptionsBuilder;
 
 use crate::docker::{DockerClient, DockerError};
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NetworkInfo {
+    pub id: String,
+    pub name: String,
+    pub driver: String,
+}
+
 impl DockerClient {
+    pub async fn list_networks(&self) -> Result<Vec<NetworkInfo>, DockerError> {
+        let networks = self
+            .inner()
+            .list_networks(Some(ListNetworksOptions::<&str> {
+                ..Default::default()
+            }))
+            .await?;
+        Ok(networks
+            .into_iter()
+            .map(|n| NetworkInfo {
+                id: n.id.unwrap_or_default(),
+                name: n.name.unwrap_or_default(),
+                driver: n.driver.unwrap_or_default(),
+            })
+            .collect())
+    }
+
     pub async fn create_network(&self, name: &str) -> Result<String, DockerError> {
         let config = NetworkCreateRequest {
             name: name.to_string(),

@@ -21,9 +21,14 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     if (cached !== null) return cached;
   }
 
+  const headers: Record<string, string> = {};
+  if (options?.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   });
   if (!res.ok) {
@@ -147,6 +152,9 @@ export const api = {
     ),
 
   listDatabases: () => request<{ data: any[] }>('/databases'),
+
+  createDatabase: (body: { name: string; db_type: string; app_id?: string; memory_mb?: number; expose_port?: boolean }) =>
+    request<{ data: any }>('/databases', { method: 'POST', body: JSON.stringify(body) }),
 
   linkDatabase: (dbId: string, appId: string) =>
     request<{ message: string }>(`/databases/${dbId}/link/${appId}`, { method: 'POST' }),
@@ -622,6 +630,13 @@ export const api = {
     request<{ data: { success: boolean; message: string } }>(`/log-drains/${drainId}/test`, {
       method: 'POST',
     }),
+
+  // GitHub Apps
+  getGitHubSetup: () =>
+    request<{ manifest: Record<string, unknown>; form_action: string }>('/github/setup'),
+
+  listGitHubApps: () =>
+    request<{ data: Array<{ id: string; name: string; app_id: number; html_url: string; created_at: string }> }>('/github/apps'),
 
   // Git sources
   listGitSources: () =>

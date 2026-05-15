@@ -3,9 +3,11 @@ import type { LogDrain } from '@lib/types';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import Toggle from '@islands/shared/Toggle/Toggle';
 import { Plus, Trash2, Database, BarChart, Globe, Zap } from 'lucide-preact';
 import Input from '@islands/shared/Input/Input';
+import Select from '@islands/shared/Select/Select';
 import Textarea from '@islands/shared/Textarea/Textarea';
 import formStyles from '@styles/form.module.css';
 import styles from './log-drains.module.css';
@@ -51,6 +53,7 @@ export default function LogDrains({ appId }: Props) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api.listLogDrains(appId)
@@ -233,15 +236,15 @@ export default function LogDrains({ appId }: Props) {
               />
               <div>
                 <label htmlFor="drain-http-method" class={formStyles.label}>Method</label>
-                <select
+                <Select
                   id="drain-http-method"
-                  class={formStyles.select}
                   value={newConfig.method || 'POST'}
-                  onChange={(e) => updateConfig('method', (e.target as HTMLSelectElement).value)}
-                >
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                </select>
+                  onChange={(v) => updateConfig('method', v)}
+                  options={[
+                    { value: 'POST', label: 'POST' },
+                    { value: 'PUT', label: 'PUT' },
+                  ]}
+                />
               </div>
             </div>
             <Textarea
@@ -256,15 +259,15 @@ export default function LogDrains({ appId }: Props) {
             />
             <div>
               <label htmlFor="drain-http-format" class={formStyles.label}>Format</label>
-              <select
+              <Select
                 id="drain-http-format"
-                class={formStyles.select}
                 value={newConfig.format || 'json'}
-                onChange={(e) => updateConfig('format', (e.target as HTMLSelectElement).value)}
-              >
-                <option value="json">JSON</option>
-                <option value="text">Plain text</option>
-              </select>
+                onChange={(v) => updateConfig('format', v)}
+                options={[
+                  { value: 'json', label: 'JSON' },
+                  { value: 'text', label: 'Plain text' },
+                ]}
+              />
             </div>
           </>
         );
@@ -369,25 +372,14 @@ export default function LogDrains({ appId }: Props) {
                 >
                   Test
                 </Button>
-                {confirmDeleteId === drain.id ? (
-                  <>
-                    <Button variant="danger" size="sm" onClick={() => handleDelete(drain.id)}>
-                      Confirm
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    class={styles.iconButton}
-                    onClick={() => setConfirmDeleteId(drain.id)}
-                    aria-label={`Delete ${drain.name} drain`}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  class={styles.iconButton}
+                  onClick={() => setConfirmDeleteId(drain.id)}
+                  aria-label={`Delete ${drain.name} drain`}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
               </div>
             </div>
           ))}
@@ -396,6 +388,26 @@ export default function LogDrains({ appId }: Props) {
 
       {/* a11y [WCAG 4.1.3]: announce changes to AT */}
       <div role="status" aria-live="polite" class="sr-only" />
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete log drain?"
+        description={`This will permanently remove "${drains.find((d) => d.id === confirmDeleteId)?.name ?? 'this drain'}" and stop forwarding logs to it. This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setDeleting(true);
+          try {
+            await handleDelete(confirmDeleteId);
+          } finally {
+            setDeleting(false);
+            setConfirmDeleteId(null);
+          }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

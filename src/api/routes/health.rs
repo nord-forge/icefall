@@ -1,15 +1,19 @@
 use axum::extract::{Path, Query, State};
-use axum::routing::get;
+use axum::http::HeaderMap;
+use axum::routing::{delete, get};
 use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
 use crate::db::models::NewHealthCheck;
 use crate::monitoring::health_runner::calculate_uptime;
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/apps/{id}/health", get(get_health).put(update_health))
+    Router::new()
+        .route("/apps/{id}/health", get(get_health).put(update_health))
+        .route("/health-checks/{id}", delete(delete_health_check))
 }
 
 #[derive(Deserialize)]
@@ -85,8 +89,38 @@ async fn update_health(
             .await?;
         Ok(Json(serde_json::json!({ "data": check })))
     } else {
-        Ok(Json(
-            serde_json::json!({ "data": checks[0], "note": "update existing health checks not yet supported — delete and recreate" }),
-        ))
+        // Update existing health check
+        let check = &checks[0];
+        state
+            .db
+            .update_health_check(
+                &check.id,
+                body.interval_secs,
+                body.failure_threshold,
+                body.auto_restart,
+                body.config.as_deref(),
+            )
+            .await?;
+
+        // Re-fetch updated checks to return current state
+        let updated_checks = state.db.get_health_checks(&id).await?;
+        let updated = updated_checks
+            .first()
+            .ok_or_else(|| ApiError::NotFound("health check not found after update".into()))?;
+
+        Ok(Json(serde_json::json!({ "data": updated })))
     }
+}
+
+async fn delete_health_check(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    state.db.delete_health_check(&id).await?;
+    Ok(Json(serde_json::json!({ "message": "deleted" })))
 }

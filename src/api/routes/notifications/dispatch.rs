@@ -13,10 +13,7 @@ pub async fn dispatch_notification(
     match channel_type {
         "webhook" => dispatch_webhook(config, event, summary, details).await,
         "smtp" => dispatch_smtp(config, event, summary, details).await,
-        "plunk" => {
-            tracing::info!("Plunk notification: [{event}] {summary}");
-            Ok(())
-        }
+        "plunk" => dispatch_plunk(config, event, summary, details).await,
         "slack" => dispatch_slack(config, event, summary, details).await,
         "discord" => dispatch_discord(config, event, summary, details).await,
         _ => Err(format!("unknown channel type: {channel_type}")),
@@ -160,6 +157,60 @@ async fn dispatch_discord(
     } else {
         Err(format!("discord webhook returned {}", resp.status()))
     }
+}
+
+async fn dispatch_plunk(
+    config: &str,
+    event: &str,
+    summary: &str,
+    details: &serde_json::Value,
+) -> Result<(), String> {
+    let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
+    let api_key = parsed
+        .get("api_key")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let to_email = parsed
+        .get("to_email")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+
+    if api_key.is_empty() || to_email.is_empty() {
+        return Err("Plunk: missing api_key or to_email".to_string());
+    }
+
+    let app_name = details
+        .get("app_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    let body = serde_json::json!({
+        "to": to_email,
+        "subject": format!("[Icefall] {event}: {summary}"),
+        "body": format!(
+            "Event: {event}\nSummary: {summary}\nApp: {app_name}\n\nDetails:\n{details_pretty}\n\nTimestamp: {ts}",
+            details_pretty = serde_json::to_string_pretty(details).unwrap_or_default(),
+            ts = crate::db::models::now_iso8601(),
+        ),
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.useplunk.com/v1/send")
+        .bearer_auth(api_key)
+        .json(&body)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("Plunk API error: {e}"))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Plunk returned error: {text}"));
+    }
+
+    tracing::info!("Plunk notification sent: [{event}] {summary}");
+    Ok(())
 }
 
 fn event_color_hex(event: &str) -> &'static str {

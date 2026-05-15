@@ -319,6 +319,15 @@ pub trait Database: Send + Sync + 'static {
     // Health Checks
     async fn create_health_check(&self, hc: &NewHealthCheck) -> Result<HealthCheck, DbError>;
     async fn get_health_checks(&self, app_id: &str) -> Result<Vec<HealthCheck>, DbError>;
+    async fn update_health_check(
+        &self,
+        id: &str,
+        interval_secs: Option<i64>,
+        failure_threshold: Option<i64>,
+        auto_restart: Option<bool>,
+        config: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn delete_health_check(&self, id: &str) -> Result<(), DbError>;
     async fn record_health_event(&self, event: &NewHealthCheckEvent) -> Result<(), DbError>;
     async fn get_health_events(
         &self,
@@ -600,6 +609,33 @@ pub trait Database: Send + Sync + 'static {
         &self,
         schedule: &CleanupSchedule,
     ) -> Result<CleanupSchedule, DbError>;
+
+    // Cleanup runs
+    async fn create_cleanup_run(&self) -> Result<CleanupRun, DbError>;
+    async fn finish_cleanup_run(
+        &self,
+        id: &str,
+        status: &str,
+        freed_bytes: i64,
+        removed_items: i64,
+        error: Option<&str>,
+        details: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_cleanup_runs(&self, limit: i64) -> Result<Vec<CleanupRun>, DbError>;
+
+    // Shared variables
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError>;
+    async fn set_shared_variable(&self, var: &NewSharedVariable)
+        -> Result<SharedVariable, DbError>;
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError>;
+    async fn get_shared_variables_for_app(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError>;
 
     // Team-scoped queries
     async fn list_apps_by_team(&self, team_id: &str) -> Result<Vec<App>, DbError>;

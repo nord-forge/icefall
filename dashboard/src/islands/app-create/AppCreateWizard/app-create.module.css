@@ -401,3 +401,103 @@
     animation: none;
   }
 }
+
+.categoryFilters {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.categoryChip {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.categoryChip:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.categoryChip:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.categoryChipActive {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.categoryChipActive:hover {
+  opacity: 0.9;
+}
+
+.serviceTags {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+.githubNotice {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: oklch(0.95 0.04 85);
+  border: 1px solid oklch(0.85 0.08 85);
+  border-radius: var(--radius-md);
+}
+
+:global([data-theme="dark"]) .githubNotice {
+  background: oklch(0.22 0.03 85);
+  border-color: oklch(0.35 0.06 85);
+}
+
+.githubNoticeIcon {
+  color: oklch(0.55 0.15 85);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.githubNoticeTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+}
+
+.githubNoticeText {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+  margin-bottom: var(--space-3);
+}
+
+.githubReady {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: oklch(0.95 0.03 145);
+  border: 1px solid oklch(0.85 0.06 145);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: oklch(0.35 0.1 145);
+}
+
+:global([data-theme="dark"]) .githubReady {
+  background: oklch(0.22 0.03 145);
+  border-color: oklch(0.35 0.06 145);
+  color: oklch(0.7 0.1 145);
+}

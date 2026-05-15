@@ -135,10 +135,13 @@ async fn run_cleanup(
         updated_at: String::new(),
     });
 
+    // Record cleanup run start
+    let run = state.db.create_cleanup_run().await?;
+
     let mut images_removed: u64 = 0;
     let mut containers_removed: u64 = 0;
     let mut volumes_removed: u64 = 0;
-    let networks_removed: u64 = 0;
+    let mut networks_removed: u64 = 0;
     let mut errors: Vec<String> = Vec::new();
 
     // Clean dangling images
@@ -203,22 +206,63 @@ async fn run_cleanup(
     }
 
     // Clean unused networks
-    // Note: The Docker client does not have a list_networks method yet,
-    // so we cannot enumerate networks for removal. This will be implemented
-    // once list_networks is added to the DockerClient.
     if config.cleanup_unused_networks {
-        errors.push(
-            "Network cleanup not yet implemented: DockerClient.list_networks() pending".to_string(),
-        );
+        match state.docker.list_networks().await {
+            Ok(networks) => {
+                // Skip built-in Docker networks that should never be removed
+                let protected = ["bridge", "host", "none"];
+                for network in &networks {
+                    if protected.contains(&network.name.as_str()) {
+                        continue;
+                    }
+                    if let Err(e) = state.docker.remove_network(&network.name).await {
+                        // Network in use will fail, which is expected
+                        errors.push(format!("Failed to remove network {}: {e}", network.name));
+                    } else {
+                        networks_removed += 1;
+                    }
+                }
+            }
+            Err(e) => errors.push(format!("Failed to list networks: {e}")),
+        }
     }
 
     let status = if errors.is_empty() {
         "completed"
-    } else if images_removed > 0 || containers_removed > 0 || volumes_removed > 0 {
+    } else if images_removed > 0
+        || containers_removed > 0
+        || volumes_removed > 0
+        || networks_removed > 0
+    {
         "completed_with_errors"
     } else {
         "failed"
     };
+
+    let total_removed = images_removed + containers_removed + volumes_removed + networks_removed;
+    let error_text = if errors.is_empty() {
+        None
+    } else {
+        Some(errors.join("; "))
+    };
+    let details_json = serde_json::json!({
+        "images_removed": images_removed,
+        "containers_removed": containers_removed,
+        "volumes_removed": volumes_removed,
+        "networks_removed": networks_removed,
+    });
+
+    let _ = state
+        .db
+        .finish_cleanup_run(
+            &run.id,
+            status,
+            0, // freed_bytes not tracked at this level
+            total_removed as i64,
+            error_text.as_deref(),
+            Some(&details_json.to_string()),
+        )
+        .await;
 
     Ok(Json(serde_json::json!({
         "data": {
@@ -240,10 +284,6 @@ async fn list_history(
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
 
-    // Cleanup history table does not exist yet. This will be populated
-    // once a cleanup_history migration is added to track run results.
-    Ok(Json(serde_json::json!({
-        "data": [],
-        "note": "Cleanup history tracking not yet implemented"
-    })))
+    let runs = state.db.list_cleanup_runs(10).await?;
+    Ok(Json(serde_json::json!({ "data": runs })))
 }

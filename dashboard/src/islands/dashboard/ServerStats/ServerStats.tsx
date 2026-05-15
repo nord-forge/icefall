@@ -6,6 +6,7 @@ import { api } from '@lib/api';
 import { createSSEClient } from '@lib/sse';
 import type { Server, ServerMetricsSnapshot, ServerResources } from '@lib/types';
 import { formatBytes, formatPercent } from '@lib/format';
+import { createVisibleInterval } from '@lib/visibility';
 import ProgressBar from '@islands/shared/ProgressBar/ProgressBar';
 import Sparkline from '@islands/shared/Sparkline/Sparkline';
 import ServerHealthStrip from '@islands/dashboard/ServerHealthStrip/ServerHealthStrip';
@@ -77,7 +78,7 @@ export default function ServerStats() {
     }
 
     fetchAll();
-    const interval = setInterval(fetchAll, 5_000);
+    const stopPolling = createVisibleInterval(fetchAll, 5_000);
 
     const sse = createSSEClient('/api/v1/events', {
       'server.connected': (data: any) => {
@@ -98,7 +99,7 @@ export default function ServerStats() {
 
     return () => {
       active = false;
-      clearInterval(interval);
+      stopPolling();
       sse.close();
     };
   }, []);

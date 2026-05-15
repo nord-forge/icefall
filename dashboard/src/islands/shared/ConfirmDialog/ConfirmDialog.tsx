@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import Button from '@islands/shared/Button/Button';
 import styles from './confirm-dialog.module.css';
 
@@ -43,13 +44,16 @@ export default function ConfirmDialog({
     }
   }, [open]);
 
-  // Lock body scroll when open
+  // Prevent scroll without removing scrollbar (avoids content shift)
   useEffect(() => {
     if (open) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
     }
     return () => {
       document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     };
   }, [open]);
 
@@ -99,7 +103,7 @@ export default function ConfirmDialog({
   const titleId = 'confirm-dialog-title';
   const descId = 'confirm-dialog-desc';
 
-  return (
+  return createPortal(
     <div class={styles.backdrop} onClick={onCancel}>
       {/* a11y [WCAG 4.1.2]: alertdialog role with aria-modal and labelling */}
       <div
@@ -137,6 +141,7 @@ export default function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

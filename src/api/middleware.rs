@@ -21,6 +21,8 @@ const PUBLIC_PATHS: &[&str] = &[
     "/api/v1/health",
     "/api/v1/servers/setup",
     "/api/v1/settings/oauth/providers",
+    "/api/v1/github/events",
+    "/api/v1/github/callback",
 ];
 
 const PUBLIC_PREFIXES: &[&str] = &[

@@ -3,6 +3,7 @@ import type { ProjectEnvironment } from '@lib/types';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import { Plus, Trash2 } from 'lucide-preact';
 import Input from '@islands/shared/Input/Input';
 import formStyles from '@styles/form.module.css';
@@ -21,6 +22,7 @@ export default function EnvironmentTabs({ projectId, onFilterChange }: Props) {
   const [newColor, setNewColor] = useState('#3b82f6');
   const [adding, setAdding] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api.listProjectEnvironments(projectId)
@@ -100,33 +102,14 @@ export default function EnvironmentTabs({ projectId, onFilterChange }: Props) {
               {env.name}
             </button>
 
-            {confirmDeleteId === env.id ? (
-              <>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDelete(env.id)}
-                >
-                  Confirm
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setConfirmDeleteId(null)}
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <button
-                type="button"
-                class={styles.deleteButton}
-                onClick={() => setConfirmDeleteId(env.id)}
-                aria-label={`Delete ${env.name} environment`}
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
-            )}
+            <button
+              type="button"
+              class={styles.deleteButton}
+              onClick={() => setConfirmDeleteId(env.id)}
+              aria-label={`Delete ${env.name} environment`}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
           </div>
         ))}
 
@@ -188,6 +171,26 @@ export default function EnvironmentTabs({ projectId, onFilterChange }: Props) {
           ? `Showing apps in ${environments.find((e) => e.id === activeId)?.name} environment`
           : 'Showing all apps'}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete environment?"
+        description={`This will permanently remove the "${environments.find((e) => e.id === confirmDeleteId)?.name ?? 'this environment'}" environment. Apps assigned to it will become unassigned. This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setDeleting(true);
+          try {
+            await handleDelete(confirmDeleteId);
+          } finally {
+            setDeleting(false);
+            setConfirmDeleteId(null);
+          }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

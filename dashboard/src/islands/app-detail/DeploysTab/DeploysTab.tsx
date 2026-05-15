@@ -5,6 +5,7 @@ import type { App, Deploy } from '@lib/types';
 import { formatRelativeTime, formatDuration, shortSha } from '@lib/format';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import Button from '@islands/shared/Button/Button';
+import { createSSEClient } from '@lib/sse';
 import { RotateCcw, X } from 'lucide-preact';
 import ApprovalBadge from './components/ApprovalBadge';
 import CanaryResultsSection from './components/CanaryResultsSection';
@@ -56,6 +57,17 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
 
   useEffect(() => {
     api.listDeploys(appId).then(({ data }) => { setDeploys(data); setLoading(false); }).catch(() => setLoading(false));
+
+    const sse = createSSEClient('/api/v1/events', {
+      'deploy.status': () => {
+        api.listDeploys(appId).then(({ data }) => setDeploys(data)).catch(() => {});
+      },
+      'deploy.created': () => {
+        api.listDeploys(appId).then(({ data }) => setDeploys(data)).catch(() => {});
+      },
+    });
+
+    return () => sse.close();
   }, [appId]);
 
   if (loading) return <p class={styles.message}>Loading deploys...</p>;

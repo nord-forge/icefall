@@ -50,6 +50,75 @@ pub(super) async fn get_health_checks(
     Ok(checks)
 }
 
+pub(super) async fn update_health_check(
+    pool: &SqlitePool,
+    id: &str,
+    interval_secs: Option<i64>,
+    failure_threshold: Option<i64>,
+    auto_restart: Option<bool>,
+    config: Option<&str>,
+) -> Result<(), DbError> {
+    // Build dynamic SET clauses for only the provided fields
+    let mut sets = Vec::new();
+    if interval_secs.is_some() {
+        sets.push("interval_secs = ?");
+    }
+    if failure_threshold.is_some() {
+        sets.push("failure_threshold = ?");
+    }
+    if auto_restart.is_some() {
+        sets.push("auto_restart = ?");
+    }
+    if config.is_some() {
+        sets.push("config = ?");
+    }
+
+    if sets.is_empty() {
+        return Ok(());
+    }
+
+    let sql = format!("UPDATE health_checks SET {} WHERE id = ?", sets.join(", "));
+
+    let mut query = sqlx::query(&sql);
+    if let Some(v) = interval_secs {
+        query = query.bind(v);
+    }
+    if let Some(v) = failure_threshold {
+        query = query.bind(v);
+    }
+    if let Some(v) = auto_restart {
+        query = query.bind(v);
+    }
+    if let Some(v) = config {
+        query = query.bind(v);
+    }
+    query = query.bind(id);
+
+    let result = query.execute(pool).await?;
+    if result.rows_affected() == 0 {
+        return Err(DbError::NotFound(format!("health check {id}")));
+    }
+    Ok(())
+}
+
+pub(super) async fn delete_health_check(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
+    // Delete related events first
+    sqlx::query("DELETE FROM health_check_events WHERE health_check_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    let result = sqlx::query("DELETE FROM health_checks WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(DbError::NotFound(format!("health check {id}")));
+    }
+    Ok(())
+}
+
 pub(super) async fn record_health_event(
     pool: &SqlitePool,
     event: &NewHealthCheckEvent,

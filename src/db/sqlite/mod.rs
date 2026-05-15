@@ -3,6 +3,7 @@ mod apps;
 mod audit;
 mod backups;
 mod canary;
+mod cleanup_runs;
 mod cleanup_schedule;
 mod config_history;
 mod databases;
@@ -28,6 +29,7 @@ mod registries;
 mod search;
 mod servers;
 mod sessions;
+mod shared_variables;
 mod ssh_keys;
 mod team_isolation_tests;
 mod team_scoping;
@@ -698,6 +700,29 @@ impl Database for SqliteDatabase {
         health::get_health_checks(&self.pool, app_id).await
     }
 
+    async fn update_health_check(
+        &self,
+        id: &str,
+        interval_secs: Option<i64>,
+        failure_threshold: Option<i64>,
+        auto_restart: Option<bool>,
+        config: Option<&str>,
+    ) -> Result<(), DbError> {
+        health::update_health_check(
+            &self.pool,
+            id,
+            interval_secs,
+            failure_threshold,
+            auto_restart,
+            config,
+        )
+        .await
+    }
+
+    async fn delete_health_check(&self, id: &str) -> Result<(), DbError> {
+        health::delete_health_check(&self.pool, id).await
+    }
+
     async fn record_health_event(&self, event: &NewHealthCheckEvent) -> Result<(), DbError> {
         health::record_health_event(&self.pool, event).await
     }
@@ -1319,6 +1344,65 @@ impl Database for SqliteDatabase {
         schedule: &CleanupSchedule,
     ) -> Result<CleanupSchedule, DbError> {
         cleanup_schedule::upsert_cleanup_schedule(&self.pool, schedule).await
+    }
+
+    // --- Cleanup Runs ---
+
+    async fn create_cleanup_run(&self) -> Result<CleanupRun, DbError> {
+        cleanup_runs::create_cleanup_run(&self.pool).await
+    }
+
+    async fn finish_cleanup_run(
+        &self,
+        id: &str,
+        status: &str,
+        freed_bytes: i64,
+        removed_items: i64,
+        error: Option<&str>,
+        details: Option<&str>,
+    ) -> Result<(), DbError> {
+        cleanup_runs::finish_cleanup_run(
+            &self.pool,
+            id,
+            status,
+            freed_bytes,
+            removed_items,
+            error,
+            details,
+        )
+        .await
+    }
+
+    async fn list_cleanup_runs(&self, limit: i64) -> Result<Vec<CleanupRun>, DbError> {
+        cleanup_runs::list_cleanup_runs(&self.pool, limit).await
+    }
+
+    // --- Shared Variables ---
+
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::list_shared_variables(&self.pool, &self.encryptor, scope, scope_id).await
+    }
+
+    async fn set_shared_variable(
+        &self,
+        var: &NewSharedVariable,
+    ) -> Result<SharedVariable, DbError> {
+        shared_variables::set_shared_variable(&self.pool, &self.encryptor, var).await
+    }
+
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError> {
+        shared_variables::delete_shared_variable(&self.pool, id).await
+    }
+
+    async fn get_shared_variables_for_app(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::get_shared_variables_for_app(&self.pool, &self.encryptor, app_id).await
     }
 
     // --- Team-scoped queries ---

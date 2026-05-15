@@ -6,6 +6,8 @@ use axum::{Json, Router};
 use crate::api::error::ApiError;
 use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
+use crate::github::auth::generate_jwt;
+use crate::github::client::GitHubClient;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -42,17 +44,59 @@ async fn delete_source(
 async fn list_repos(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_id): Path<String>,
+    Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
 
-    // TODO: Call the GitHub API with the installation token to list repos.
-    // This requires a GitHub API client that exchanges the installation ID
-    // for an access token and queries the /installation/repositories endpoint.
-    Ok(Json(serde_json::json!({
-        "data": [],
-        "note": "GitHub API integration pending"
-    })))
+    // Find the installation
+    let installations = state.db.list_github_installations().await?;
+    let installation = installations
+        .iter()
+        .find(|i| i.id == id)
+        .ok_or_else(|| ApiError::NotFound(format!("Installation {id} not found")))?;
+
+    // Find the GitHub App linked to this installation
+    let github_app = state
+        .db
+        .get_github_app_for_installation(installation.installation_id)
+        .await?
+        .ok_or_else(|| {
+            ApiError::BadRequest(
+                "No GitHub App linked to this installation. Please reconnect via Settings.".into(),
+            )
+        })?;
+
+    // Generate JWT and get installation token
+    let jwt = generate_jwt(github_app.app_id, &github_app.private_key).map_err(|e| {
+        tracing::error!(
+            "Failed to generate JWT for GitHub App {}: {e}",
+            github_app.app_id
+        );
+        ApiError::Internal(Box::new(std::io::Error::other(e)))
+    })?;
+
+    let client = GitHubClient::new(&github_app.api_url);
+
+    let token = client
+        .get_installation_token(&jwt, installation.installation_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                "Failed to get installation token for installation {}: {e}",
+                installation.installation_id
+            );
+            ApiError::Internal(Box::new(std::io::Error::other(e)))
+        })?;
+
+    let repos = client
+        .list_installation_repos(&token.token)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to list repos: {e}");
+            ApiError::Internal(Box::new(std::io::Error::other(e)))
+        })?;
+
+    Ok(Json(serde_json::json!({ "data": repos })))
 }

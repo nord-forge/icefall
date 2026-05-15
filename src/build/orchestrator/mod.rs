@@ -60,12 +60,15 @@ impl BuildOrchestrator {
             .as_deref()
             .ok_or_else(|| BuildError::GitClone("app has no git_repo configured".to_string()))?;
 
+        // Try to obtain a GitHub installation access token for cloning private repos
+        let github_token = self.resolve_github_token(git_repo).await;
+
         let clone_opts = GitCloneOptions {
             repo_url: git_repo.to_string(),
             branch: Some(app.git_branch.clone()),
             sha: None,
             ssh_key_path: None,
-            token: None,
+            token: github_token,
             submodules: app.git_submodules_enabled,
             lfs: app.git_lfs_enabled,
             shallow: app.git_shallow_clone,
@@ -377,6 +380,65 @@ impl BuildOrchestrator {
             .db
             .update_deploy_status(deploy_id, "failed", Some(&log))
             .await;
+    }
+
+    /// Attempt to resolve a GitHub installation access token for the given repo URL.
+    ///
+    /// Searches all GitHub installations, finds one whose app matches,
+    /// generates a JWT, and exchanges it for an installation token.
+    /// Returns None if no matching installation is found or if token generation fails.
+    async fn resolve_github_token(&self, repo_url: &str) -> Option<String> {
+        // Only attempt for GitHub-hosted repos
+        if !repo_url.contains("github.com") {
+            return None;
+        }
+
+        let installations = self.db.list_github_installations().await.ok()?;
+
+        for installation in &installations {
+            // Try to find a GitHub App linked to this installation
+            let app = match self
+                .db
+                .get_github_app_for_installation(installation.installation_id)
+                .await
+            {
+                Ok(Some(app)) => app,
+                _ => continue,
+            };
+
+            // Generate JWT and get installation token
+            let jwt = match crate::github::auth::generate_jwt(app.app_id, &app.private_key) {
+                Ok(jwt) => jwt,
+                Err(e) => {
+                    tracing::warn!("Failed to generate JWT for GitHub App {}: {e}", app.app_id);
+                    continue;
+                }
+            };
+
+            let client = crate::github::client::GitHubClient::new(&app.api_url);
+            match client
+                .get_installation_token(&jwt, installation.installation_id)
+                .await
+            {
+                Ok(token) => {
+                    tracing::info!(
+                        installation_id = installation.installation_id,
+                        app_name = %app.name,
+                        "Using GitHub App installation token for git clone"
+                    );
+                    return Some(token.token);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get installation token for installation {}: {e}",
+                        installation.installation_id
+                    );
+                    continue;
+                }
+            }
+        }
+
+        None
     }
 
     async fn collect_secrets(&self, deploy_id: &str) -> Vec<String> {

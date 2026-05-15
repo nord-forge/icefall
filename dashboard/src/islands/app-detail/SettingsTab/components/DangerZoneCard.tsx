@@ -1,9 +1,11 @@
+import { useState } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import { AlertTriangle, Square, Play, RotateCw, Trash2 } from 'lucide-preact';
 import styles from '../settings-tab.module.css';
 
 type Props = {
-  confirmDelete: boolean;
+  appName: string;
   deleting: boolean;
   stopping: boolean;
   starting: boolean;
@@ -12,11 +14,10 @@ type Props = {
   onRestart: () => void;
   onStop: () => void;
   onDelete: () => void;
-  onConfirmDeleteToggle: (v: boolean) => void;
 };
 
 export default function DangerZoneCard({
-  confirmDelete,
+  appName,
   deleting,
   stopping,
   starting,
@@ -25,8 +26,9 @@ export default function DangerZoneCard({
   onRestart,
   onStop,
   onDelete,
-  onConfirmDeleteToggle,
 }: Props) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   return (
     <div class={styles.dangerCard}>
       <h2 class={styles.dangerTitle}>
@@ -56,19 +58,23 @@ export default function DangerZoneCard({
           <p class={styles.dangerLabel}>Delete Application</p>
           <p class={styles.dangerDescription}>Deleting this app will remove all deploys, domains, and environment variables. This action cannot be undone.</p>
         </div>
-        {confirmDelete ? (
-          <div class={styles.confirmActions}>
-            <Button variant="ghost" onClick={() => onConfirmDeleteToggle(false)}>Cancel</Button>
-            <Button variant="danger" onClick={onDelete} loading={deleting}>
-              <Trash2 size={14} /> Confirm Delete
-            </Button>
-          </div>
-        ) : (
-          <Button variant="danger" onClick={() => onConfirmDeleteToggle(true)}>
-            <Trash2 size={14} /> Delete App
-          </Button>
-        )}
+        <Button variant="danger" onClick={() => setConfirmOpen(true)}>
+          <Trash2 size={14} /> Delete App
+        </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete application?"
+        description={`This will permanently delete "${appName}" including all deploys, domains, and environment variables. This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={() => {
+          onDelete();
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

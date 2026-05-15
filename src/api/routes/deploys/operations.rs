@@ -116,6 +116,10 @@ pub(super) async fn create_deploy(
                 .await
             {
                 tracing::error!("Image deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
             }
         });
     } else if app.deploy_mode == "native" {
@@ -145,6 +149,10 @@ pub(super) async fn create_deploy(
                 .await
             {
                 tracing::error!("Native deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
             }
         });
     } else {
@@ -162,7 +170,15 @@ pub(super) async fn create_deploy(
             if is_auto_mode {
                 let work_dir = state.config.data_dir.join("builds").join(&deploy_id);
                 let Some(git_repo) = app_clone.git_repo.as_deref() else {
-                    tracing::error!("Auto-mode deploy failed: no git_repo");
+                    tracing::error!("Auto-mode deploy failed: no git_repo for {deploy_id}");
+                    let _ = state
+                        .db
+                        .update_deploy_status(
+                            &deploy_id,
+                            "failed",
+                            Some("No git repository configured"),
+                        )
+                        .await;
                     return;
                 };
 
@@ -205,6 +221,15 @@ pub(super) async fn create_deploy(
                     );
 
                     let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                        tracing::error!("Failed to re-fetch deploy {deploy_id} for native deploy");
+                        let _ = state
+                            .db
+                            .update_deploy_status(
+                                &deploy_id,
+                                "failed",
+                                Some("Internal error: deploy record not found"),
+                            )
+                            .await;
                         return;
                     };
 
@@ -218,6 +243,10 @@ pub(super) async fn create_deploy(
                         .await
                     {
                         tracing::error!("Native deploy failed for {deploy_id}: {e}");
+                        let _ = state
+                            .db
+                            .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                            .await;
                     }
                     return;
                 }
@@ -249,7 +278,15 @@ pub(super) async fn create_deploy(
                     };
 
                     let Some(git_repo) = app_clone.git_repo.as_deref() else {
-                        tracing::error!("Remote deploy failed: no git_repo");
+                        tracing::error!("Remote deploy failed: no git_repo for {deploy_id}");
+                        let _ = state
+                            .db
+                            .update_deploy_status(
+                                &deploy_id,
+                                "failed",
+                                Some("No git repository configured"),
+                            )
+                            .await;
                         return;
                     };
 
@@ -301,6 +338,10 @@ pub(super) async fn create_deploy(
                         Ok(result) => result.image_ref,
                         Err(e) => {
                             tracing::error!("Build failed for deploy {deploy_id}: {e}");
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
                             return;
                         }
                     }
@@ -308,6 +349,15 @@ pub(super) async fn create_deploy(
             };
 
             let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                tracing::error!("Failed to re-fetch deploy {deploy_id} after build");
+                let _ = state
+                    .db
+                    .update_deploy_status(
+                        &deploy_id,
+                        "failed",
+                        Some("Internal error: deploy record not found after build"),
+                    )
+                    .await;
                 return;
             };
 
@@ -316,6 +366,10 @@ pub(super) async fn create_deploy(
                 .await
             {
                 tracing::error!("Deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
             }
         });
     }
@@ -391,6 +445,10 @@ pub(super) async fn rollback_deploy(
             .await
         {
             tracing::error!("Rollback deploy failed for {rollback_id}: {e}");
+            let _ = state
+                .db
+                .update_deploy_status(&rollback_id, "failed", Some(&e.to_string()))
+                .await;
         }
     });
 

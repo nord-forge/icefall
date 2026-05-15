@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'preact/hooks';
 import { api } from '@lib/api';
+import { createVisibleInterval } from '@lib/visibility';
 import { createSSEClient } from '@lib/sse';
 import type { App, Server, ServerResources, ServerMetricsSnapshot } from '@lib/types';
 import { formatBytes, formatPercent, formatRelativeTime } from '@lib/format';
@@ -113,7 +114,7 @@ export default function ServerDetail() {
       },
     });
 
-    const metricsInterval = setInterval(async () => {
+    const stopMetricsPolling = createVisibleInterval(async () => {
       try {
         const res = await api.getServer(serverId);
         if (active) setServer(res.data);
@@ -137,7 +138,7 @@ export default function ServerDetail() {
     return () => {
       active = false;
       sse.close();
-      clearInterval(metricsInterval);
+      stopMetricsPolling();
     };
   }, [serverId]);
 

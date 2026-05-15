@@ -42,7 +42,7 @@ export default function ExportBundleCard({ app }: Props) {
       <p class={styles.settingsDescription}>
         Download this app's configuration as a portable .icefall bundle. The
         bundle includes git settings, build config, environment variables, and
-        resource limits -- everything needed to recreate this app on another
+        resource limits. Everything needed to recreate this app on another
         instance.
       </p>
       <div class={styles.saveRow}>

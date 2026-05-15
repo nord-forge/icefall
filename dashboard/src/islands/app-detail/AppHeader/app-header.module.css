@@ -127,8 +127,8 @@
   outline-offset: 2px;
 }
 
-.deployGroup > button:first-child,
-.deployGroup > a:first-child > button {
+.deployGroup>button:first-child,
+.deployGroup>a:first-child>button {
   border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 

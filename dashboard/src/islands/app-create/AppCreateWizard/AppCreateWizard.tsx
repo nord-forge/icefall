@@ -5,7 +5,8 @@ import Button from '@islands/shared/Button/Button';
 import ServerSelectStep from '@islands/app-create/ServerSelectStep/ServerSelectStep';
 import { ArrowLeft, ArrowRight, Rocket } from 'lucide-preact';
 import SourceCards from './components/SourceCards';
-import OneClickServices, { ONE_CLICK_SERVICES } from './components/OneClickServices';
+import OneClickServices from './components/OneClickServices';
+import type { OneClickService } from './components/OneClickServices';
 import GitRepoStep from './components/GitRepoStep';
 import BuildSettingsStep from './components/BuildSettingsStep';
 import ImageStep from './components/ImageStep';
@@ -20,7 +21,6 @@ export default function AppCreateWizard() {
   const [step, setStep] = useState(0);
   const [deploySource, setDeploySource] = useState<DeploySource | null>(null);
   const [deploying, setDeploying] = useState(false);
-  const [serviceSearch, setServiceSearch] = useState('');
   const [deployingService, setDeployingService] = useState<string | null>(null);
   const [composeError, setComposeError] = useState('');
   const [servers, setServers] = useState<Server[]>([]);
@@ -39,6 +39,11 @@ export default function AppCreateWizard() {
     image_ref: '',
     compose_content: '',
   });
+
+  const projectId = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('project_id') || null;
+  }, []);
 
   useEffect(() => {
     api.listServers().then(({ data }) => {
@@ -166,6 +171,10 @@ export default function AppCreateWizard() {
 
       const { data: app } = await api.createApp(createBody);
 
+      if (projectId) {
+        await api.updateApp(app.id, { project_id: projectId } as any);
+      }
+
       if (form.envContent.trim()) {
         await api.importEnv(app.id, form.envContent, 'shared');
       }
@@ -191,15 +200,15 @@ export default function AppCreateWizard() {
     }
   }
 
-  async function handleOneClickDeploy(service: typeof ONE_CLICK_SERVICES[number]) {
+  async function handleOneClickDeploy(service: OneClickService) {
     setDeployingService(service.name);
     try {
       const name = service.name.toLowerCase().replace(/\s+/g, '-');
-      const createBody: Parameters<typeof api.createApp>[0] = {
-        name,
-        image_ref: service.image,
-        port: service.port,
-      };
+      const createBody: Parameters<typeof api.createApp>[0] = { name };
+
+      if (service.compose_content) {
+        createBody.compose_content = service.compose_content;
+      }
 
       const recommended = servers.find((s) => s.recommended && s.status === 'online');
       const firstOnline = servers.find((s) => s.status === 'online' && s.role !== 'control-plane') || servers.find((s) => s.status === 'online');
@@ -210,11 +219,18 @@ export default function AppCreateWizard() {
 
       const { data: app } = await api.createApp(createBody);
 
-      if (service.env) {
-        const envContent = Object.entries(service.env)
-          .map(([k, v]) => `${k}=${v}`)
-          .join('\n');
-        await api.importEnv(app.id, envContent, 'shared');
+      if (projectId) {
+        await api.updateApp(app.id, { project_id: projectId } as any);
+      }
+
+      if (service.default_env) {
+        try {
+          const envObj = JSON.parse(service.default_env);
+          const envContent = Object.entries(envObj)
+            .map(([k, v]) => `${k}=${v}`)
+            .join('\n');
+          if (envContent) await api.importEnv(app.id, envContent, 'shared');
+        } catch { /* invalid JSON, skip */ }
       }
 
       const { data: deploy } = await api.triggerDeploy(app.id);
@@ -223,14 +239,6 @@ export default function AppCreateWizard() {
       setDeployingService(null);
     }
   }
-
-  const filteredServices = serviceSearch.trim()
-    ? ONE_CLICK_SERVICES.filter((s) =>
-        s.name.toLowerCase().includes(serviceSearch.toLowerCase()) ||
-        s.description.toLowerCase().includes(serviceSearch.toLowerCase()) ||
-        s.category.includes(serviceSearch.toLowerCase())
-      )
-    : ONE_CLICK_SERVICES;
 
   // --- Determine which content to render for the current step ---
 
@@ -333,9 +341,6 @@ export default function AppCreateWizard() {
             <SourceCards onSelect={handleSourceSelect} />
           </div>
           <OneClickServices
-            serviceSearch={serviceSearch}
-            onSearchChange={setServiceSearch}
-            filteredServices={filteredServices}
             deployingService={deployingService}
             onDeploy={handleOneClickDeploy}
           />

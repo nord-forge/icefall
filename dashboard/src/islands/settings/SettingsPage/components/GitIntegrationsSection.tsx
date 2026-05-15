@@ -3,6 +3,7 @@ import type { GitHubInstallation } from '@lib/types';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import { GitBranch, Plus, Trash2 } from 'lucide-preact';
 import styles from '../settings-page.module.css';
 
@@ -14,6 +15,7 @@ export default function GitIntegrationsSection({ onSaveMessage }: Props) {
   const [installations, setInstallations] = useState<GitHubInstallation[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     api.listGitSources()
@@ -76,30 +78,39 @@ export default function GitIntegrationsSection({ onSaveMessage }: Props) {
                 </span>
               </div>
               <div class={styles.itemActions}>
-                {confirmDeleteId === inst.id ? (
-                  <>
-                    <Button variant="danger" size="sm" onClick={() => handleDisconnect(inst.id)}>
-                      Confirm
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    class={styles.iconButton}
-                    onClick={() => setConfirmDeleteId(inst.id)}
-                    aria-label={`Disconnect ${inst.account_name}`}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  class={styles.iconButton}
+                  onClick={() => setConfirmDeleteId(inst.id)}
+                  aria-label={`Disconnect ${inst.account_name}`}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Disconnect GitHub integration?"
+        description={`This will disconnect "${installations.find((i) => i.id === confirmDeleteId)?.account_name ?? 'this account'}" and revoke access to its repositories. Existing deploys will not be affected, but future deploys from this source will fail.`}
+        confirmLabel="Disconnect"
+        variant="danger"
+        loading={disconnecting}
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setDisconnecting(true);
+          try {
+            await handleDisconnect(confirmDeleteId);
+          } finally {
+            setDisconnecting(false);
+            setConfirmDeleteId(null);
+          }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

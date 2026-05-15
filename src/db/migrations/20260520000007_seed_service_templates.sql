@@ -1,7 +1,7 @@
 -- Seed the 50 bundled service templates (IF-148)
 -- Targets: solo developers and small teams (1-10 people)
 
-INSERT INTO service_templates (id, name, description, version, icon_url, categories, website, required_inputs, default_env, min_resources, compose_content, readme, created_at, updated_at)
+INSERT OR REPLACE INTO service_templates (id, name, description, version, icon_url, categories, website, required_inputs, default_env, min_resources, compose_content, readme, created_at, updated_at)
 VALUES
 
 -- 1. Gitea

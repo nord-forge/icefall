@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'preact/hooks';
-import { api, request } from '@lib/api';
+import { request } from '@lib/api';
 import { addToast } from '@stores/toast';
 import Card from '@islands/shared/Card/Card';
 import Input from '@islands/shared/Input/Input';
 import Toggle from '@islands/shared/Toggle/Toggle';
 import Button from '@islands/shared/Button/Button';
-import Tabs from '@islands/shared/Tabs/Tabs';
+import Select from '@islands/shared/Select/Select';
 import styles from './shared-variables-page.module.css';
 
 type SharedVar = {
@@ -75,33 +75,53 @@ export default function SharedVariablesPage() {
 
   const scopeItems = selectedScope === 'project' ? projects : servers;
 
+  function switchScope(scope: 'project' | 'server') {
+    setSelectedScope(scope);
+    setVars([]);
+    const items = scope === 'project' ? projects : servers;
+    setSelectedId(items.length > 0 ? items[0].id : '');
+  }
+
   return (
     <div class={styles.page}>
       <h1 class={styles.title}>Shared variables</h1>
 
-      <Tabs
-        tabs={[
-          { id: 'project', label: 'Project scope', content: null },
-          { id: 'server', label: 'Server scope', content: null },
-        ]}
-        defaultTab={selectedScope}
-      />
+      <div class={styles.tabBar} role="tablist" aria-label="Variable scope">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={selectedScope === 'project'}
+          class={`${styles.tab} ${selectedScope === 'project' ? styles.tabActive : ''}`}
+          onClick={() => switchScope('project')}
+        >
+          Project scope
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={selectedScope === 'server'}
+          class={`${styles.tab} ${selectedScope === 'server' ? styles.tabActive : ''}`}
+          onClick={() => switchScope('server')}
+        >
+          Server scope
+        </button>
+      </div>
 
       <div class={styles.controls}>
         <div class={styles.scopeSelector}>
           <label class={styles.label}>
             {selectedScope === 'project' ? 'Project' : 'Server'}
           </label>
-          <select
-            class={styles.select}
-            value={selectedId}
-            onChange={(e) => setSelectedId((e.target as HTMLSelectElement).value)}
-            aria-label={`Select ${selectedScope}`}
-          >
-            {scopeItems.map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
+          {scopeItems.length > 0 ? (
+            <Select
+              value={selectedId}
+              onChange={setSelectedId}
+              aria-label={`Select ${selectedScope}`}
+              options={scopeItems.map((item) => ({ value: item.id, label: item.name }))}
+            />
+          ) : (
+            <p class={styles.empty}>No {selectedScope}s found. Create one first.</p>
+          )}
         </div>
       </div>
 
