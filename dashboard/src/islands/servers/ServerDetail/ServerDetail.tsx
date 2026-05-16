@@ -15,6 +15,7 @@ import { Cpu, MemoryStick, HardDrive, Server as ServerIcon, Globe, Hash, Clock, 
 import { addToast } from '@stores/toast';
 import Input from '@islands/shared/Input/Input';
 import ForecastSection from './components/ForecastSection';
+import InstancesSection from './components/InstancesSection';
 import ServerCleanupCard from './components/ServerCleanupCard';
 import styles from './server-detail.module.css';
 
@@ -358,6 +359,8 @@ export default function ServerDetail() {
           </div>
 
           <ForecastSection serverId={serverId} />
+
+          <InstancesSection serverId={serverId} />
         </div>
       )}
 

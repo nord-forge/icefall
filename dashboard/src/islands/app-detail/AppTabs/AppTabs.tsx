@@ -10,6 +10,7 @@ type Props = {
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'deploys', label: 'Deploys' },
+  { key: 'instances', label: 'Instances' },
   { key: 'logs', label: 'Logs' },
   { key: 'env', label: 'Env Vars' },
   { key: 'databases', label: 'Databases' },
@@ -24,6 +25,7 @@ const TABS = [
 const TAB_PRELOADERS: Record<string, () => void> = {
   overview: () => { import('@islands/app-detail/OverviewTab/OverviewTab'); },
   deploys: () => { import('@islands/app-detail/DeploysTab/DeploysTab'); },
+  instances: () => { import('@islands/app-detail/InstancesTab/InstancesTab'); },
   logs: () => { import('@islands/logs/LogViewer/LogViewer'); },
   env: () => { import('@islands/env-vars/EnvVarEditor/EnvVarEditor'); },
   databases: () => { import('@islands/app-detail/DatabaseTab/DatabaseTab'); },

@@ -27,8 +27,37 @@ export type App = {
   log_noise_patterns: string | null;
   log_highlight_patterns: string | null;
   project_environment_id: string | null;
+  desired_instances: number;
+  lb_policy: LbPolicy;
+  lb_health_check_path: string;
+  lb_sticky_sessions: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type LbPolicy = 'round_robin' | 'least_conn' | 'ip_hash' | 'random';
+
+export type AppInstanceStatus =
+  | 'deploying'
+  | 'running'
+  | 'unhealthy'
+  | 'stopped'
+  | 'failed';
+
+export type AppInstance = {
+  id: string;
+  app_id: string;
+  server_id: string;
+  status: AppInstanceStatus;
+  container_id: string | null;
+  host_port: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An app instance annotated with its app name (server-scoped listing). */
+export type ServerAppInstance = AppInstance & {
+  app_name: string;
 }
 
 export type DeployMode = 'auto' | 'native' | 'container';
@@ -111,6 +140,7 @@ export type Server = {
   created_at: string;
   updated_at: string;
   app_count?: number;
+  instance_count?: number;
   recommendation_score?: number;
   recommended?: boolean;
 }

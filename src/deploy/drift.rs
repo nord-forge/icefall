@@ -101,6 +101,10 @@ mod tests {
             has_custom_proxy_config: false,
             proxy_presets: None,
             tunnel_enabled: false,
+            desired_instances: 1,
+            lb_policy: "round_robin".into(),
+            lb_health_check_path: "/".into(),
+            lb_sticky_sessions: false,
             created_at: "2026-01-01".into(),
             updated_at: "2026-01-01".into(),
         }

@@ -1,4 +1,4 @@
-import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation } from './types';
+import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -123,6 +123,31 @@ export const api = {
     request<{ data: { drifted: boolean; current_hash: string; deployed_hash: string | null; fields: string[] } }>(
       `/apps/${appId}/drift`
     ),
+
+  // --- Load balancing / scaling ---
+
+  listInstances: (appId: string) =>
+    request<{ data: AppInstance[] }>(`/apps/${appId}/instances`),
+
+  scaleApp: (appId: string, desiredInstances: number) =>
+    request<{ message: string; deploy_id?: string; desired_instances: number }>(
+      `/apps/${appId}/scale`,
+      { method: 'PUT', body: JSON.stringify({ desired_instances: desiredInstances }) }
+    ),
+
+  updateLbConfig: (
+    appId: string,
+    body: { policy?: LbPolicy; health_check_path?: string; sticky_sessions?: boolean }
+  ) =>
+    request<{ message: string }>(`/apps/${appId}/lb-config`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteInstance: (appId: string, instanceId: string) =>
+    request<{ message: string }>(`/apps/${appId}/instances/${instanceId}`, {
+      method: 'DELETE',
+    }),
 
   listEnvVars: (appId: string, reveal = false) =>
     request<{ data: EnvVar[] }>(`/apps/${appId}/env${reveal ? '?reveal=true' : ''}`),
@@ -504,6 +529,9 @@ export const api = {
     request<{ data: { enrollment_token: string } }>(`/servers/${id}/token`, {
       method: 'POST',
     }),
+
+  listServerInstances: (serverId: string) =>
+    request<{ data: ServerAppInstance[] }>(`/servers/${serverId}/instances`),
 
   updateAgent: (id: string) =>
     request<{ data: { status: string; target_version?: string } }>(`/servers/${id}/update`, {

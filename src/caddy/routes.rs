@@ -41,6 +41,89 @@ impl CaddyClient {
         Ok(())
     }
 
+    /// Add a reverse_proxy route balanced across multiple upstreams, with the
+    /// given load balancing policy and active/passive health checks.
+    pub async fn add_route_balanced(
+        &self,
+        domain: &str,
+        upstreams: &[String],
+        policy: &str,
+        health_check_path: &str,
+    ) -> Result<(), CaddyError> {
+        let route =
+            CaddyRoute::reverse_proxy_balanced(domain, None, upstreams, policy, health_check_path);
+        let url = format!("{}/config/apps/http/servers/srv0/routes", self.base_url());
+
+        let response = self.client().post(&url).json(&route).send().await?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CaddyError::ApiError { status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Update an existing route to balance across multiple upstreams.
+    pub async fn update_route_balanced(
+        &self,
+        domain: &str,
+        upstreams: &[String],
+        policy: &str,
+        health_check_path: &str,
+    ) -> Result<(), CaddyError> {
+        let routes = self.get_routes_raw().await?;
+
+        let index = routes
+            .iter()
+            .position(|r| {
+                r.matchers
+                    .iter()
+                    .any(|m| m.host.contains(&domain.to_string()))
+            })
+            .ok_or_else(|| CaddyError::RouteNotFound(domain.to_string()))?;
+
+        let route =
+            CaddyRoute::reverse_proxy_balanced(domain, None, upstreams, policy, health_check_path);
+        let url = format!(
+            "{}/config/apps/http/servers/srv0/routes/{}",
+            self.base_url(),
+            index
+        );
+
+        let response = self.client().put(&url).json(&route).send().await?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CaddyError::ApiError { status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Set a balanced route: update it if the domain already has a route,
+    /// otherwise add a new one.
+    pub async fn set_route_balanced(
+        &self,
+        domain: &str,
+        upstreams: &[String],
+        policy: &str,
+        health_check_path: &str,
+    ) -> Result<(), CaddyError> {
+        match self
+            .update_route_balanced(domain, upstreams, policy, health_check_path)
+            .await
+        {
+            Err(CaddyError::RouteNotFound(_)) => {
+                self.add_route_balanced(domain, upstreams, policy, health_check_path)
+                    .await
+            }
+            other => other,
+        }
+    }
+
     pub async fn remove_route(&self, domain: &str) -> Result<(), CaddyError> {
         let routes = self.get_routes_raw().await?;
 

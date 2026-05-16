@@ -63,6 +63,30 @@ impl DockerClient {
         Ok(())
     }
 
+    /// Export an image to an OCI/Docker tar archive, collected into memory.
+    /// Used to transfer a built image to remote servers.
+    pub async fn export_image(&self, image: &str) -> Result<Bytes, DockerError> {
+        let mut stream = self.inner().export_image(image);
+        let mut buf = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            buf.extend_from_slice(&chunk?);
+        }
+        Ok(Bytes::from(buf))
+    }
+
+    /// Import an image from a tar archive (equivalent to `docker load`).
+    pub async fn import_image(&self, tar: Bytes) -> Result<(), DockerError> {
+        let mut stream = self.inner().import_image(
+            bollard::query_parameters::ImportImageOptions::default(),
+            bollard::body_full(tar),
+            None,
+        );
+        while let Some(result) = stream.next().await {
+            result?;
+        }
+        Ok(())
+    }
+
     pub async fn list_images(
         &self,
         reference: Option<&str>,

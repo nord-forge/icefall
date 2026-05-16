@@ -50,8 +50,39 @@ pub struct App {
     pub has_custom_proxy_config: bool,
     pub proxy_presets: Option<String>,
     pub tunnel_enabled: bool,
+    pub desired_instances: i64,
+    pub lb_policy: String,
+    pub lb_health_check_path: String,
+    pub lb_sticky_sessions: bool,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AppInstance {
+    pub id: String,
+    pub app_id: String,
+    pub server_id: String,
+    pub status: String,
+    pub container_id: Option<String>,
+    pub host_port: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub struct NewAppInstance {
+    pub app_id: String,
+    pub server_id: String,
+    pub status: String,
+    pub container_id: Option<String>,
+    pub host_port: Option<i64>,
+}
+
+#[derive(Default)]
+pub struct UpdateAppInstance {
+    pub status: Option<String>,
+    pub container_id: Option<Option<String>>,
+    pub host_port: Option<Option<i64>>,
 }
 
 pub struct NewApp {
@@ -102,4 +133,8 @@ pub struct UpdateApp {
     pub tunnel_enabled: Option<bool>,
     pub require_deploy_approval: Option<bool>,
     pub project_environment_id: Option<Option<String>>,
+    pub desired_instances: Option<i64>,
+    pub lb_policy: Option<String>,
+    pub lb_health_check_path: Option<String>,
+    pub lb_sticky_sessions: Option<bool>,
 }

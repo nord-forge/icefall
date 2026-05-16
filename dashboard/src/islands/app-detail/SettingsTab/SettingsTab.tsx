@@ -14,6 +14,7 @@ import AutoDeployCard from './components/AutoDeployCard';
 import PreviewDeploymentsCard from './components/PreviewDeploymentsCard';
 import PersistentStorageCard from './components/PersistentStorageCard';
 import ServerPlacementCard from './components/ServerPlacementCard';
+import ScalingCard from './components/ScalingCard';
 import EnvironmentAssignmentCard from './components/EnvironmentAssignmentCard';
 import DeployApprovalCard from './components/DeployApprovalCard';
 import TunnelCard from './components/TunnelCard';
@@ -400,6 +401,8 @@ export default function SettingsTab({ app, servers = [] }: Props) {
         {/* a11y [WCAG 4.1.3]: announce save result to AT */}
         <span role="status" aria-live="polite">{saveMessage}</span>
       </div>
+
+      <ScalingCard app={app} />
 
       {/* Server Placement — only in multi-server mode */}
       {multiServer && (

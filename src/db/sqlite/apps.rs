@@ -190,6 +190,17 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.project_environment_id.as_deref(),
     };
+    let desired_instances = update
+        .desired_instances
+        .unwrap_or(existing.desired_instances);
+    let lb_policy = update.lb_policy.as_deref().unwrap_or(&existing.lb_policy);
+    let lb_health_check_path = update
+        .lb_health_check_path
+        .as_deref()
+        .unwrap_or(&existing.lb_health_check_path);
+    let lb_sticky_sessions = update
+        .lb_sticky_sessions
+        .unwrap_or(existing.lb_sticky_sessions);
     let now = now_iso8601();
 
     sqlx::query(
@@ -206,6 +217,8 @@ pub(super) async fn update_app(
          log_noise_patterns = ?, log_highlight_patterns = ?,
          tunnel_enabled = ?, require_deploy_approval = ?,
          project_environment_id = ?,
+         desired_instances = ?, lb_policy = ?,
+         lb_health_check_path = ?, lb_sticky_sessions = ?,
          updated_at = ? WHERE id = ?",
     )
     .bind(name)
@@ -243,6 +256,10 @@ pub(super) async fn update_app(
     .bind(tunnel_enabled)
     .bind(require_deploy_approval)
     .bind(project_environment_id)
+    .bind(desired_instances)
+    .bind(lb_policy)
+    .bind(lb_health_check_path)
+    .bind(lb_sticky_sessions)
     .bind(&now)
     .bind(id)
     .execute(pool)
@@ -261,6 +278,118 @@ pub(super) async fn delete_app(pool: &SqlitePool, id: &str) -> Result<(), DbErro
 
     if result.rows_affected() == 0 {
         return Err(DbError::NotFound(format!("app {id}")));
+    }
+    Ok(())
+}
+
+pub(super) async fn create_app_instance(
+    pool: &SqlitePool,
+    instance: &NewAppInstance,
+) -> Result<AppInstance, DbError> {
+    let id = new_id();
+    let now = now_iso8601();
+
+    sqlx::query(
+        "INSERT INTO app_instances (id, app_id, server_id, status, container_id, host_port, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(&instance.app_id)
+    .bind(&instance.server_id)
+    .bind(&instance.status)
+    .bind(&instance.container_id)
+    .bind(instance.host_port)
+    .bind(&now)
+    .bind(&now)
+    .execute(pool)
+    .await?;
+
+    get_app_instance(pool, &id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(id))
+}
+
+pub(super) async fn get_app_instance(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<Option<AppInstance>, DbError> {
+    Ok(
+        sqlx::query_as::<_, AppInstance>("SELECT * FROM app_instances WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+pub(super) async fn list_app_instances(
+    pool: &SqlitePool,
+    app_id: &str,
+) -> Result<Vec<AppInstance>, DbError> {
+    Ok(sqlx::query_as::<_, AppInstance>(
+        "SELECT * FROM app_instances WHERE app_id = ? ORDER BY created_at ASC",
+    )
+    .bind(app_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub(super) async fn list_app_instances_by_server(
+    pool: &SqlitePool,
+    server_id: &str,
+) -> Result<Vec<AppInstance>, DbError> {
+    Ok(sqlx::query_as::<_, AppInstance>(
+        "SELECT * FROM app_instances WHERE server_id = ? ORDER BY app_id, created_at ASC",
+    )
+    .bind(server_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub(super) async fn update_app_instance(
+    pool: &SqlitePool,
+    id: &str,
+    update: &UpdateAppInstance,
+) -> Result<AppInstance, DbError> {
+    let existing = get_app_instance(pool, id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(format!("app_instance {id}")))?;
+
+    let status = update.status.as_deref().unwrap_or(&existing.status);
+    let container_id = match &update.container_id {
+        Some(v) => v.as_deref(),
+        None => existing.container_id.as_deref(),
+    };
+    let host_port = match update.host_port {
+        Some(v) => v,
+        None => existing.host_port,
+    };
+    let now = now_iso8601();
+
+    sqlx::query(
+        "UPDATE app_instances SET status = ?, container_id = ?, host_port = ?, updated_at = ?
+         WHERE id = ?",
+    )
+    .bind(status)
+    .bind(container_id)
+    .bind(host_port)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    get_app_instance(pool, id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(id.to_string()))
+}
+
+pub(super) async fn delete_app_instance(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
+    let result = sqlx::query("DELETE FROM app_instances WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(DbError::NotFound(format!("app_instance {id}")));
     }
     Ok(())
 }

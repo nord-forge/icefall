@@ -117,6 +117,8 @@ pub struct IcefallConfig {
     pub deploy_stop_timeout_secs: i64,
     #[serde(default = "defaults::ssl_check_interval_hours")]
     pub ssl_check_interval_hours: u64,
+    #[serde(default = "defaults::image_transfer_chunk_bytes")]
+    pub image_transfer_chunk_bytes: usize,
 }
 
 impl IcefallConfig {
@@ -270,6 +272,7 @@ impl Default for IcefallConfig {
             health_check_interval_ms: defaults::health_check_interval_ms(),
             deploy_stop_timeout_secs: defaults::deploy_stop_timeout_secs(),
             ssl_check_interval_hours: defaults::ssl_check_interval_hours(),
+            image_transfer_chunk_bytes: defaults::image_transfer_chunk_bytes(),
         }
     }
 }

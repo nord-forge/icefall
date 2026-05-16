@@ -63,11 +63,12 @@ async fn handle_agent_connection(
 ) {
     let (mut ws_sink, mut ws_stream) = socket.split();
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<AgentMessage>();
+    let (bin_tx, mut bin_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
     // Close old connection if agent reconnects
     if let Some(old) = state
         .agent_registry
-        .register(server_id.clone(), server_name.clone(), tx)
+        .register(server_id.clone(), server_name.clone(), tx, bin_tx)
         .await
     {
         drop(old.sender);
@@ -86,10 +87,29 @@ async fn handle_agent_connection(
 
     let sid_send = server_id.clone();
     let send_task = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            if let Ok(json) = serde_json::to_string(&msg) {
-                if ws_sink.send(Message::text(json)).await.is_err() {
-                    break;
+        loop {
+            tokio::select! {
+                msg = rx.recv() => {
+                    match msg {
+                        Some(msg) => {
+                            if let Ok(json) = serde_json::to_string(&msg) {
+                                if ws_sink.send(Message::text(json)).await.is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                frame = bin_rx.recv() => {
+                    match frame {
+                        Some(frame) => {
+                            if ws_sink.send(Message::binary(frame)).await.is_err() {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
                 }
             }
         }
@@ -115,7 +135,11 @@ async fn handle_agent_connection(
                                 ref event_type,
                                 ref data,
                             } => {
-                                forward_agent_event(&event_bus, &sid_recv, event_type, data);
+                                if event_type == "image.load.chunk_ack" {
+                                    resolve_chunk_ack(&registry, data).await;
+                                } else {
+                                    forward_agent_event(&event_bus, &sid_recv, event_type, data);
+                                }
                             }
                             AgentMessage::Request { .. } => {}
                         }
@@ -149,6 +173,25 @@ async fn handle_agent_connection(
         None,
         serde_json::json!({ "server_id": &server_id, "name": &server_name, "reason": "disconnected" }),
     );
+}
+
+async fn resolve_chunk_ack(
+    registry: &crate::agent::registry::AgentRegistry,
+    data: &serde_json::Value,
+) {
+    let Some(transfer_id) = data["transfer_id"].as_str() else {
+        return;
+    };
+    let Some(chunk_index) = data["chunk_index"].as_u64() else {
+        return;
+    };
+    let ack = crate::agent::registry::ChunkAck {
+        ok: data["ok"].as_bool().unwrap_or(false),
+        error: data["error"].as_str().map(str::to_string),
+    };
+    registry
+        .resolve_chunk_ack(transfer_id, chunk_index as u32, ack)
+        .await;
 }
 
 fn forward_agent_event(

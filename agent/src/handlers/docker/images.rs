@@ -88,3 +88,92 @@ pub async fn image_build(ctx: &HandlerContext, params: Value) -> Result<Value, H
     info!(tag = %p.tag, "image built");
     Ok(serde_json::json!({ "ok": true, "tag": p.tag }))
 }
+
+fn parse_transfer_id(hex: &str) -> Result<[u8; 16], HandlerError> {
+    let bytes = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16))
+        .collect::<Result<Vec<u8>, _>>()
+        .map_err(|_| HandlerError::InvalidParams("invalid transfer_id hex".to_string()))?;
+    bytes
+        .try_into()
+        .map_err(|_| HandlerError::InvalidParams("transfer_id must be 16 bytes".to_string()))
+}
+
+#[derive(Debug, Deserialize)]
+struct LoadBeginParams {
+    /// 32-char hex string identifying this transfer.
+    transfer_id: String,
+    total_chunks: u32,
+    chunk_size: usize,
+    /// Hex SHA-256 of the fully reassembled (compressed) tar archive.
+    total_sha256: String,
+}
+
+/// Begin an image transfer: the agent allocates a temp file to reassemble
+/// incoming binary chunk frames into.
+pub async fn image_load_begin(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
+    let p: LoadBeginParams =
+        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
+    let transfer_id = parse_transfer_id(&p.transfer_id)?;
+
+    ctx.transfers
+        .begin(transfer_id, p.total_chunks, p.total_sha256, p.chunk_size)
+        .await
+        .map_err(HandlerError::Other)?;
+
+    info!(transfer_id = %p.transfer_id, total_chunks = p.total_chunks, "image transfer begun");
+    Ok(serde_json::json!({ "ok": true }))
+}
+
+#[derive(Debug, Deserialize)]
+struct LoadCommitParams {
+    transfer_id: String,
+}
+
+/// Commit an image transfer: verify all chunks arrived and the whole-file
+/// checksum matches, then load the reassembled archive into Docker.
+pub async fn image_load_commit(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
+    let p: LoadCommitParams =
+        serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
+    let transfer_id = parse_transfer_id(&p.transfer_id)?;
+
+    let path = ctx
+        .transfers
+        .commit(transfer_id)
+        .await
+        .map_err(HandlerError::Other)?;
+
+    // Decompress (gzip) and load into Docker.
+    let result = load_image_from_gzip(ctx, &path).await;
+    ctx.transfers.cleanup(transfer_id).await;
+    result?;
+
+    info!(transfer_id = %p.transfer_id, "image transfer committed and loaded");
+    Ok(serde_json::json!({ "ok": true }))
+}
+
+async fn load_image_from_gzip(
+    ctx: &HandlerContext,
+    path: &std::path::Path,
+) -> Result<(), HandlerError> {
+    use std::io::Read;
+
+    let compressed =
+        std::fs::read(path).map_err(|e| HandlerError::Other(format!("read archive: {e}")))?;
+    let mut decoder = flate2::read::GzDecoder::new(&compressed[..]);
+    let mut tar_bytes = Vec::new();
+    decoder
+        .read_to_end(&mut tar_bytes)
+        .map_err(|e| HandlerError::Other(format!("gunzip: {e}")))?;
+
+    let mut stream = ctx.docker.import_image(
+        bollard::query_parameters::ImportImageOptions::default(),
+        bollard::body_full(tar_bytes.into()),
+        None,
+    );
+    while let Some(result) = stream.next().await {
+        result?;
+    }
+    Ok(())
+}

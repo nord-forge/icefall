@@ -26,6 +26,7 @@ pub fn routes() -> Router<AppState> {
                 .delete(crud::delete_server),
         )
         .route("/servers/{id}/token", post(crud::regenerate_token))
+        .route("/servers/{id}/instances", get(crud::list_server_instances))
         .route("/servers/{id}/update", post(agent::update_agent))
         .route("/servers/update-all", post(agent::update_all_agents))
         .route("/agent/download/{target}", get(scripts::download_agent))
