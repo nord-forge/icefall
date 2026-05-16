@@ -152,6 +152,30 @@ impl Database for SqliteDatabase {
         apps::delete_app(&self.pool, id).await
     }
 
+    async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError> {
+        apps::create_app_instance(&self.pool, instance).await
+    }
+
+    async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError> {
+        apps::get_app_instance(&self.pool, id).await
+    }
+
+    async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError> {
+        apps::list_app_instances(&self.pool, app_id).await
+    }
+
+    async fn update_app_instance(
+        &self,
+        id: &str,
+        update: &UpdateAppInstance,
+    ) -> Result<AppInstance, DbError> {
+        apps::update_app_instance(&self.pool, id, update).await
+    }
+
+    async fn delete_app_instance(&self, id: &str) -> Result<(), DbError> {
+        apps::delete_app_instance(&self.pool, id).await
+    }
+
     // --- Environments ---
 
     async fn create_environment(&self, env: &NewEnvironment) -> Result<Environment, DbError> {

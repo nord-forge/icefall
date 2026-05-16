@@ -125,6 +125,160 @@ impl RemoteExecutor {
             .ok_or_else(|| DeployError::RemoteBuild("no image_tag in response".to_string()))
     }
 
+    // --- Image transfer ---
+
+    /// Transfer a built image to the remote server and load it into the remote
+    /// Docker daemon.
+    ///
+    /// The raw `docker save` tar (`image_tar`) is gzip-compressed, split into
+    /// `chunk_size`-byte chunks, and streamed as binary WebSocket frames. Each
+    /// chunk carries a SHA-256 the agent verifies; a failed chunk is retried
+    /// individually. The whole transfer is retried up to `MAX_TRANSFER_ATTEMPTS`
+    /// times on a fatal error.
+    pub async fn load_image(
+        &self,
+        image_tar: &[u8],
+        chunk_size: usize,
+        timeout: Duration,
+    ) -> Result<(), DeployError> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        // Compress the tar once; the compressed payload is what gets chunked.
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(image_tar)
+            .map_err(|e| DeployError::RemoteOp(format!("gzip: {e}")))?;
+        let compressed = encoder
+            .finish()
+            .map_err(|e| DeployError::RemoteOp(format!("gzip finish: {e}")))?;
+
+        tracing::info!(
+            server = %self.server_id,
+            raw_bytes = image_tar.len(),
+            compressed_bytes = compressed.len(),
+            "transferring image to remote server"
+        );
+
+        const MAX_TRANSFER_ATTEMPTS: u32 = 3;
+        let mut last_err = None;
+        for attempt in 1..=MAX_TRANSFER_ATTEMPTS {
+            match self
+                .transfer_compressed_image(&compressed, chunk_size, timeout)
+                .await
+            {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    tracing::warn!(
+                        server = %self.server_id,
+                        attempt,
+                        "image transfer attempt failed: {e}"
+                    );
+                    last_err = Some(e);
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| DeployError::RemoteOp("image transfer failed".to_string())))
+    }
+
+    /// Perform one full transfer attempt of the already-compressed payload.
+    async fn transfer_compressed_image(
+        &self,
+        compressed: &[u8],
+        chunk_size: usize,
+        timeout: Duration,
+    ) -> Result<(), DeployError> {
+        use icefall_common::transfer::{hex_encode, sha256_hex, sha256_of, ChunkFrame};
+
+        let chunk_size = chunk_size.max(64 * 1024);
+        let chunks: Vec<&[u8]> = compressed.chunks(chunk_size).collect();
+        let total_chunks = chunks.len() as u32;
+
+        // Fresh random transfer id per attempt.
+        let transfer_id: [u8; 16] = {
+            use rand::Rng;
+            rand::rng().random()
+        };
+        let transfer_hex = hex_encode(&transfer_id);
+        let total_sha256 = sha256_hex(&sha256_of(compressed));
+
+        // begin
+        self.call_with_timeout(
+            "image.load.begin",
+            serde_json::json!({
+                "transfer_id": transfer_hex,
+                "total_chunks": total_chunks,
+                "chunk_size": chunk_size,
+                "total_sha256": total_sha256,
+            }),
+            timeout,
+        )
+        .await?;
+
+        // chunks, with per-chunk retry
+        const MAX_CHUNK_ATTEMPTS: u32 = 4;
+        for (index, payload) in chunks.iter().enumerate() {
+            let frame = ChunkFrame {
+                transfer_id,
+                chunk_index: index as u32,
+                total_chunks,
+                sha256: sha256_of(payload),
+                payload: payload.to_vec(),
+            };
+            let encoded = frame.encode();
+
+            let mut chunk_ok = false;
+            let mut chunk_err = None;
+            for chunk_attempt in 1..=MAX_CHUNK_ATTEMPTS {
+                match self
+                    .registry
+                    .send_chunk(
+                        &self.server_id,
+                        &transfer_hex,
+                        index as u32,
+                        encoded.clone(),
+                        timeout,
+                    )
+                    .await
+                {
+                    Ok(ack) if ack.ok => {
+                        chunk_ok = true;
+                        break;
+                    }
+                    Ok(ack) => {
+                        chunk_err = ack.error;
+                        tracing::warn!(
+                            "chunk {index} rejected (attempt {chunk_attempt}): {chunk_err:?}"
+                        );
+                    }
+                    Err(e) => {
+                        chunk_err = Some(e);
+                        tracing::warn!(
+                            "chunk {index} send failed (attempt {chunk_attempt}): {chunk_err:?}"
+                        );
+                    }
+                }
+            }
+            if !chunk_ok {
+                return Err(DeployError::RemoteOp(format!(
+                    "chunk {index} failed after {MAX_CHUNK_ATTEMPTS} attempts: {}",
+                    chunk_err.unwrap_or_else(|| "unknown error".to_string())
+                )));
+            }
+        }
+
+        // commit
+        self.call_with_timeout(
+            "image.load.commit",
+            serde_json::json!({ "transfer_id": transfer_hex }),
+            timeout,
+        )
+        .await?;
+
+        Ok(())
+    }
+
     // --- Container operations ---
 
     pub async fn create_network(&self, name: &str) -> Result<(), DeployError> {

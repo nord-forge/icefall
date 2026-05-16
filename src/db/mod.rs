@@ -39,6 +39,17 @@ pub trait Database: Send + Sync + 'static {
     async fn update_app(&self, id: &str, update: &UpdateApp) -> Result<App, DbError>;
     async fn delete_app(&self, id: &str) -> Result<(), DbError>;
 
+    // App instances (multi-instance / load balancing)
+    async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError>;
+    async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError>;
+    async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError>;
+    async fn update_app_instance(
+        &self,
+        id: &str,
+        update: &UpdateAppInstance,
+    ) -> Result<AppInstance, DbError>;
+    async fn delete_app_instance(&self, id: &str) -> Result<(), DbError>;
+
     // Environments
     async fn create_environment(&self, env: &NewEnvironment) -> Result<Environment, DbError>;
     async fn list_environments(&self, app_id: &str) -> Result<Vec<Environment>, DbError>;

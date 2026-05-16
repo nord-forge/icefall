@@ -2,8 +2,9 @@ mod crud;
 mod drift;
 mod lifecycle;
 mod migrate;
+mod scaling;
 
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use crate::api::AppState;
@@ -23,4 +24,11 @@ pub fn routes() -> Router<AppState> {
         .route("/apps/{id}/wake", post(lifecycle::wake_app))
         .route("/apps/{id}/migrate", put(migrate::migrate_app))
         .route("/apps/{id}/drift", get(drift::check_drift))
+        .route("/apps/{id}/scale", put(scaling::scale_app))
+        .route("/apps/{id}/instances", get(scaling::list_instances))
+        .route("/apps/{id}/lb-config", put(scaling::update_lb_config))
+        .route(
+            "/apps/{id}/instances/{instance_id}",
+            delete(scaling::delete_instance),
+        )
 }

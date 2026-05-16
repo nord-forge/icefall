@@ -3,6 +3,7 @@ mod connection;
 mod context;
 mod enroll;
 mod handlers;
+mod transfer;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -118,6 +119,7 @@ async fn main() {
                 config: Arc::new(cfg),
                 active_logs: Arc::new(Mutex::new(HashMap::new())),
                 active_terminals: Arc::new(Mutex::new(HashMap::new())),
+                transfers: crate::transfer::TransferManager::new(),
                 shutdown: shutdown_rx.clone(),
             };
 

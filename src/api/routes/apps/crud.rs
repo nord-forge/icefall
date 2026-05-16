@@ -238,6 +238,10 @@ pub(super) async fn update_app(
                 tunnel_enabled: body.tunnel_enabled,
                 require_deploy_approval: body.require_deploy_approval,
                 project_environment_id: body.project_environment_id,
+                desired_instances: None,
+                lb_policy: None,
+                lb_health_check_path: None,
+                lb_sticky_sessions: None,
             },
         )
         .await?;

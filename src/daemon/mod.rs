@@ -245,6 +245,16 @@ impl DaemonRunner {
 
         let agent_registry = crate::agent::registry::AgentRegistry::new();
 
+        crate::monitoring::instance_health_runner::spawn_instance_health_runner(
+            db.clone(),
+            docker.clone(),
+            caddy.clone(),
+            config.clone(),
+            event_bus.clone(),
+            agent_registry.clone(),
+            build_locks.clone(),
+        );
+
         // Build app state and router
         let state = AppState {
             db,

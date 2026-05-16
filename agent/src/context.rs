@@ -24,5 +24,6 @@ pub struct HandlerContext {
     pub config: Arc<AgentConfig>,
     pub active_logs: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
     pub active_terminals: Arc<Mutex<HashMap<String, TerminalSession>>>,
+    pub transfers: crate::transfer::TransferManager,
     pub shutdown: watch::Receiver<bool>,
 }

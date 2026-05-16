@@ -92,3 +92,7 @@ pub fn deploy_stop_timeout_secs() -> i64 {
 pub fn ssl_check_interval_hours() -> u64 {
     24
 }
+
+pub fn image_transfer_chunk_bytes() -> usize {
+    8 * 1024 * 1024
+}

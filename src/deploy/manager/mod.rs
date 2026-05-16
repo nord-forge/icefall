@@ -1,6 +1,7 @@
 mod cleanup;
 mod deploy_inner;
 mod environment;
+mod instances;
 #[cfg(test)]
 mod tests;
 
