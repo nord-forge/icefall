@@ -107,6 +107,8 @@ impl DaemonRunner {
         let docker = match DockerClient::connect(&config.container_socket).await {
             Ok(client) => {
                 info!("Container runtime connected ({})", config.runtime);
+                // For Podman, verify container DNS works and warn if not.
+                client.check_network_dns().await;
                 Arc::new(client)
             }
             Err(e) => {

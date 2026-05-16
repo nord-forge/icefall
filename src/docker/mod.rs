@@ -2,11 +2,19 @@ pub mod containers;
 pub mod images;
 pub mod logs;
 pub mod networks;
+pub mod quirks;
 pub mod stats;
 pub mod volumes;
 
+#[cfg(test)]
+mod runtime_compat_tests;
+
 use bollard::Docker;
 use thiserror::Error;
+
+pub use quirks::{DnsBackend, RuntimeQuirks};
+
+use crate::config::ContainerRuntime;
 
 #[derive(Debug, Error)]
 pub enum DockerError {
@@ -27,6 +35,7 @@ pub enum DockerError {
 #[derive(Clone)]
 pub struct DockerClient {
     inner: Docker,
+    quirks: RuntimeQuirks,
 }
 
 impl DockerClient {
@@ -34,14 +43,55 @@ impl DockerClient {
         let docker = Docker::connect_with_socket(socket_path, 120, bollard::API_DEFAULT_VERSION)
             .map_err(|e| DockerError::Unavailable(e.to_string()))?;
 
-        let client = Self { inner: docker };
+        // Provisional client so ping/info can run; quirks filled in below.
+        let mut client = Self {
+            inner: docker,
+            quirks: RuntimeQuirks::docker_default(),
+        };
         client.ping().await?;
+        client.quirks = client.detect_quirks(socket_path).await;
+
+        if client.quirks.runtime == ContainerRuntime::Podman {
+            tracing::info!(
+                rootless = client.quirks.rootless,
+                "Container runtime is Podman; rootless={}",
+                client.quirks.rootless
+            );
+        }
         Ok(client)
     }
 
     pub async fn connect_default() -> Result<Self, DockerError> {
         let socket = crate::config::defaults::container_socket();
         Self::connect(&socket).await
+    }
+
+    /// Quirks of the connected runtime (Docker vs Podman, rootless, etc).
+    pub fn quirks(&self) -> &RuntimeQuirks {
+        &self.quirks
+    }
+
+    /// Detect runtime quirks from `info` and the socket path. Falls back to the
+    /// Docker baseline if introspection fails — never blocks connecting.
+    async fn detect_quirks(&self, socket_path: &str) -> RuntimeQuirks {
+        let runtime = match self.runtime_version().await {
+            Ok(info) if info.name == "podman" => ContainerRuntime::Podman,
+            _ => ContainerRuntime::Docker,
+        };
+
+        if runtime == ContainerRuntime::Docker {
+            return RuntimeQuirks::docker_default();
+        }
+
+        let security_options = self
+            .inner
+            .info()
+            .await
+            .ok()
+            .and_then(|i| i.security_options)
+            .unwrap_or_default();
+
+        RuntimeQuirks::detect(runtime, socket_path, &security_options)
     }
 
     pub async fn ping(&self) -> Result<(), DockerError> {

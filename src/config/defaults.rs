@@ -25,20 +25,43 @@ pub fn container_socket() -> String {
 }
 
 pub fn detect_socket() -> String {
-    let podman_paths = ["/run/podman/podman.sock", "/var/run/podman/podman.sock"];
-    let docker_paths = ["/var/run/docker.sock"];
-
-    for path in &podman_paths {
-        if std::path::Path::new(path).exists() {
-            return path.to_string();
+    // Probe order: rootless Podman first (per-user socket), then rootful
+    // Podman, then Docker. Rootless Podman exposes its API under the user's
+    // runtime directory — missing this makes the daemon fall back to a Docker
+    // socket that does not exist on a rootless host.
+    for path in rootless_podman_socket_paths() {
+        if std::path::Path::new(&path).exists() {
+            return path;
         }
     }
-    for path in &docker_paths {
+
+    let rootful_paths = [
+        "/run/podman/podman.sock",
+        "/var/run/podman/podman.sock",
+        "/var/run/docker.sock",
+    ];
+    for path in &rootful_paths {
         if std::path::Path::new(path).exists() {
             return path.to_string();
         }
     }
     "/var/run/docker.sock".to_string()
+}
+
+/// Candidate rootless Podman socket paths, most specific first.
+///
+/// Rootless Podman places its API socket under the per-user runtime directory.
+/// `XDG_RUNTIME_DIR` is set in every systemd user session (`/run/user/<uid>`),
+/// which is the canonical location; an explicit `ICEFALL_CONTAINER_SOCKET`
+/// override covers any non-standard setup.
+fn rootless_podman_socket_paths() -> Vec<String> {
+    let mut paths = Vec::new();
+    if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
+        if !dir.is_empty() {
+            paths.push(format!("{}/podman/podman.sock", dir.trim_end_matches('/')));
+        }
+    }
+    paths
 }
 
 pub fn detect_runtime_from_socket(socket: &str) -> String {
@@ -95,4 +118,43 @@ pub fn ssl_check_interval_hours() -> u64 {
 
 pub fn image_transfer_chunk_bytes() -> usize {
     8 * 1024 * 1024
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rootless_socket_path_derives_from_xdg_runtime_dir() {
+        // SAFETY: single-threaded test; env is restored before returning.
+        let prev = std::env::var("XDG_RUNTIME_DIR").ok();
+        std::env::set_var("XDG_RUNTIME_DIR", "/run/user/1000");
+        let paths = rootless_podman_socket_paths();
+        assert_eq!(paths, vec!["/run/user/1000/podman/podman.sock"]);
+        match prev {
+            Some(v) => std::env::set_var("XDG_RUNTIME_DIR", v),
+            None => std::env::remove_var("XDG_RUNTIME_DIR"),
+        }
+    }
+
+    #[test]
+    fn rootless_socket_path_trims_trailing_slash() {
+        let prev = std::env::var("XDG_RUNTIME_DIR").ok();
+        std::env::set_var("XDG_RUNTIME_DIR", "/run/user/1000/");
+        let paths = rootless_podman_socket_paths();
+        assert_eq!(paths, vec!["/run/user/1000/podman/podman.sock"]);
+        match prev {
+            Some(v) => std::env::set_var("XDG_RUNTIME_DIR", v),
+            None => std::env::remove_var("XDG_RUNTIME_DIR"),
+        }
+    }
+
+    #[test]
+    fn detect_runtime_from_socket_identifies_podman() {
+        assert_eq!(
+            detect_runtime_from_socket("/run/user/1000/podman/podman.sock"),
+            "podman"
+        );
+        assert_eq!(detect_runtime_from_socket("/var/run/docker.sock"), "docker");
+    }
 }
