@@ -4,7 +4,12 @@
 #
 # Environment variables:
 #   ICEFALL_VERSION   - Version to install (default: latest)
+#   ICEFALL_RUNTIME   - Container runtime: docker | podman | auto (default: auto)
 #   NO_COLOR          - Disable colored output
+#
+# Flags (positional, any order):
+#   --yes             - Non-interactive; accept defaults
+#   --runtime=NAME    - Container runtime: docker | podman | auto
 
 set -euo pipefail
 
@@ -14,7 +19,27 @@ ICEFALL_DATA="/var/lib/icefall"
 ICEFALL_CONFIG="/etc/icefall/config.toml"
 ICEFALL_SERVICE="/etc/systemd/system/icefall.service"
 ICEFALL_LOG="/var/log/icefall-install.log"
-NONINTERACTIVE="${1:-}"
+
+# Runtime preference: docker | podman | auto. Env var is the default; a
+# --runtime= flag overrides it. "auto" (or empty) means detect/prompt.
+RUNTIME_CHOICE="${ICEFALL_RUNTIME:-auto}"
+NONINTERACTIVE=""
+
+for _arg in "$@"; do
+    case "$_arg" in
+        --yes)
+            NONINTERACTIVE="--yes"
+            ;;
+        --runtime=*)
+            RUNTIME_CHOICE="${_arg#--runtime=}"
+            ;;
+    esac
+done
+
+case "$RUNTIME_CHOICE" in
+    docker|podman|auto) ;;
+    *) echo "Invalid --runtime / ICEFALL_RUNTIME value: '$RUNTIME_CHOICE' (expected docker, podman, or auto)" >&2; exit 1 ;;
+esac
 
 if [ -n "${NO_COLOR:-}" ]; then
     BLUE="" GREEN="" YELLOW="" RED="" BOLD="" RESET=""
@@ -131,7 +156,139 @@ ensure_podman_socket() {
     ok "Podman socket active"
 }
 
+# Read the runtime from an existing config so a re-install never flips a
+# server's runtime. Sets RUNTIME_CHOICE to the configured value if found.
+adopt_runtime_from_config() {
+    if [ ! -f "$ICEFALL_CONFIG" ]; then
+        return 1
+    fi
+    local configured
+    configured=$(grep -E '^\s*runtime\s*=' "$ICEFALL_CONFIG" 2>/dev/null \
+        | head -1 | sed -E 's/.*=\s*"?([a-z]+)"?.*/\1/')
+    case "$configured" in
+        docker|podman)
+            RUNTIME_CHOICE="$configured"
+            info "Existing install uses '$configured' — keeping that runtime"
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Ensure Docker is installed and running; install it if missing. Used by
+# forced (--runtime=docker) mode — never falls back to another runtime.
+ensure_docker() {
+    if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+        CONTAINER_RUNTIME="docker"
+        CONTAINER_SOCKET="/var/run/docker.sock"
+        ok "Docker $(docker --version | cut -d' ' -f3 | tr -d ',') detected (running)"
+        return 0
+    fi
+    if command -v docker &>/dev/null; then
+        warn "Docker is installed but not running — starting it"
+        if is_alpine; then
+            rc-service docker start 2>/dev/null || true
+        else
+            systemctl start docker 2>/dev/null || true
+        fi
+        if docker info &>/dev/null 2>&1; then
+            CONTAINER_RUNTIME="docker"
+            CONTAINER_SOCKET="/var/run/docker.sock"
+            ok "Docker started"
+            return 0
+        fi
+        error "Docker is installed but failed to start. Fix Docker, then re-run."
+    fi
+    install_docker
+}
+
+# Ensure Podman is installed and running; install it if missing. Used by
+# forced (--runtime=podman) mode — never falls back to another runtime.
+ensure_podman() {
+    if command -v podman &>/dev/null; then
+        ensure_podman_socket
+        if podman info &>/dev/null 2>&1; then
+            local podman_version podman_major
+            podman_version=$(podman --version | awk '{print $3}')
+            podman_major=$(echo "$podman_version" | cut -d. -f1)
+            if [ "$podman_major" -lt 4 ]; then
+                error "Podman $podman_version detected but Icefall requires >= 4.0. Upgrade Podman, then re-run."
+            fi
+            CONTAINER_RUNTIME="podman"
+            if [ -S "/run/podman/podman.sock" ]; then
+                CONTAINER_SOCKET="/run/podman/podman.sock"
+            else
+                CONTAINER_SOCKET="/var/run/podman/podman.sock"
+            fi
+            ok "Podman $podman_version detected (running)"
+            return 0
+        fi
+        error "Podman is installed but its API socket is not reachable. Run 'systemctl enable --now podman.socket', then re-run."
+    fi
+    install_podman
+}
+
+# When both runtimes are installed and the user has not forced a choice,
+# offer an explicit pick (with an auto-detect fallback) so a Podman-committed
+# user is not silently given Docker.
+prompt_runtime_choice() {
+    # Only relevant in interactive auto mode.
+    [ "$RUNTIME_CHOICE" = "auto" ] || return 0
+    [ "$NONINTERACTIVE" = "--yes" ] && return 0
+
+    local have_docker=false have_podman=false
+    command -v docker &>/dev/null && have_docker=true
+    command -v podman &>/dev/null && have_podman=true
+
+    # Only prompt when there is an actual choice to make.
+    if [ "$have_docker" = true ] && [ "$have_podman" = true ]; then
+        info "Both Docker and Podman are installed."
+        echo ""
+        echo "  Which container runtime should Icefall use?"
+        echo ""
+        echo "    1) Docker"
+        echo "    2) Podman"
+        echo "    3) Auto-detect     — recommended, pick for me"
+        echo ""
+        local choice
+        read -rp "Use [1/2/3]: " choice
+        case "$choice" in
+            1) RUNTIME_CHOICE="docker" ;;
+            2) RUNTIME_CHOICE="podman" ;;
+            *) RUNTIME_CHOICE="auto" ;;
+        esac
+    fi
+}
+
 install_container_runtime() {
+    # A re-install always keeps the runtime the server was set up with,
+    # unless the user explicitly overrides it with --runtime / ICEFALL_RUNTIME.
+    if [ "$RUNTIME_CHOICE" = "auto" ]; then
+        adopt_runtime_from_config || true
+    fi
+
+    # If still on auto and both runtimes exist, let the user choose.
+    if [ "$RUNTIME_CHOICE" = "auto" ]; then
+        prompt_runtime_choice
+    fi
+
+    # Forced runtime — honor it exactly, never fall back to the other.
+    case "$RUNTIME_CHOICE" in
+        docker)
+            info "Using Docker (requested explicitly)"
+            ensure_docker
+            return
+            ;;
+        podman)
+            info "Using Podman (requested explicitly)"
+            ensure_podman
+            return
+            ;;
+    esac
+
+    # Auto mode: detect a running runtime first.
     if detect_container_runtime; then
         if [ "$CONTAINER_RUNTIME" = "podman" ]; then
             ensure_podman_socket
@@ -139,7 +296,7 @@ install_container_runtime() {
         return
     fi
 
-    # Neither runtime found — try to start existing installs
+    # Neither runtime running — try to start an installed-but-stopped one.
     if command -v docker &>/dev/null; then
         warn "Docker is installed but not running"
         if is_alpine; then
@@ -166,24 +323,34 @@ install_container_runtime() {
         fi
     fi
 
-    # Nothing installed — ask user which to install
+    # Nothing installed — ask which to install.
     info "No container runtime detected."
     echo ""
-    echo "  1) Docker (recommended — widest compatibility)"
-    echo "  2) Podman (daemonless, lower resource usage)"
+    echo "  Which container runtime should Icefall use?"
+    echo ""
+    echo "    1) Docker          — widest compatibility"
+    echo "    2) Podman          — daemonless, rootless-capable"
+    echo "    3) Auto-detect     — recommended, pick for me"
     echo ""
 
+    local choice
     if [ "$NONINTERACTIVE" = "--yes" ]; then
-        local choice="1"
+        choice="3"
     else
-        read -rp "Install [1/2]: " choice
+        read -rp "Install [1/2/3]: " choice
     fi
 
     case "$choice" in
+        1)
+            install_docker
+            ;;
         2)
             install_podman
             ;;
         *)
+            # Auto / unsure: default to Docker for a fresh box (widest
+            # compatibility), matching the prior behavior.
+            info "Auto-detect: no runtime present — installing Docker"
             install_docker
             ;;
     esac
