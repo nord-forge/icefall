@@ -6,35 +6,56 @@ Icefall is built for developers who want Vercel/Railway-level simplicity on thei
 
 ## Status
 
-🚧 **Early development** — not yet usable. See [PRD.md](./PRD.md) for the full product plan and [DESIGN.md](./DESIGN.md) for the visual design system.
+🚧 **Active development — approaching v1.** Core deployment, multi-server, teams,
+and load balancing are implemented. APIs and the data model may still change
+before the first stable release. See [PRD.md](./PRD.md) for the product plan and
+[DESIGN.md](./DESIGN.md) for the visual design system.
 
 ## What it does
 
+**Deployments**
 - **Git-push deploys** — connect a repo, push to main, your app is live
+- **GitHub App integration** — automatic webhooks and commit status checks
 - **Preview environments** — feature branches auto-deploy with isolated config
-- **Framework detection** — Astro, Next.js, React, Vue, Nuxt, Node.js, Docker, static sites
-- **Managed databases** — one-click Postgres, MySQL, Redis, MongoDB with auto-backups
+- **Framework detection** — Astro, Next.js, React, Vue, Nuxt, Node.js, Docker Compose, static sites
+- **Rolling deploys with auto-rollback** — failed health checks roll back automatically
 - **Real-time build logs** — structured, collapsible steps that tell you exactly what went wrong
+
+**Scaling & infrastructure**
+- **Multi-server** — register worker servers and place apps across them
+- **Load balancing** — run an app as multiple instances with health-aware traffic distribution
+- **Managed databases** — one-click Postgres, MySQL, Redis, MongoDB with auto-backups
 - **Automatic HTTPS** — powered by Caddy, zero SSL config
-- **Health monitoring** — TCP + Docker health checks with email/webhook notifications
+- **Health monitoring** — per-instance health checks with email/webhook notifications
+
+**Operations**
+- **Teams & multi-tenancy** — team-scoped resources, roles, and invitations
+- **Self-update** — signed releases with automatic rollback on failure
+- **MCP server** — manage Icefall from AI assistants
+- **Audit log, drift detection, and incident tracking**
 
 ## Architecture
 
-- **Rust daemon** — build engine, container management, API server
+- **Rust daemon** — build engine, container management, API server, agent coordination
+- **Rust agent** — lightweight worker that runs on each additional server
 - **Astro + Preact dashboard** — lightweight admin UI with light/dark themes
-- **Caddy** — reverse proxy with automatic HTTPS
-- **Docker** — container runtime (managed via API, not CLI)
-- **SQLite** — zero-ops default database (Postgres-ready for clusters)
+- **Caddy** — reverse proxy with automatic HTTPS and multi-upstream load balancing
+- **Docker or Podman** — container runtime, managed via API (not CLI); rootless Podman supported
+- **SQLite** — zero-ops default database, with Postgres-compatible SQL for future clustering
 
 ## Install
 
-> Coming soon
-
 ```bash
-curl -fsSL https://icefall.dev/install.sh | sh
+curl -fsSL https://icefall.dev/install.sh | bash
 ```
 
-**Requirements:** Linux (Ubuntu 22.04+, Debian 12+, RHEL 9+, Fedora 38+, Arch), Docker, 1 vCPU / 1GB RAM minimum.
+The installer detects your OS, sets up a container runtime and Caddy, and starts
+Icefall as a service. See the [installation docs](https://icefall.dev/getting-started/installation/)
+for flags — including `--runtime=docker|podman|auto` to choose your container
+runtime, and `--yes` for unattended installs.
+
+**Requirements:** Linux (Ubuntu 20.04+, Debian 11+, RHEL/Rocky/Alma 9+, Fedora 38+, Alpine 3.16+),
+Docker or Podman ≥ 4.0, 1 vCPU / 1 GB RAM minimum (2 GB recommended).
 
 ## Attribution
 

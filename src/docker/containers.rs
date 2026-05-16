@@ -53,16 +53,32 @@ pub struct ContainerInfo {
 
 impl DockerClient {
     pub async fn create_container(&self, config: &ContainerConfig) -> Result<String, DockerError> {
+        let quirks = self.quirks();
+
         let mut port_bindings: HashMap<String, Option<Vec<PortBinding>>> = HashMap::new();
         let mut exposed_ports: Vec<String> = Vec::new();
 
         for port in &config.ports {
+            // Rootless Podman cannot publish privileged ports — fail early
+            // with a clear message rather than a cryptic runtime error.
+            if let Some(host_port) = port.host_port {
+                if quirks.rootless && host_port < quirks.min_unprivileged_port {
+                    return Err(DockerError::Unavailable(format!(
+                        "rootless Podman cannot bind host port {host_port} \
+                         (ports below {} require root); use a higher port",
+                        quirks.min_unprivileged_port
+                    )));
+                }
+            }
+
             let key = format!("{}/{}", port.container_port, port.protocol);
             exposed_ports.push(key.clone());
             port_bindings.insert(
                 key,
                 Some(vec![PortBinding {
-                    host_ip: Some("0.0.0.0".to_string()),
+                    // Docker / rootful Podman bind 0.0.0.0; rootless Podman uses
+                    // loopback (Caddy is co-located and proxies to it).
+                    host_ip: Some(quirks.host_bind_ip.clone()),
                     host_port: port.host_port.map(|p| p.to_string()),
                 }]),
             );
@@ -93,6 +109,33 @@ impl DockerClient {
                     }),
                     maximum_retry_count: None,
                 });
+
+        // Rootless Podman realizes restart policies via systemd user units,
+        // which only auto-start after a reboot if lingering is enabled.
+        if quirks.rootless
+            && matches!(
+                config.restart_policy.as_deref(),
+                Some("always" | "unless-stopped")
+            )
+        {
+            tracing::warn!(
+                container = %config.name,
+                "rootless Podman: restart policy '{}' requires `loginctl enable-linger` \
+                 to survive a host reboot",
+                config.restart_policy.as_deref().unwrap_or_default()
+            );
+        }
+
+        // Rootless Podman ignores cgroup limits without cgroups v2 delegation.
+        if !quirks.supports_cgroup_limits
+            && (config.memory_bytes.is_some() || config.cpu_shares.is_some())
+        {
+            tracing::warn!(
+                container = %config.name,
+                "runtime may ignore memory/CPU limits — rootless Podman needs \
+                 cgroups v2 with delegation enabled for resource limits to apply"
+            );
+        }
 
         let host_config = HostConfig {
             port_bindings: Some(port_bindings),

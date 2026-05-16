@@ -5,11 +5,28 @@ description: Use Podman as an alternative container runtime for Icefall.
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Icefall supports Podman as an opt-in alternative to Docker. Both runtimes use the same container API (OCI-compatible), so all Icefall features work identically regardless of which runtime you choose.
+Icefall supports Podman as a first-class alternative to Docker, **including
+rootless Podman**. Both runtimes are driven through the same Docker-compatible
+socket API, and Icefall detects runtime-specific behavior automatically.
 
 <Aside type="note">
-Docker is the default and recommended runtime. Podman support is opt-in for environments where Docker is unavailable or where rootless containers are required.
+The installer auto-detects your runtime. You can also choose explicitly with
+`--runtime=podman` — see the [installation guide](/getting-started/installation/#choosing-a-container-runtime).
+Podman 4.0 or newer is required.
 </Aside>
+
+## Installing with Podman
+
+The quickest path is to let the installer set Podman up for you:
+
+```bash
+curl -fsSL https://icefall.dev/install.sh | bash -s -- --runtime=podman
+```
+
+In `--runtime=podman` mode the installer commits to Podman: it installs Podman
+if missing, enables the API socket, and **never silently falls back to Docker**.
+If you omit the flag and both runtimes are present, the installer asks which to
+use (with an auto-detect option).
 
 ## Configuration
 
@@ -91,12 +108,21 @@ systemctl --user enable --now podman.socket
 # /run/user/$(id -u)/podman/podman.sock
 ```
 
-If using rootless Podman, set the socket path accordingly:
+Icefall **auto-detects the rootless socket** from `XDG_RUNTIME_DIR`, so if it
+runs in the same user session you usually do not need to set the path by hand.
+To be explicit (recommended for a systemd service), set it in the config:
 
-```toml title="/etc/icefall/config.toml"
+```toml title="config.toml"
 runtime = "podman"
 container_socket = "/run/user/1000/podman/podman.sock"
 ```
+
+<Aside type="caution">
+Running Icefall fully rootless requires `XDG_RUNTIME_DIR` to be set and the
+rootless `podman.socket` user unit to be active. If Icefall runs as a systemd
+**system** service it cannot see a user socket — see "Running Icefall rootless"
+below.
+</Aside>
 
 ### Verifying the connection
 
@@ -109,6 +135,35 @@ sudo journalctl -u icefall -n 20
 # You should see:
 # Container runtime connected (podman)
 ```
+
+## Running Icefall rootless
+
+With Podman, Icefall can run **without root** — the daemon, the container
+runtime, and your apps all run as an unprivileged user. This is a meaningful
+security improvement: a compromised app cannot escalate to root on the host.
+
+When Icefall detects a rootless Podman socket it automatically adjusts its
+behavior:
+
+- **Port binding** — published ports bind to `127.0.0.1` instead of `0.0.0.0`.
+  Caddy runs on the same host and proxies to them, so apps stay reachable.
+- **Privileged ports** — rootless Podman cannot bind host ports below `1024`.
+  Icefall rejects such a request up front with a clear error. Apps are
+  published on high ports and fronted by Caddy on 80/443, so this does not
+  affect normal use.
+- **Resource limits** — rootless cgroup limits only apply with cgroups v2 and
+  delegation enabled; Icefall logs a warning if limits may be ignored.
+- **Restart policies** — `always` / `unless-stopped` survive a reboot only if
+  user lingering is enabled: `sudo loginctl enable-linger $USER`.
+
+### Rootless setup checklist
+
+1. Run the rootless Podman socket: `systemctl --user enable --now podman.socket`
+2. Enable lingering so it survives logout/reboot: `sudo loginctl enable-linger $USER`
+3. Ensure `XDG_RUNTIME_DIR` is set in the Icefall process environment.
+4. Point `container_socket` at the rootless socket (or let auto-detection find it).
+5. Front your apps with Caddy (already part of the standard install) so they
+   are reachable on ports 80/443.
 
 ## Behavioral differences
 
@@ -200,13 +255,25 @@ Icefall abstracts the container runtime through its API, so you rarely need to i
 
 ## Migrating from Docker to Podman
 
-### Before you start
+There are two migration targets. **Rootful Podman** is a drop-in swap — Icefall
+stays a root system service, only the runtime changes. **Rootless Podman** goes
+further: Icefall and your apps run as an unprivileged user, which is a real
+security improvement but changes how the service is run. Pick the path that
+matches your goal.
+
+### Before you start (both paths)
 
 1. Back up your Icefall instance: `icefall migrate export backup.tar.gz`
 2. Note your running apps: `icefall apps list`
 3. Stop the Icefall daemon: `sudo systemctl stop icefall`
 
-### Migration steps
+<Aside type="caution">
+Docker images are stored in `/var/lib/docker` and Podman images in `/var/lib/containers` (rootful) or `~/.local/share/containers` (rootless). Switching runtimes means your existing container images are not shared. Apps will need a fresh deploy to pull or build images under Podman.
+</Aside>
+
+### Path A — migrate to rootful Podman
+
+Icefall keeps running as a root system service; only the runtime changes.
 
 ```bash
 # 1. Install Podman
@@ -231,13 +298,77 @@ icefall apps list
 # For each app, trigger a new deploy from the dashboard or CLI
 ```
 
+### Path B — migrate to rootless Podman
+
+This moves Icefall off root entirely: the daemon, the runtime, and your apps
+all run as an unprivileged user. It is more involved than Path A because the
+Icefall service moves from a **system** unit to a **user** unit — a system
+service has no `XDG_RUNTIME_DIR` and cannot reach the rootless socket.
+
+<Aside type="note">
+Review the [Running Icefall rootless](#running-icefall-rootless) section first —
+it explains the behavior changes (loopback port binding, no privileged ports,
+restart-policy lingering) that apply once you are rootless.
+</Aside>
+
+```bash
+# Run these as the NON-ROOT user that will own Icefall.
+
+# 1. Install Podman (system package; the runtime itself still installs as root)
+sudo apt-get install -y podman aardvark-dns
+
+# 2. Enable the rootless Podman API socket for THIS user
+systemctl --user enable --now podman.socket
+echo "$XDG_RUNTIME_DIR/podman/podman.sock"   # note this path
+
+# 3. Enable lingering so the user's services survive logout / reboot
+sudo loginctl enable-linger "$USER"
+
+# 4. Move Icefall's data and config somewhere the user owns, e.g.:
+#    ~/.config/icefall/config.toml  and  ~/.local/share/icefall
+mkdir -p ~/.config/icefall ~/.local/share/icefall
+sudo cp /etc/icefall/config.toml ~/.config/icefall/config.toml
+sudo cp -r /var/lib/icefall/. ~/.local/share/icefall/
+sudo chown -R "$USER" ~/.config/icefall ~/.local/share/icefall
+
+# 5. Point the config at the rootless runtime and user-owned paths
+#    (edit ~/.config/icefall/config.toml)
+#    runtime          = "podman"
+#    container_socket = "/run/user/<uid>/podman/podman.sock"
+#    data_dir         = "/home/<user>/.local/share/icefall"
+#    sqlite_path      = "/home/<user>/.local/share/icefall/icefall.db"
+
+# 6. Disable the old root system service
+sudo systemctl disable --now icefall
+
+# 7. Create a user service unit at ~/.config/systemd/user/icefall.service
+#    [Service]
+#    ExecStart=/usr/local/bin/icefall daemon start
+#    Environment=ICEFALL_CONFIG=%h/.config/icefall/config.toml
+#    [Install]
+#    WantedBy=default.target
+
+# 8. Start Icefall as a user service
+systemctl --user daemon-reload
+systemctl --user enable --now icefall
+
+# 9. Verify — note "rootless=true"
+journalctl --user -u icefall -n 10 | grep -E "runtime connected|rootless"
+
+# 10. Redeploy your apps
+icefall apps list
+```
+
 <Aside type="caution">
-Docker images are stored in `/var/lib/docker` and Podman images in `/var/lib/containers`. Switching runtimes means your existing container images are not shared between them. Apps will need a fresh deploy to pull or build images under Podman.
+Rootless apps publish ports on `127.0.0.1` and cannot bind ports below 1024.
+Keep Caddy in front (it serves 80/443 and proxies to the high ports) — the
+standard install already does this. If an app explicitly requested a privileged
+host port, change it to a high port before redeploying.
 </Aside>
 
 ### Rolling back to Docker
 
-If you need to switch back:
+**From rootful Podman (Path A):**
 
 ```bash
 # 1. Stop Icefall
@@ -249,6 +380,27 @@ sudo sed -i 's|container_socket = "/run/podman/podman.sock"|container_socket = "
 
 # 3. Restart
 sudo systemctl start icefall
+```
+
+**From rootless Podman (Path B):** the service is a user unit, so roll back
+through that and (optionally) restore the root system service.
+
+```bash
+# 1. Stop the rootless user service
+systemctl --user stop icefall
+
+# 2. Point the user config back at Docker
+#    (edit ~/.config/icefall/config.toml)
+#    runtime          = "docker"
+#    container_socket = "/var/run/docker.sock"
+
+# 3a. To keep running as a user service against Docker, just restart it:
+systemctl --user start icefall
+
+# 3b. Or to return to the original root system service, re-enable it
+#     (it still has the pre-migration config and data):
+systemctl --user disable --now icefall
+sudo systemctl enable --now icefall
 ```
 
 ## Troubleshooting
@@ -306,3 +458,24 @@ podman logs icefall-db-<name>
 # If permission errors, try:
 podman unshare chown -R 999:999 /var/lib/containers/storage/volumes/<volume>/_data
 ```
+
+## Verifying Podman compatibility
+
+Before relying on Podman in production — especially rootless — run through this
+checklist on the target server. Each step maps to a real divergence Icefall
+handles.
+
+| # | Check | Expected result |
+|---|-------|-----------------|
+| 1 | Daemon connects: `journalctl -u icefall \| grep "runtime connected"` | `Container runtime connected (podman)` |
+| 2 | Rootless detected (if applicable): logs show `rootless=true` | Matches your setup |
+| 3 | Deploy a test app, then `podman ps --filter label=icefall.app` | Container running |
+| 4 | App reachable through Caddy on its domain | HTTP 200 |
+| 5 | Container DNS: logs show `Podman container DNS available` | No `aardvark-dns` warning |
+| 6 | Scale the app to 2+ instances | All instances start, Caddy load-balances |
+| 7 | Multi-server deploy: image transfers to a Podman worker | Container starts on the worker |
+| 8 | Resource limits: set a memory limit, check `podman stats` | Limit applied, or a warning was logged |
+
+If steps 5 or 8 surface a warning, install `aardvark-dns` / enable cgroups v2
+delegation respectively — Icefall keeps working, but those features need the
+host configured.
