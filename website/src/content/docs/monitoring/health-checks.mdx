@@ -1,6 +1,55 @@
 ---
-title: "health-checks"
-description: "Icefall documentation"
+title: Health checks
+description: How Icefall decides whether an app instance is healthy.
 ---
 
-Documentation coming soon.
+Icefall watches every running app instance and uses its health to decide what
+to route traffic to and when to restart something that has gone wrong.
+
+## What gets checked
+
+For each instance, Icefall tracks two things:
+
+- **Container state** — is the container running, or has it exited or crashed?
+- **HTTP health** — an optional request to a path inside the app.
+
+An instance is considered healthy only when the container is running *and*, if
+an HTTP health check is configured, that check passes.
+
+## HTTP health checks
+
+By default an instance counts as healthy as soon as its container is up. To
+check that the app itself is actually serving, configure an HTTP health check:
+a path Icefall requests (for example `/health` or `/`) and the status code range
+that counts as a pass.
+
+Icefall calls the path on an interval. After a configured number of consecutive
+failures the instance is marked unhealthy.
+
+## What happens to an unhealthy instance
+
+When an instance goes unhealthy, Icefall:
+
+- stops routing new requests to it — if the app runs
+  [multiple instances](/concepts/architecture/), traffic shifts to the healthy
+  ones,
+- restarts it according to its restart policy,
+- records the transition so it shows up in the app's status and can fire a
+  [notification](/management/notifications/).
+
+If every instance of an app is unhealthy, the app is down — Icefall keeps trying
+to restart instances and surfaces the state prominently in the dashboard.
+
+## Deploys wait for health
+
+A new deploy does not replace the old version until the new instance reports
+healthy. If it never becomes healthy, Icefall keeps the previous version serving
+traffic, so a broken build does not take the app offline. See
+[builds](/concepts/builds/) for the full deploy lifecycle.
+
+## Multi-server
+
+On a [multi-server](/concepts/architecture/) setup, the worker running an
+instance reports its health to the control plane. A worker that stops reporting
+for longer than the offline threshold has all of its instances treated as
+unhealthy, and the control plane reschedules them where it can.

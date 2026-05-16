@@ -1,6 +1,47 @@
 ---
-title: "metrics"
-description: "Icefall documentation"
+title: Metrics
+description: CPU, memory, and disk metrics for your server and apps.
 ---
 
-Documentation coming soon.
+Icefall reports resource usage for the server itself and for every running app,
+so you can see what is consuming CPU, memory, and disk.
+
+## Server metrics
+
+The dashboard shows a live overview of the host: CPU load, memory used and
+available, and disk usage. The same overview is available from the CLI:
+
+```bash
+icefall status
+```
+
+This prints the Icefall version alongside current CPU, memory, and disk figures
+— a quick way to check a server's headroom before deploying something new.
+
+## App metrics
+
+Each app reports the resource usage of its container(s): CPU and memory, sampled
+on an interval and shown as recent history in the dashboard. If an app runs
+[multiple instances](/concepts/architecture/), each instance is reported
+separately so you can spot an uneven one.
+
+Use these to size an app — if memory sits near the limit you set, raise it; if
+CPU is consistently idle, the app may be a candidate for fewer resources.
+
+## Memory limits
+
+Apps and [managed databases](/databases/provisioning/) run with a memory limit.
+Metrics show usage against that limit, so a container approaching its ceiling is
+visible before the runtime kills it for being out of memory.
+
+## Multi-server
+
+On a [multi-server](/concepts/architecture/) setup, every worker reports its own
+host metrics and the metrics of the instances it runs. The dashboard aggregates
+them, so you see each server's load and where each app instance is placed.
+
+## Alerting
+
+Metrics feed [notifications](/management/notifications/): Icefall can tell you
+when a server or app crosses a resource threshold, so you do not have to watch
+the dashboard to catch a server running low on memory or disk.

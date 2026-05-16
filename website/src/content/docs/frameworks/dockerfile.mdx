@@ -1,8 +1,75 @@
 ---
-title: "Deploy dockerfile"
-description: "How to deploy a dockerfile app on Icefall."
+title: Deploy with a Dockerfile
+description: Deploy any app on Icefall by providing your own Dockerfile.
 ---
 
-Guide coming soon. Icefall auto-detects dockerfile projects and generates an optimized Dockerfile.
+When a project has its own `Dockerfile`, Icefall uses it as-is instead of
+generating one. This is the escape hatch for any stack — a language or
+framework Icefall does not detect, or an app with build steps you need full
+control over.
 
-See [Introduction](/docs/getting-started/introduction) for the general deployment workflow.
+## Auto-detection
+
+If Icefall finds a `Dockerfile` in the repository root, it builds from that and
+skips framework detection entirely. Your Dockerfile is the source of truth.
+
+## Deploying
+
+```bash
+icefall deploy
+```
+
+Icefall builds the image from your `Dockerfile` and runs the resulting
+container. `icefall deploy --no-cache` forces a clean build that ignores the
+layer cache.
+
+## What your Dockerfile must do
+
+- **Expose the right port.** Your app must listen on `0.0.0.0` and on the port
+  Icefall expects. Set it with `EXPOSE` and have the app read `PORT` from the
+  environment, or set the port explicitly (see below).
+- **Define a start command.** Use `CMD` (or `ENTRYPOINT`) so the container has
+  something to run.
+
+```dockerfile
+FROM node:22-slim
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN npm ci
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+## Setting the port
+
+If your app does not honor `PORT`, tell Icefall which port the container
+listens on:
+
+```toml
+[build]
+port = 3000
+```
+
+## Best practices
+
+- **Multi-stage builds** — build in one stage, copy only the artifacts into a
+  slim final image.
+- **Pin base image versions** — use `node:22-slim`, not `node:latest`, so
+  builds are reproducible.
+- **Run as a non-root user** in the final stage.
+- **No secrets in the image** — pass them as Icefall environment variables, not
+  `COPY`-ed `.env` files or `ARG`s.
+- Add a `.dockerignore` so `node_modules`, `.git`, and local env files stay out
+  of the build context.
+
+## Common issues
+
+**Health check never passes** — the app is not listening on `0.0.0.0` on the
+expected port. Bind to `0.0.0.0` and set `port` if needed.
+
+**Build context too large** — add a `.dockerignore`.
+
+See [Introduction](/getting-started/introduction/) for the general deployment
+workflow.

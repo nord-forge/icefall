@@ -1,8 +1,64 @@
 ---
-title: "Deploy react"
-description: "How to deploy a react app on Icefall."
+title: Deploy React
+description: How to deploy a React single-page app on Icefall.
 ---
 
-Guide coming soon. Icefall auto-detects react projects and generates an optimized Dockerfile.
+A React app built with Vite or Create React App is a static site once built —
+Icefall builds it and serves the output with Caddy.
 
-See [Introduction](/docs/getting-started/introduction) for the general deployment workflow.
+## Auto-detection
+
+Icefall detects React when it finds `react` in `package.json` and a static
+build setup (Vite or Create React App) rather than a server framework.
+
+| Setting | Value |
+|---------|-------|
+| Build command | `build` script in `package.json` |
+| Output directory | `dist/` (Vite) or `build/` (Create React App) |
+| Port | 80 |
+| Served by | Caddy (static files) |
+
+If your app is a React *server* framework (Next.js, Remix), it is detected as
+that framework instead — this page is for client-rendered SPAs.
+
+## Deploying
+
+```bash
+icefall deploy
+```
+
+Icefall generates a multi-stage Dockerfile that installs dependencies, runs the
+build, and copies the output into a Caddy container that serves the files.
+
+## SPA routing
+
+Caddy is configured to fall back to `index.html` for unknown paths, so
+client-side routes (React Router) work on direct navigation and refresh — no
+extra configuration.
+
+## Build-time environment variables
+
+A built SPA has no server, so environment variables are baked in at build time.
+Vite exposes variables prefixed with `VITE_`; Create React App uses `REACT_APP_`.
+Set these in the dashboard before deploying — changing them later needs a new
+deploy. Never put secrets in a client build; anything bundled ships to the
+browser.
+
+## Override defaults
+
+```toml
+[build]
+build_command = "npm run build"
+output_dir = "build"
+```
+
+## Common issues
+
+**Routes 404 on refresh** — confirm the build is detected as a static React
+SPA, not a server framework.
+
+**Wrong output directory** — Vite uses `dist/`, Create React App uses `build/`.
+Set `output_dir` explicitly if detection picks the wrong one.
+
+See [Introduction](/getting-started/introduction/) for the general deployment
+workflow.

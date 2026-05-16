@@ -1,6 +1,81 @@
 ---
-title: "provisioning"
-description: "Icefall documentation"
+title: Provisioning databases
+description: One-click managed databases — engines, connection strings, and linking to apps.
 ---
 
-Documentation coming soon.
+Icefall can run managed databases for you as containers, with generated
+credentials, a stable internal hostname, and automatic [backups](/databases/backups/).
+
+## Supported engines
+
+| Engine | Image | Port | Default memory |
+|--------|-------|------|----------------|
+| PostgreSQL | `postgres:17` | 5432 | 1024 MB |
+| MySQL | `mysql:8` | 3306 | 1024 MB |
+| MariaDB | `mariadb:11` | 3306 | 1024 MB |
+| MongoDB | `mongo:7` | 27017 | 512 MB |
+| Redis | `redis:7` | 6379 | 256 MB |
+| KeyDB | `eqalpha/keydb` | 6379 | 256 MB |
+| Valkey | `valkey/valkey:8` | 6379 | 256 MB |
+| Dragonfly | `dragonflydb/dragonfly` | 6379 | 512 MB |
+| ClickHouse | `clickhouse-server:24` | 8123 | 2048 MB |
+| CockroachDB | `cockroachdb/cockroach` | 26257 | 2048 MB |
+| Cassandra | `cassandra:5` | 9042 | 2048 MB |
+
+## Creating a database
+
+From the dashboard, or the CLI:
+
+```bash
+icefall db create postgres
+icefall db list
+```
+
+When you provision a database, Icefall:
+
+- Starts a container named `icefall-db-<name>` with a persistent data volume.
+- Generates a random 32-character password and a `icefall` user.
+- Gives it a stable internal hostname, `<name>.icefall.internal`, so apps on the
+  same network can reach it.
+- Sets a memory limit (the defaults above; adjustable per database).
+- Sets a restart policy so the database survives restarts.
+
+By default a database is reachable only on Icefall's internal network. You can
+optionally expose its port on the host if you need to connect from outside.
+
+## Connection strings
+
+Icefall generates the connection string at provision time and stores it
+encrypted. The shape depends on the engine — for example:
+
+```
+postgresql://icefall:<password>@icefall-db-mydb:5432/icefall
+mysql://icefall:<password>@icefall-db-mydb:3306/icefall
+redis://:<password>@icefall-db-mydb:6379
+mongodb://icefall:<password>@icefall-db-mydb:27017/icefall
+```
+
+View the connection string in the dashboard — it is masked by default and
+copy-to-clipboard.
+
+## Linking a database to an app
+
+Link a database to an app and Icefall injects the connection string into the
+app's environment as a variable, named for the engine:
+
+| Engines | Variable |
+|---------|----------|
+| PostgreSQL, MySQL, MariaDB, CockroachDB | `DATABASE_URL` |
+| Redis, KeyDB, Valkey, Dragonfly | `REDIS_URL` |
+| MongoDB | `MONGODB_URL` |
+| ClickHouse | `CLICKHOUSE_URL` |
+| Cassandra | `CASSANDRA_URL` |
+
+Your app reads the variable like any other environment variable. Unlinking
+removes it again. The app deploys after the change so the new value takes effect.
+
+## Credentials at rest
+
+Database credentials are stored in Icefall's encrypted SQLite database — never
+in plaintext. The connection string still ends up inside the linked app's
+container as an environment variable, which is how the app connects.

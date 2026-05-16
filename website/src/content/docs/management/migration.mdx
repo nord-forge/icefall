@@ -1,6 +1,67 @@
 ---
-title: "migration"
-description: "Icefall documentation"
+title: Server migration
+description: Move an entire Icefall server to new hardware.
 ---
 
-Documentation coming soon.
+`icefall migrate` exports the full state of an Icefall server into a single
+archive and imports it onto another — the way to move to new hardware, change
+hosting, or keep an offsite copy of everything.
+
+## What is in an export
+
+An export captures everything Icefall needs to recreate the server:
+
+- the encrypted SQLite database — apps, domains, users, settings, and all
+  stored credentials,
+- `config.toml`,
+- dumps of every [managed database](/databases/provisioning/),
+- application data volumes,
+- logs.
+
+It is the same set of state as an [instance backup](/databases/backups/),
+packaged as one portable file.
+
+## Exporting
+
+```bash
+icefall migrate export --output icefall-backup.tar.gz
+```
+
+The output can also be an S3 URL, so the archive is written straight to object
+storage:
+
+```bash
+icefall migrate export --output s3://my-bucket/icefall-backup.tar.gz
+```
+
+Add `--dry-run` to see what would be exported without writing anything.
+
+## Importing
+
+On the new server, install Icefall, then import the archive:
+
+```bash
+icefall migrate import --from icefall-backup.tar.gz
+```
+
+Import restores the database, configuration, managed databases, and volumes,
+then brings apps back up. `--dry-run` previews the import without applying it.
+
+<aside type="caution">
+The export contains the encrypted SQLite database **and** the encryption key
+material needed to read it. Treat the archive like a credential — anyone with it
+has everything. Store it somewhere private and transfer it over a secure
+channel.
+</aside>
+
+## Same-version recommendation
+
+Export and import with the same Icefall version. If the target server is on a
+different version, [update](/management/updates/) it to match before importing,
+so the database schema lines up.
+
+## Migration is not a live sync
+
+`migrate` is a point-in-time copy, not continuous replication. Anything that
+changes on the old server after the export is not in the archive — schedule the
+cutover so the old server is idle when you take the final export.
