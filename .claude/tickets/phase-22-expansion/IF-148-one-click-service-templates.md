@@ -60,7 +60,7 @@ Build a template system that lets users deploy popular self-hosted services in o
   10. Verdaccio — private npm registry
   11. Appsmith — low-code internal tools
   12. Forgejo — community-governed Git forge
-  13. Gitness — Git + CI in one platform
+  13. Harness (Gitness) — Git + CI in one platform
 
   **Productivity (8)**
   14. n8n — workflow automation

@@ -34,6 +34,10 @@ export function invalidatePrefix(prefix: string): void {
   }
 }
 
+export function clearAll(): void {
+  store.clear();
+}
+
 /** Periodic sweep to remove stale entries that were never read. */
 const SWEEP_INTERVAL = 60_000;
 setInterval(() => {
@@ -42,3 +46,8 @@ setInterval(() => {
     if (now - entry.timestamp > TTL) store.delete(key);
   }
 }, SWEEP_INTERVAL);
+
+/** Clear cache on View Transition navigation so pages always get fresh data. */
+if (typeof document !== 'undefined') {
+  document.addEventListener('astro:before-swap', () => store.clear());
+}

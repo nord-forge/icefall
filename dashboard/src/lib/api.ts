@@ -1,4 +1,4 @@
-import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult } from './types';
+import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -21,9 +21,14 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     if (cached !== null) return cached;
   }
 
+  const headers: Record<string, string> = {};
+  if (options?.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   });
   if (!res.ok) {
@@ -148,6 +153,9 @@ export const api = {
 
   listDatabases: () => request<{ data: any[] }>('/databases'),
 
+  createDatabase: (body: { name: string; db_type: string; app_id?: string; memory_mb?: number; expose_port?: boolean }) =>
+    request<{ data: any }>('/databases', { method: 'POST', body: JSON.stringify(body) }),
+
   linkDatabase: (dbId: string, appId: string) =>
     request<{ message: string }>(`/databases/${dbId}/link/${appId}`, { method: 'POST' }),
 
@@ -174,6 +182,18 @@ export const api = {
     config?: string;
   }) =>
     request<{ data: any }>(`/apps/${appId}/health`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  createHealthCheck: (appId: string, body: {
+    check_type: string;
+    interval_secs: number;
+    failure_threshold: number;
+    auto_restart: boolean;
+    config?: string;
+  }) =>
+    request<{ data: any }>(`/apps/${appId}/health`, { method: 'POST', body: JSON.stringify(body) }),
+
+  deleteHealthCheck: (appId: string, checkId: string) =>
+    request<{ message: string }>(`/health-checks/${checkId}`, { method: 'DELETE' }),
 
   getServerStatus: () => request<ServerStatus>('/server/status'),
 
@@ -623,6 +643,13 @@ export const api = {
       method: 'POST',
     }),
 
+  // GitHub Apps
+  getGitHubSetup: () =>
+    request<{ manifest: Record<string, unknown>; form_action: string }>('/github/setup'),
+
+  listGitHubApps: () =>
+    request<{ data: Array<{ id: string; name: string; app_id: number; html_url: string; created_at: string }> }>('/github/apps'),
+
   // Git sources
   listGitSources: () =>
     request<{ data: GitHubInstallation[] }>('/git-sources'),
@@ -663,6 +690,66 @@ export const api = {
     request<{ data: App }>('/bundles/import', {
       method: 'POST',
       body: JSON.stringify(bundle),
+    }),
+
+  // Teams
+  listTeams: () =>
+    request<{ data: Team[] }>('/teams'),
+
+  createTeam: (name: string) =>
+    request<{ data: Team }>('/teams', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  getTeam: (id: string) =>
+    request<{ data: { team: Team; members: TeamMember[]; resource_count: number } }>(`/teams/${id}`),
+
+  updateTeam: (id: string, body: { name?: string; settings?: Record<string, unknown> }) =>
+    request<{ data: Team }>(`/teams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteTeam: (id: string) =>
+    request<{ message: string }>(`/teams/${id}`, { method: 'DELETE' }),
+
+  switchTeam: (id: string) =>
+    request<{ data: { team_id: string; role: string }; message: string }>(`/teams/${id}/switch`, {
+      method: 'POST',
+    }),
+
+  listTeamMembers: (teamId: string) =>
+    request<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
+
+  updateTeamMemberRole: (teamId: string, userId: string, role: string) =>
+    request<{ message: string }>(`/teams/${teamId}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeTeamMember: (teamId: string, userId: string) =>
+    request<{ message: string }>(`/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  inviteTeamMember: (teamId: string, email: string, role: string) =>
+    request<{ data: TeamInvitation }>(`/teams/${teamId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    }),
+
+  listTeamInvitations: (teamId: string) =>
+    request<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`),
+
+  acceptInvitation: (token: string) =>
+    request<{ data: { team: Team; role: string }; message: string }>(`/invitations/${token}/accept`, {
+      method: 'POST',
+    }),
+
+  declineInvitation: (token: string) =>
+    request<{ message: string }>(`/invitations/${token}`, {
+      method: 'DELETE',
     }),
 };
 

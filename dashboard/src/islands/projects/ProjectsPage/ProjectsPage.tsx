@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Project, App } from '@lib/types';
 import { api } from '@lib/api';
+import { invalidatePrefix } from '@lib/cache';
 import { formatRelativeTime } from '@lib/format';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import { Plus, FolderOpen, Pencil, Trash2, ArrowLeft, Grid2x2, Database } from 'lucide-preact';
+import { addToast } from '@stores/toast';
 import { SkeletonCard } from '@islands/shared/Skeleton/Skeleton';
 import Input from '@islands/shared/Input/Input';
 import styles from './projects-page.module.css';
@@ -32,6 +35,7 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   const [formName, setFormName] = useState('');
@@ -107,15 +111,9 @@ export default function ProjectsPage() {
     setSaving(false);
   }
 
-  async function handleDelete(id: string, e: Event) {
-    e.stopPropagation();
-    if (confirmDeleteId !== id) {
-      setConfirmDeleteId(id);
-      return;
-    }
+  async function handleDelete(id: string) {
     try {
       await api.deleteProject(id);
-      setConfirmDeleteId(null);
       if (selectedProject?.id === id) {
         setSelectedProject(null);
       }
@@ -125,10 +123,13 @@ export default function ProjectsPage() {
     }
   }
 
-  async function openDetail(project: Project) {
+  async function openDetail(project: Project, pushState = true) {
     try {
       const { data } = await api.getProject(project.id);
       setSelectedProject(data as ProjectDetail);
+      if (pushState) {
+        window.history.pushState({ projectId: project.id }, '', `/projects?id=${project.id}`);
+      }
     } catch {
       setError('Failed to load project details');
     }
@@ -137,6 +138,54 @@ export default function ProjectsPage() {
   function backToList() {
     setSelectedProject(null);
     setError('');
+    window.history.pushState(null, '', '/projects');
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id && projects.length > 0) {
+      const project = projects.find((p) => p.id === id);
+      if (project) openDetail(project, false);
+    }
+
+    function handlePopState() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id) {
+        const project = projects.find((p) => p.id === id);
+        if (project) openDetail(project, false);
+      } else {
+        setSelectedProject(null);
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [projects]);
+
+  // Detail view state
+  const [showAddDb, setShowAddDb] = useState(false);
+  const [newDbName, setNewDbName] = useState('');
+  const [newDbType, setNewDbType] = useState('postgres');
+  const [creatingDb, setCreatingDb] = useState(false);
+
+  async function handleCreateDb() {
+    if (!newDbName.trim() || !selectedProject) return;
+    setCreatingDb(true);
+    try {
+      await api.createDatabase({ name: newDbName.trim(), db_type: newDbType, app_id: undefined });
+      addToast('success', `Database "${newDbName.trim()}" created`);
+      setNewDbName('');
+      setShowAddDb(false);
+      invalidatePrefix('/projects');
+      invalidatePrefix('/databases');
+      const { data } = await api.getProject(selectedProject.id);
+      setSelectedProject(data as ProjectDetail);
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to create database');
+    }
+    setCreatingDb(false);
   }
 
   // Detail view
@@ -169,9 +218,17 @@ export default function ProjectsPage() {
         </div>
 
         <section aria-labelledby="project-apps-heading" style={{ marginBottom: 'var(--space-6)' }}>
-          <h2 id="project-apps-heading" class={styles.sectionTitle}>
-            Apps ({selectedProject.apps?.length || 0})
-          </h2>
+          <div class={styles.sectionHeader}>
+            <h2 id="project-apps-heading" class={styles.sectionTitle}>
+              Apps ({selectedProject.apps?.length || 0})
+            </h2>
+            <a href={`/apps/new?project_id=${selectedProject.id}`}>
+              <Button variant="secondary" size="sm">
+                <Plus size={14} /> Add app
+              </Button>
+            </a>
+          </div>
+
           {selectedProject.apps && selectedProject.apps.length > 0 ? (
             <div class={styles.resourceList}>
               {selectedProject.apps.map((app) => (
@@ -187,14 +244,59 @@ export default function ProjectsPage() {
               ))}
             </div>
           ) : (
-            <p class={styles.noResources}>No apps assigned to this project yet.</p>
+            <p class={styles.noResources}>No apps in this project yet. Click "Add app" to get started.</p>
           )}
         </section>
 
         <section aria-labelledby="project-dbs-heading">
-          <h2 id="project-dbs-heading" class={styles.sectionTitle}>
-            Databases ({selectedProject.databases?.length || 0})
-          </h2>
+          <div class={styles.sectionHeader}>
+            <h2 id="project-dbs-heading" class={styles.sectionTitle}>
+              Databases ({selectedProject.databases?.length || 0})
+            </h2>
+            {!showAddDb && (
+              <Button variant="secondary" size="sm" onClick={() => setShowAddDb(true)}>
+                <Plus size={14} /> Add database
+              </Button>
+            )}
+          </div>
+
+          {showAddDb && (
+            <div class={styles.addResourceForm}>
+              <Input
+                label="Database name"
+                name="new-db-name"
+                value={newDbName}
+                onChange={setNewDbName}
+                placeholder="my-database"
+              />
+              <div>
+                <label class={formStyles.label} style={{ marginBottom: 'var(--space-2)', display: 'block' }}>Type</label>
+                <div class={styles.dbTypeOptions} role="radiogroup" aria-label="Database type">
+                  {['postgres', 'mysql', 'redis', 'mongo'].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      class={`${styles.dbTypeOption} ${newDbType === t ? styles.dbTypeOptionSelected : ''}`}
+                      onClick={() => setNewDbType(t)}
+                      role="radio"
+                      aria-checked={newDbType === t}
+                    >
+                      {t === 'postgres' ? 'PostgreSQL' : t === 'mysql' ? 'MySQL' : t === 'redis' ? 'Redis' : 'MongoDB'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div class={styles.addResourceActions}>
+                <Button variant="ghost" size="sm" onClick={() => { setShowAddDb(false); setNewDbName(''); }}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleCreateDb} loading={creatingDb} disabled={!newDbName.trim()}>
+                  Create database
+                </Button>
+              </div>
+            </div>
+          )}
+
           {selectedProject.databases && selectedProject.databases.length > 0 ? (
             <div class={styles.resourceList}>
               {selectedProject.databases.map((db) => (
@@ -207,9 +309,9 @@ export default function ProjectsPage() {
                 </a>
               ))}
             </div>
-          ) : (
-            <p class={styles.noResources}>No databases assigned to this project yet.</p>
-          )}
+          ) : !showAddDb ? (
+            <p class={styles.noResources}>No databases in this project yet. Click "Add database" to get started.</p>
+          ) : null}
         </section>
       </div>
     );
@@ -323,33 +425,14 @@ export default function ProjectsPage() {
                   >
                     <Pencil size={14} />
                   </button>
-                  {confirmDeleteId === project.id ? (
-                    <div class={styles.confirmRow}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e: Event) => { e.stopPropagation(); setConfirmDeleteId(null); }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={(e: Event) => handleDelete(project.id, e)}
-                      >
-                        <Trash2 size={12} /> Delete
-                      </Button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      class={`${styles.iconButton} ${styles.iconButtonDanger}`}
-                      onClick={(e: Event) => handleDelete(project.id, e)}
-                      aria-label={`Delete project ${project.name}`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    class={`${styles.iconButton} ${styles.iconButtonDanger}`}
+                    onClick={(e: Event) => { e.stopPropagation(); setConfirmDeleteId(project.id); }}
+                    aria-label={`Delete project ${project.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
               {project.description && (
@@ -364,6 +447,26 @@ export default function ProjectsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete project?"
+        description={`This will permanently remove "${projects.find((p) => p.id === confirmDeleteId)?.name ?? 'this project'}" and unlink all its apps and databases. This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setDeleting(true);
+          try {
+            await handleDelete(confirmDeleteId);
+          } finally {
+            setDeleting(false);
+            setConfirmDeleteId(null);
+          }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

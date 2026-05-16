@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
 import { api } from '@lib/api';
+import { createVisibleInterval } from '@lib/visibility';
 import { createSSEClient } from '@lib/sse';
 import { formatBytes, formatPercent } from '@lib/format';
 import type { ServerStatus } from '@lib/types';
@@ -39,7 +40,7 @@ export default function SystemStatus() {
     }
 
     check();
-    const interval = setInterval(check, 30_000);
+    const stopPolling = createVisibleInterval(check, 30_000);
 
     const sse = createSSEClient('/api/v1/events', {
       'server.status': () => { if (active) check(); },
@@ -59,7 +60,7 @@ export default function SystemStatus() {
       },
     });
 
-    return () => { active = false; clearInterval(interval); sse.close(); };
+    return () => { active = false; stopPolling(); sse.close(); };
   }, []);
 
   const dotClass = {

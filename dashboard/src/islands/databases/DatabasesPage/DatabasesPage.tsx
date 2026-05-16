@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/preact';
 import { $databases, $databasesLoaded } from '@stores/databases';
 import type { ManagedDb } from '@stores/databases';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import Select from '@islands/shared/Select/Select';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import DatabaseBrowser from '@islands/databases/DatabaseBrowser/DatabaseBrowser';
@@ -57,6 +58,7 @@ export default function DatabasesPage() {
   const [showCredentials, setShowCredentials] = useState(false);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [newDb, setNewDb] = useState({ name: '', db_type: 'postgres', memory_mb: '' });
 
@@ -254,20 +256,30 @@ export default function DatabasesPage() {
                 <p class={styles.dangerLabel}>Delete Database</p>
                 <p class={styles.dangerDescription}>This will permanently delete the database and all its data.</p>
               </div>
-              {confirmDelete ? (
-                <div class={styles.confirmActions}>
-                  <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-                  <Button variant="danger" onClick={() => handleDelete(selectedDb.id)}>
-                    <Trash2 size={14} /> Confirm Delete
-                  </Button>
-                </div>
-              ) : (
-                <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                  <Trash2 size={14} /> Delete
-                </Button>
-              )}
+              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                <Trash2 size={14} /> Delete
+              </Button>
             </div>
           </div>
+
+          <ConfirmDialog
+            open={confirmDelete}
+            title="Delete database?"
+            description={`This will permanently delete "${selectedDb.name}" and all its data, including backups. This action cannot be undone.`}
+            confirmLabel="Delete"
+            variant="danger"
+            loading={deleting}
+            onConfirm={async () => {
+              setDeleting(true);
+              try {
+                await handleDelete(selectedDb.id);
+              } finally {
+                setDeleting(false);
+                setConfirmDelete(false);
+              }
+            }}
+            onCancel={() => setConfirmDelete(false)}
+          />
         </div>
       </div>
     );

@@ -7,6 +7,7 @@ use serde::Deserialize;
 use crate::api::error::ApiError;
 use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
+use crate::db::models::NewLogDrain;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -19,12 +20,14 @@ pub fn routes() -> Router<AppState> {
 async fn list_drains(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_app_id): Path<String>,
+    Path(app_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({ "data": [] })))
+
+    let drains = state.db.list_log_drains_for_app(&app_id).await?;
+    Ok(Json(serde_json::json!({ "data": drains })))
 }
 
 async fn list_global_drains(
@@ -34,7 +37,9 @@ async fn list_global_drains(
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({ "data": [] })))
+
+    let drains = state.db.list_global_log_drains().await?;
+    Ok(Json(serde_json::json!({ "data": drains })))
 }
 
 #[derive(Deserialize)]
@@ -42,6 +47,7 @@ struct CreateDrainRequest {
     name: String,
     drain_type: String,
     config: serde_json::Value,
+    #[allow(dead_code)]
     enabled: Option<bool>,
 }
 
@@ -54,18 +60,20 @@ async fn create_drain(
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({
-        "data": {
-            "id": uuid::Uuid::new_v4().to_string(),
-            "app_id": app_id,
-            "name": body.name,
-            "drain_type": body.drain_type,
-            "config": body.config,
-            "enabled": body.enabled.unwrap_or(true),
-            "last_sent_at": null,
-            "created_at": chrono::Utc::now().to_rfc3339(),
-        }
-    })))
+
+    if body.name.trim().is_empty() {
+        return Err(ApiError::BadRequest("name is required".into()));
+    }
+
+    let new_drain = NewLogDrain {
+        app_id: Some(app_id),
+        name: body.name,
+        drain_type: body.drain_type,
+        config: body.config.to_string(),
+    };
+
+    let drain = state.db.create_log_drain(&new_drain).await?;
+    Ok(Json(serde_json::json!({ "data": drain })))
 }
 
 async fn update_drain(
@@ -77,37 +85,162 @@ async fn update_drain(
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({
-        "data": {
-            "id": drain_id,
-            "name": body.name,
-            "drain_type": body.drain_type,
-            "config": body.config,
-            "enabled": body.enabled.unwrap_or(true),
-        }
-    })))
+
+    let existing = state.db.get_log_drain(&drain_id).await?;
+    if existing.is_none() {
+        return Err(ApiError::NotFound(format!(
+            "log drain {drain_id} not found"
+        )));
+    }
+
+    let update = NewLogDrain {
+        app_id: existing.unwrap().app_id,
+        name: body.name,
+        drain_type: body.drain_type,
+        config: body.config.to_string(),
+    };
+
+    let drain = state.db.update_log_drain(&drain_id, &update).await?;
+    Ok(Json(serde_json::json!({ "data": drain })))
 }
 
 async fn delete_drain(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_drain_id): Path<String>,
+    Path(drain_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    state.db.delete_log_drain(&drain_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }
 
 async fn test_drain(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_drain_id): Path<String>,
+    Path(drain_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({
-        "data": { "success": true, "message": "Test log sent successfully" }
-    })))
+
+    let drain = state.db.get_log_drain(&drain_id).await?;
+    if drain.is_none() {
+        return Err(ApiError::NotFound(format!(
+            "log drain {drain_id} not found"
+        )));
+    }
+
+    let drain = drain.unwrap();
+    let config: serde_json::Value = serde_json::from_str(&drain.config).unwrap_or_default();
+
+    match drain.drain_type.as_str() {
+        "http" => {
+            let url = config["url"].as_str().unwrap_or_default();
+            let method = config["method"].as_str().unwrap_or("POST");
+            if url.is_empty() {
+                return Err(ApiError::BadRequest(
+                    "HTTP drain has no URL configured".into(),
+                ));
+            }
+            let client = reqwest::Client::new();
+            let test_payload = serde_json::json!({
+                "message": "Test log from Icefall",
+                "level": "info",
+                "timestamp": crate::db::models::now_iso8601(),
+                "source": "icefall-test"
+            });
+            let resp = match method {
+                "PUT" => client.put(url).json(&test_payload).send().await,
+                _ => client.post(url).json(&test_payload).send().await,
+            };
+            match resp {
+                Ok(r) if r.status().is_success() => Ok(Json(serde_json::json!({
+                    "data": { "success": true, "message": "Test log sent successfully" }
+                }))),
+                Ok(r) => Err(ApiError::BadRequest(format!(
+                    "Drain responded with status {}",
+                    r.status()
+                ))),
+                Err(e) => Err(ApiError::BadRequest(format!("Failed to reach drain: {e}"))),
+            }
+        }
+        "loki" => {
+            let url = config["url"].as_str().unwrap_or_default();
+            if url.is_empty() {
+                return Err(ApiError::BadRequest(
+                    "Loki drain has no URL configured".into(),
+                ));
+            }
+            let push_url = format!("{}/loki/api/v1/push", url.trim_end_matches('/'));
+            let payload = serde_json::json!({
+                "streams": [{
+                    "stream": { "app": "icefall-test", "level": "info" },
+                    "values": [[
+                        format!("{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)),
+                        "Test log from Icefall"
+                    ]]
+                }]
+            });
+            let client = reqwest::Client::new();
+            let mut req = client.post(&push_url).json(&payload);
+            if let Some(tenant) = config["tenant_id"].as_str() {
+                req = req.header("X-Scope-OrgID", tenant);
+            }
+            if let (Some(user), Some(pass)) =
+                (config["username"].as_str(), config["password"].as_str())
+            {
+                req = req.basic_auth(user, Some(pass));
+            }
+            match req.send().await {
+                Ok(r) if r.status().is_success() || r.status().as_u16() == 204 => {
+                    Ok(Json(serde_json::json!({
+                        "data": { "success": true, "message": "Test log sent to Loki" }
+                    })))
+                }
+                Ok(r) => {
+                    let body = r.text().await.unwrap_or_default();
+                    Err(ApiError::BadRequest(format!(
+                        "Loki responded with error: {body}"
+                    )))
+                }
+                Err(e) => Err(ApiError::BadRequest(format!("Failed to reach Loki: {e}"))),
+            }
+        }
+        "axiom" => {
+            let dataset = config["dataset"].as_str().unwrap_or_default();
+            let token = config["api_token"].as_str().unwrap_or_default();
+            if dataset.is_empty() || token.is_empty() {
+                return Err(ApiError::BadRequest(
+                    "Axiom drain needs dataset and api_token".into(),
+                ));
+            }
+            let url = format!("https://api.axiom.co/v1/datasets/{dataset}/ingest");
+            let payload = serde_json::json!([{
+                "_time": crate::db::models::now_iso8601(),
+                "message": "Test log from Icefall",
+                "level": "info",
+            }]);
+            let client = reqwest::Client::new();
+            match client
+                .post(&url)
+                .bearer_auth(token)
+                .json(&payload)
+                .send()
+                .await
+            {
+                Ok(r) if r.status().is_success() => Ok(Json(serde_json::json!({
+                    "data": { "success": true, "message": "Test log sent to Axiom" }
+                }))),
+                Ok(r) => {
+                    let body = r.text().await.unwrap_or_default();
+                    Err(ApiError::BadRequest(format!("Axiom error: {body}")))
+                }
+                Err(e) => Err(ApiError::BadRequest(format!("Failed to reach Axiom: {e}"))),
+            }
+        }
+        other => Err(ApiError::BadRequest(format!("Unknown drain type: {other}"))),
+    }
 }

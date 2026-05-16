@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $serverMetricsRange } from '@stores/server';
 import { api } from '@lib/api';
+import { createVisibleInterval } from '@lib/visibility';
 import type { ServerMetricsSnapshot } from '@lib/types';
 import { formatPercent } from '@lib/format';
 import MetricsChart from '@islands/shared/MetricsChart/MetricsChart';
@@ -51,8 +52,8 @@ export default function MetricsDetailPage() {
     setLoading(true);
     fetchData(range).then(() => { if (active) setLoading(false); });
 
-    const interval = setInterval(() => fetchData(range), pollMs);
-    return () => { active = false; clearInterval(interval); };
+    const stopPolling = createVisibleInterval(() => fetchData(range), pollMs);
+    return () => { active = false; stopPolling(); };
   }, [range, fetchData]);
 
   const cpuData = data.map(s => ({ timestamp: s.timestamp, value: s.cpu_percent }));

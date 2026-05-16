@@ -270,6 +270,10 @@ async fn trigger_deploy(
                     .await
                 {
                     tracing::error!("Deploy failed for {deploy_id}: {e}");
+                    let _ = state
+                        .db
+                        .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                        .await;
                 }
             }
             Err(e) => {
@@ -320,6 +324,42 @@ async fn handle_branch_delete(state: &AppState, app: &crate::db::models::App, br
 
     let _ = state.db.delete_env_vars_by_environment(&env.id).await;
     let _ = state.db.delete_environment(&env.id).await;
+}
+
+/// Handle a GitHub push event for a known app, called from the GitHub App webhook handler.
+///
+/// This reuses the same push/branch-delete logic as the per-app webhook endpoint
+/// but skips signature verification (which was already done by the caller).
+pub async fn handle_github_push_for_app(
+    state: &AppState,
+    app_id: &str,
+    _headers: &HeaderMap,
+    body: &Bytes,
+) {
+    let Ok(Some(app)) = state.db.get_app(app_id).await else {
+        tracing::error!(app_id, "App not found for GitHub App push event");
+        return;
+    };
+
+    let event: GitHubPushEvent = match serde_json::from_slice(body) {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::error!("Failed to parse push event for app {app_id}: {e}");
+            return;
+        }
+    };
+
+    let branch = match extract_branch_from_ref(&event.r#ref) {
+        Some(b) => b.to_string(),
+        None => return,
+    };
+
+    if event.deleted.unwrap_or(false) {
+        handle_branch_delete(state, &app, &branch).await;
+        return;
+    }
+
+    handle_push(state, &app, &branch, &event.after).await;
 }
 
 pub fn validate_github_signature(secret: &str, signature_header: &str, body: &[u8]) -> bool {

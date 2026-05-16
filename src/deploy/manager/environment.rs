@@ -13,7 +13,7 @@ impl DeployManager {
         let mut has_port = false;
         let mut has_host = false;
         let mut result: Vec<String> = Vec::with_capacity(vars.len() + 2);
-        for v in vars {
+        for v in &vars {
             if v.key == "PORT" {
                 has_port = true;
             }
@@ -22,6 +22,29 @@ impl DeployManager {
             }
             result.push(format!("{}={}", v.key, v.value));
         }
+
+        // Inject shared variables (project + server scope).
+        // App-specific env vars take precedence over shared ones.
+        let shared_vars = self
+            .db
+            .get_shared_variables_for_app(&env.app_id)
+            .await
+            .unwrap_or_default();
+        for sv in shared_vars {
+            if !result
+                .iter()
+                .any(|e| e.starts_with(&format!("{}=", sv.key)))
+            {
+                if sv.key == "PORT" {
+                    has_port = true;
+                }
+                if sv.key == "HOST" {
+                    has_host = true;
+                }
+                result.push(format!("{}={}", sv.key, sv.value));
+            }
+        }
+
         if !has_port {
             result.push("PORT=3000".to_string());
         }

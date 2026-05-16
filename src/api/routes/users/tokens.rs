@@ -36,7 +36,7 @@ pub(super) async fn create_token(
     headers: HeaderMap,
     Json(body): Json<CreateTokenRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let user = authenticate_from_headers(&state, &headers)
+    let auth = crate::api::routes::auth::authenticate_with_team(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
 
@@ -46,10 +46,11 @@ pub(super) async fn create_token(
     let token = state
         .db
         .create_api_token(
-            &user.id,
+            &auth.user.id,
             &body.name,
             &token_hash,
             body.expires_at.as_deref(),
+            auth.team_id.as_deref(),
         )
         .await?;
 

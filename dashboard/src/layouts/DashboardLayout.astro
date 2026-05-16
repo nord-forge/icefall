@@ -1,14 +1,14 @@
 ---
-import { ClientRouter } from 'astro:transitions';
-import Sidebar from '@components/sidebar/Sidebar.astro';
-import CommandPalette from '@islands/shared/CommandPalette/CommandPalette';
-import KeyboardShortcuts from '@islands/shared/KeyboardShortcuts/KeyboardShortcuts';
-import Toast from '@islands/shared/Toast/Toast';
-import ReconnectOverlay from '@islands/update/ReconnectOverlay/ReconnectOverlay';
-import OfflineServerBanner from '@islands/shared/OfflineServerBanner/OfflineServerBanner';
-import sidebarStyles from '@styles/sidebar.module.css';
-import layoutStyles from '@styles/layout.module.css';
-import '../styles/global.css';
+// View Transitions disabled — caused intermittent CSS module loading failures
+import Sidebar from "@components/sidebar/Sidebar.astro";
+import CommandPalette from "@islands/shared/CommandPalette/CommandPalette";
+import KeyboardShortcuts from "@islands/shared/KeyboardShortcuts/KeyboardShortcuts";
+import Toast from "@islands/shared/Toast/Toast";
+import ReconnectOverlay from "@islands/update/ReconnectOverlay/ReconnectOverlay";
+import OfflineServerBanner from "@islands/shared/OfflineServerBanner/OfflineServerBanner";
+import sidebarStyles from "@styles/sidebar.module.css";
+import layoutStyles from "@styles/layout.module.css";
+import "../styles/global.css";
 
 interface Props {
   title: string;
@@ -17,7 +17,7 @@ interface Props {
 const { title } = Astro.props;
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -26,50 +26,27 @@ const { title } = Astro.props;
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap" />
-    <ClientRouter />
-    <style is:inline>
-      html { box-sizing: border-box; }
-      *, *::before, *::after { box-sizing: inherit; margin: 0; padding: 0; }
-      body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-      .ice-layout { display: flex; min-height: 100vh; }
-      .ice-sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; z-index: 100; transform: translateX(-100%); }
-      .ice-main { flex: 1; min-width: 0; padding: 24px; }
-      @media (min-width: 641px) {
-        .ice-sidebar { transform: translateX(0); }
-        .ice-main { margin-left: 220px; }
-      }
-      /* Prevent flash of unstyled content during View Transitions */
-      ::view-transition-old(root) { animation-duration: 0.15s; }
-      ::view-transition-new(root) { animation-duration: 0.15s; }
-      [data-astro-transition-fallback="animate"] { animation: none !important; }
-    </style>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap"
+    />
+    <!-- ClientRouter (View Transitions) disabled — causes intermittent CSS module loading failures on navigation -->
     <script is:inline>
-      (function() {
-        var stored = localStorage.getItem('icefall-theme');
-        var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.setAttribute('data-theme', theme);
-      })();
+      var s = localStorage.getItem("icefall-theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        s ||
+          (matchMedia("(prefers-color-scheme:dark)").matches
+            ? "dark"
+            : "light"),
+      );
     </script>
-    <script is:inline>
-      fetch('/api/v1/users/me', { credentials: 'same-origin' }).then(function(r) {
-        if (r.status === 401 || r.status === 400) {
-          fetch('/api/v1/onboarding/status', { credentials: 'same-origin' })
-            .then(function(or) { return or.json(); })
-            .then(function(ob) {
-              window.location.href = ob.is_complete ? '/login' : '/onboarding';
-            })
-            .catch(function() { window.location.href = '/login'; });
-        }
-      }).catch(function() {});
-    </script>
+    <script src="../scripts/auth-guard.ts"></script>
   </head>
   <body>
-    {/* a11y [WCAG 2.4.1]: skip link to bypass sidebar navigation */}
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <CommandPalette client:only="preact" transition:persist />
+    <CommandPalette client:only="preact" />
     <div class={`ice-layout ${layoutStyles.layout}`}>
-      {/* Mobile hamburger — visible below 641px */}
       <button
         type="button"
         class={sidebarStyles.hamburger}
@@ -78,19 +55,37 @@ const { title } = Astro.props;
         aria-expanded="false"
         aria-controls="sidebar-panel"
       >
-        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
+        <svg
+          aria-hidden="true"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
-      {/* a11y [WCAG 2.4.3]: backdrop closes mobile drawer on click */}
-      <div class={sidebarStyles.backdrop} id="sidebar-backdrop" aria-hidden="true"></div>
-      <div id="sidebar-panel" transition:persist>
+      <div
+        class={sidebarStyles.backdrop}
+        id="sidebar-backdrop"
+        aria-hidden="true"
+      >
+      </div>
+      <div id="sidebar-panel">
         <Sidebar />
       </div>
-      <OfflineServerBanner client:only="preact" transition:persist />
-      <main id="main-content" tabindex="-1" class={`ice-main ${layoutStyles.main}`} transition:animate="fade">
+      <OfflineServerBanner client:only="preact" />
+      <main
+        id="main-content"
+        tabindex="-1"
+        class={`ice-main ${layoutStyles.main}`}
+      >
         <div class={layoutStyles.content}>
           <slot />
         </div>
@@ -99,117 +94,6 @@ const { title } = Astro.props;
     <KeyboardShortcuts client:idle />
     <Toast client:only="preact" />
     <ReconnectOverlay client:only="preact" />
-
-    <script>
-      // Mobile sidebar drawer: open/close + focus trap
-      function initMobileDrawer() {
-        const toggle = document.getElementById('sidebar-toggle');
-        const backdrop = document.getElementById('sidebar-backdrop');
-        const panel = document.getElementById('sidebar-panel');
-        const sidebar = panel?.querySelector<HTMLElement>('.ice-sidebar');
-        if (!toggle || !backdrop || !sidebar) return;
-
-        function openDrawer() {
-          sidebar!.classList.add('_sidebarOpen');
-          backdrop!.classList.add('_backdropVisible');
-          toggle!.setAttribute('aria-expanded', 'true');
-          toggle!.setAttribute('aria-label', 'Close navigation');
-          // a11y [WCAG 2.4.3]: trap focus inside open drawer
-          document.addEventListener('keydown', trapFocus);
-          // Focus first nav link
-          const firstLink = sidebar!.querySelector<HTMLAnchorElement>('[data-nav-index]');
-          firstLink?.focus();
-        }
-
-        function closeDrawer() {
-          sidebar!.classList.remove('_sidebarOpen');
-          backdrop!.classList.remove('_backdropVisible');
-          toggle!.setAttribute('aria-expanded', 'false');
-          toggle!.setAttribute('aria-label', 'Open navigation');
-          document.removeEventListener('keydown', trapFocus);
-          toggle!.focus();
-        }
-
-        function trapFocus(e: KeyboardEvent) {
-          if (e.key === 'Escape') {
-            closeDrawer();
-            return;
-          }
-          if (e.key !== 'Tab') return;
-
-          const focusable = sidebar!.querySelectorAll<HTMLElement>(
-            'a[href], button, [tabindex]:not([tabindex="-1"])'
-          );
-          if (focusable.length === 0) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-
-          if (e.shiftKey && document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          } else if (!e.shiftKey && document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-
-        toggle.addEventListener('click', () => {
-          const isOpen = toggle.getAttribute('aria-expanded') === 'true';
-          isOpen ? closeDrawer() : openDrawer();
-        });
-
-        backdrop.addEventListener('click', closeDrawer);
-
-        // Close drawer on nav link click (mobile)
-        sidebar.querySelectorAll('[data-nav-index]').forEach(link => {
-          link.addEventListener('click', () => {
-            if (window.innerWidth < 641) closeDrawer();
-          });
-        });
-      }
-
-      // Inject class names from CSS Modules at runtime (the module hash is not available in inline scripts)
-      // We use a stable data attribute approach instead: apply raw classes toggled via JS
-      // The CSS module classes are applied on the server; JS toggles plain marker classes
-      // that we target with global selectors below.
-      function injectDrawerStyles() {
-        if (document.getElementById('drawer-global-styles')) return;
-        const style = document.createElement('style');
-        style.id = 'drawer-global-styles';
-        style.textContent = `
-          .ice-sidebar._sidebarOpen { transform: translateX(0) !important; }
-          #sidebar-backdrop._backdropVisible { opacity: 1 !important; pointer-events: auto !important; }
-        `;
-        document.head.appendChild(style);
-      }
-
-      function scrollToHash() {
-        const hash = window.location.hash;
-        if (!hash) return;
-        const el = document.querySelector(hash);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth' });
-          return;
-        }
-        // Element may not exist yet (client:only islands). Watch for it.
-        const observer = new MutationObserver(() => {
-          const target = document.querySelector(hash);
-          if (target) {
-            observer.disconnect();
-            target.scrollIntoView({ behavior: 'smooth' });
-          }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-        setTimeout(() => observer.disconnect(), 5000);
-      }
-
-      injectDrawerStyles();
-      initMobileDrawer();
-      document.addEventListener('astro:after-swap', () => {
-        injectDrawerStyles();
-        initMobileDrawer();
-        scrollToHash();
-      });
-    </script>
+    <script src="../scripts/mobile-drawer.ts"></script>
   </body>
 </html>

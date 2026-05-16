@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import TwoFactorSection from '@islands/settings/TwoFactorSection/TwoFactorSection';
 import UpdateSettings from '@islands/update/UpdateSettings/UpdateSettings';
+import Button from '@islands/shared/Button/Button';
 import GeneralSection from './components/GeneralSection';
 import NotificationsSection from './components/NotificationsSection';
 import type { NotificationChannel } from './components/NotificationsSection';
@@ -51,6 +52,14 @@ export default function SettingsPage() {
       <CloudflareTunnelSection onSaveMessage={setSaveMessage} />
 
       <ContainerCleanupSection onSaveMessage={setSaveMessage} />
+
+      <div class={styles.section}>
+        <h2 class={styles.sectionHeading}>Teams</h2>
+        <p class={styles.mcpDescription}>
+          Manage your teams, members, and permissions.
+        </p>
+        <a href="/teams"><Button variant="secondary">Manage teams</Button></a>
+      </div>
 
       <TwoFactorSection />
 

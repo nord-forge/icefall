@@ -5,6 +5,7 @@ import LogoutButton from '@islands/shared/LogoutButton/LogoutButton';
 import SystemStatus from '@islands/shared/SystemStatus/SystemStatus';
 import UpdatePill from '@islands/update/UpdatePill/UpdatePill';
 import UpdateDialog from '@islands/update/UpdateDialog/UpdateDialog';
+import TeamSwitcher from '@islands/teams/TeamSwitcher/TeamSwitcher';
 import pkg from '../../../package.json';
 
 const currentPath = Astro.url.pathname;
@@ -50,6 +51,8 @@ function isActive(href: string): boolean {
     </a>
     <SystemStatus client:idle />
   </div>
+
+  <TeamSwitcher client:load />
 
   {/* a11y [WCAG 2.1.1]: arrow-key navigation via roving tabindex managed by inline script */}
   <nav aria-label="Main" class={styles.nav} id="sidebar-nav">

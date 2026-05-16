@@ -56,6 +56,9 @@ hmac = "0.13"
 sha2 = "0.11"
 hex = "0.4"
 
+# JWT (GitHub App authentication)
+jsonwebtoken = "9"
+
 # Self-update & release verification
 ed25519-dalek = { version = "2", features = ["pkcs8", "pem"] }
 x25519-dalek = { version = "2", features = ["static_secrets"] }
@@ -158,6 +161,9 @@ data-encoding = { workspace = true }
 hmac = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+
+# JWT (GitHub App authentication)
+jsonwebtoken = { workspace = true }
 
 # Self-update & release verification
 ed25519-dalek = { workspace = true }

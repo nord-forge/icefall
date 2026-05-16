@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useState, useRef } from 'preact/hooks';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import { createSSEClient } from '@lib/sse';
@@ -7,7 +7,7 @@ import { formatDuration, shortSha, formatRelativeTime } from '@lib/format';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import Button from '@islands/shared/Button/Button';
 import BuildStepRow from '@islands/deploy/BuildStep/BuildStep';
-import { RotateCcw, X, GitBranch, Clock } from 'lucide-preact';
+import { RotateCcw, X, GitBranch, Clock, WrapText, ArrowDownToLine } from 'lucide-preact';
 import styles from './deploy-detail.module.css';
 
 type Props = {
@@ -20,6 +20,10 @@ export default function DeployDetail({ appId, deployId, appName }: Props) {
   const [deploy, setDeploy] = useState<Deploy | null>(null);
   const [steps, setSteps] = useState<BuildStep[]>([]);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [wordWrap, setWordWrap] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [expandAll, setExpandAll] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.listDeploys(appId).then(({ data }) => {
@@ -73,6 +77,12 @@ export default function DeployDetail({ appId, deployId, appName }: Props) {
       return () => sse.close();
     }
   }, [deploy?.id, deploy?.status]);
+
+  useEffect(() => {
+    if (autoScroll && logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [steps, autoScroll]);
 
   if (!deploy) return <p class={styles.loadingText}>Loading deploy...</p>;
 
@@ -136,18 +146,52 @@ export default function DeployDetail({ appId, deployId, appName }: Props) {
         </div>
       </div>
 
+      <div class={styles.logToolbar}>
+        <button
+          type="button"
+          class={`${styles.logToggle} ${wordWrap ? styles.logToggleActive : ''}`}
+          onClick={() => setWordWrap(!wordWrap)}
+          aria-pressed={wordWrap}
+          aria-label="Toggle word wrap"
+        >
+          <WrapText size={12} /> Wrap
+        </button>
+        <button
+          type="button"
+          class={`${styles.logToggle} ${autoScroll ? styles.logToggleActive : ''}`}
+          onClick={() => setAutoScroll(!autoScroll)}
+          aria-pressed={autoScroll}
+          aria-label="Toggle auto-scroll"
+        >
+          <ArrowDownToLine size={12} /> Auto-scroll
+        </button>
+        {steps.length > 0 && (
+          <button
+            type="button"
+            class={`${styles.logToggle} ${expandAll ? styles.logToggleActive : ''}`}
+            onClick={() => setExpandAll(!expandAll)}
+            aria-pressed={expandAll}
+          >
+            {expandAll ? 'Collapse all' : 'Expand all'}
+          </button>
+        )}
+        <span class={styles.logToolbarSpacer} />
+        <span>{steps.length > 0 ? `${steps.length} steps` : 'Raw log'}</span>
+      </div>
+
       <div class={styles.stepsList}>
         {steps.length > 0 ? steps.map((step, i) => (
           <BuildStepRow
             key={i}
             step={step}
             index={i}
-            expanded={expandedStep === i || step.status === 'running' || step.status === 'failed'}
+            expanded={expandAll || expandedStep === i || step.status === 'running' || step.status === 'failed'}
             onToggle={() => setExpandedStep(expandedStep === i ? null : i)}
           />
         )) : deploy.build_log ? (
-          <div class={styles.buildLog}>
+          <div class={styles.buildLog} style={{ whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}>
             {deploy.build_log}
+            <div ref={logEndRef} />
           </div>
         ) : (
           <p class={styles.noOutput}>No build output available.</p>

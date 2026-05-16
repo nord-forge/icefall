@@ -260,6 +260,85 @@ pub async fn authenticate_from_headers(
     Ok(users.into_iter().find(|u| u.id == session.user_id))
 }
 
+pub struct AuthContext {
+    pub user: crate::db::models::User,
+    pub session_id: Option<String>,
+    pub team_id: Option<String>,
+    pub team_role: Option<String>,
+}
+
+pub async fn authenticate_with_team(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<AuthContext>, ApiError> {
+    let user = match authenticate_from_headers(state, headers).await? {
+        Some(u) => u,
+        None => return Ok(None),
+    };
+
+    let session_id = extract_session_id(headers);
+
+    // Check if authenticating via API token — use token's team_id
+    let token_team_id = if let Some(auth) = headers.get("authorization") {
+        if let Ok(auth_str) = auth.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer icefall_") {
+                let full_token = format!("icefall_{token}");
+                let token_hash = sha256_hex(&full_token);
+                state
+                    .db
+                    .get_api_token_by_hash(&token_hash)
+                    .await?
+                    .and_then(|t| t.team_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Priority: token team_id > session active_team_id > first team
+    let team_id = if let Some(tid) = token_team_id {
+        Some(tid)
+    } else if let Some(ref sid) = session_id {
+        if let Some(session) = state.db.get_session(sid).await? {
+            session.active_team_id
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let team_id = match team_id {
+        Some(tid) => Some(tid),
+        None => {
+            let teams = state.db.list_teams_for_user(&user.id).await?;
+            teams.first().map(|t| t.id.clone())
+        }
+    };
+
+    // Get team role
+    let team_role = if let Some(ref tid) = team_id {
+        state
+            .db
+            .get_team_membership(tid, &user.id)
+            .await?
+            .map(|m| m.role)
+    } else {
+        None
+    };
+
+    Ok(Some(AuthContext {
+        user,
+        session_id,
+        team_id,
+        team_role,
+    }))
+}
+
 fn sha256_hex(input: &str) -> String {
     use sha2::Digest;
     let mut hasher = sha2::Sha256::new();

@@ -9,6 +9,7 @@ import GeneralSettingsCard from './components/GeneralSettingsCard';
 import DeployModeCard from './components/DeployModeCard';
 import TagsCard from './components/TagsCard';
 import ResourceLimitsCard from './components/ResourceLimitsCard';
+import HealthCheckCard from './components/HealthCheckCard';
 import AutoDeployCard from './components/AutoDeployCard';
 import PreviewDeploymentsCard from './components/PreviewDeploymentsCard';
 import PersistentStorageCard from './components/PersistentStorageCard';
@@ -17,6 +18,7 @@ import EnvironmentAssignmentCard from './components/EnvironmentAssignmentCard';
 import DeployApprovalCard from './components/DeployApprovalCard';
 import TunnelCard from './components/TunnelCard';
 import CanaryProbeCard from './components/CanaryProbeCard';
+import LogPatternsCard from './components/LogPatternsCard';
 import ExportBundleCard from './components/ExportBundleCard';
 import DangerZoneCard from './components/DangerZoneCard';
 import styles from './settings-tab.module.css';
@@ -123,7 +125,6 @@ export default function SettingsTab({ app, servers = [] }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [starting, setStarting] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -359,6 +360,8 @@ export default function SettingsTab({ app, servers = [] }: Props) {
         onCpuSharesChange={(v) => setForm({ ...form, cpu_shares: v })}
       />
 
+      <HealthCheckCard appId={app.id} />
+
       <AutoDeployCard
         webhookBaseUrl={webhookBaseUrl}
         webhookSecret={app.webhook_secret}
@@ -419,10 +422,12 @@ export default function SettingsTab({ app, servers = [] }: Props) {
 
       <CanaryProbeCard app={app} />
 
+      <LogPatternsCard app={app} />
+
       <ExportBundleCard app={app} />
 
       <DangerZoneCard
-        confirmDelete={confirmDelete}
+        appName={app.name}
         deleting={deleting}
         stopping={stopping}
         starting={starting}
@@ -431,7 +436,6 @@ export default function SettingsTab({ app, servers = [] }: Props) {
         onRestart={async () => { setRestarting(true); try { await api.restartApp(app.id); } catch {} setRestarting(false); }}
         onStop={async () => { setStopping(true); try { await api.stopApp(app.id); } catch {} setStopping(false); }}
         onDelete={handleDelete}
-        onConfirmDeleteToggle={setConfirmDelete}
       />
 
       {/* Volume Browser Drawer */}

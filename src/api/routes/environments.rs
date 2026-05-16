@@ -7,6 +7,7 @@ use serde::Deserialize;
 use crate::api::error::ApiError;
 use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
+use crate::db::models::NewProjectEnvironment;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -29,14 +30,16 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn list_environments(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_project_id): Path<String>,
+    Path(project_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({ "data": [] })))
+
+    let envs = state.db.list_project_environments(&project_id).await?;
+    Ok(Json(serde_json::json!({ "data": envs })))
 }
 
 #[derive(Deserialize)]
@@ -46,99 +49,131 @@ struct CreateEnvironmentRequest {
 }
 
 async fn create_environment(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_project_id): Path<String>,
+    Path(project_id): Path<String>,
     Json(body): Json<CreateEnvironmentRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({
-        "data": {
-            "id": uuid::Uuid::new_v4().to_string(),
-            "project_id": _project_id,
-            "name": body.name,
-            "color": body.color,
-            "created_at": chrono::Utc::now().to_rfc3339(),
-        }
-    })))
+
+    if body.name.trim().is_empty() {
+        return Err(ApiError::BadRequest("name is required".into()));
+    }
+
+    let slug = body.name.to_lowercase().replace(' ', "-");
+
+    let new_env = NewProjectEnvironment {
+        project_id,
+        name: body.name,
+        slug,
+        color: body.color,
+    };
+
+    let env = state.db.create_project_environment(&new_env).await?;
+    Ok(Json(serde_json::json!({ "data": env })))
 }
 
 async fn update_environment(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     Path((_project_id, env_id)): Path<(String, String)>,
     Json(body): Json<CreateEnvironmentRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({
-        "data": {
-            "id": env_id,
-            "project_id": _project_id,
-            "name": body.name,
-            "color": body.color,
-        }
-    })))
+
+    if body.name.trim().is_empty() {
+        return Err(ApiError::BadRequest("name is required".into()));
+    }
+
+    let existing = state.db.get_project_environment(&env_id).await?;
+    if existing.is_none() {
+        return Err(ApiError::NotFound(format!(
+            "environment {env_id} not found"
+        )));
+    }
+
+    let env = state
+        .db
+        .update_project_environment(&env_id, &body.name, body.color.as_deref())
+        .await?;
+    Ok(Json(serde_json::json!({ "data": env })))
 }
 
 async fn delete_environment(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path((_project_id, _env_id)): Path<(String, String)>,
+    Path((_project_id, env_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    state.db.delete_project_environment(&env_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }
 
 async fn list_variables(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_env_id): Path<String>,
+    Path(env_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({ "data": [] })))
+
+    // Project environments use the same env_vars table through the environment_id
+    // linkage. The env_id here is a project_environment ID which can be used
+    // as the environment_id for env_vars storage.
+    let vars = state.db.get_env_vars(&env_id).await?;
+    Ok(Json(serde_json::json!({ "data": vars })))
 }
 
 #[derive(Deserialize)]
 struct SetVariableRequest {
     key: String,
     value: String,
+    #[allow(dead_code)]
     is_secret: Option<bool>,
 }
 
 async fn set_variable(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path(_env_id): Path<String>,
+    Path(env_id): Path<String>,
     Json(body): Json<SetVariableRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-    Ok(Json(serde_json::json!({
-        "data": {
-            "id": uuid::Uuid::new_v4().to_string(),
-            "key": body.key,
-            "value": body.value,
-            "is_secret": body.is_secret.unwrap_or(false),
-        }
-    })))
+
+    if body.key.trim().is_empty() {
+        return Err(ApiError::BadRequest("key is required".into()));
+    }
+
+    let env_var = crate::db::models::NewEnvVar {
+        environment_id: env_id,
+        key: body.key,
+        value: body.value,
+        scope: "project_environment".to_string(),
+    };
+
+    let var = state.db.set_env_var(&env_var).await?;
+    Ok(Json(serde_json::json!({ "data": var })))
 }
 
 async fn delete_variable(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path((_env_id, _var_id)): Path<(String, String)>,
+    Path((_env_id, var_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&_state, &headers)
+    authenticate_from_headers(&state, &headers)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+
+    state.db.delete_env_var(&var_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }

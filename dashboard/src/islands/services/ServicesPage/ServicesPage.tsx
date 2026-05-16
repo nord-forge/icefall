@@ -3,6 +3,7 @@ import { api, request } from '@lib/api';
 import { Search } from 'lucide-preact';
 import Badge from '@islands/shared/Badge/Badge';
 import Button from '@islands/shared/Button/Button';
+import { SERVICE_ICONS } from '@islands/app-create/AppCreateWizard/service-icons';
 import styles from './services-page.module.css';
 
 type Template = {
@@ -34,7 +35,7 @@ export default function ServicesPage() {
     const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === 'All' || (t.categories || '').toLowerCase().includes(category.toLowerCase());
     return matchesSearch && matchesCategory;
-  });
+  }).sort((a, b) => a.name.localeCompare(b.name));
 
   if (loading) return <p class={styles.loading}>Loading templates...</p>;
 
@@ -77,24 +78,23 @@ export default function ServicesPage() {
           {filtered.map((t) => (
             <div key={t.id} class={styles.card}>
               <div class={styles.cardHeader}>
-                {t.icon_url ? (
-                  <img src={t.icon_url} alt="" class={styles.icon} width={32} height={32} />
-                ) : (
-                  <div class={styles.iconPlaceholder} />
-                )}
-                <div>
+                {SERVICE_ICONS[t.name]
+                  ? SERVICE_ICONS[t.name]({ size: 32 })
+                  : <div class={styles.iconPlaceholder} />
+                }
+                <div class={styles.cardTitleGroup}>
                   <h3 class={styles.cardTitle}>{t.name}</h3>
                   {t.version && <span class={styles.version}>v{t.version}</span>}
                 </div>
+                {t.categories && (
+                  <div class={styles.badges}>
+                    {t.categories.split(',').map((c) => (
+                      <Badge key={c} label={c.trim()} size="sm" />
+                    ))}
+                  </div>
+                )}
               </div>
               {t.description && <p class={styles.description}>{t.description}</p>}
-              {t.categories && (
-                <div class={styles.badges}>
-                  {t.categories.split(',').map((c) => (
-                    <Badge key={c} label={c.trim()} size="sm" />
-                  ))}
-                </div>
-              )}
               <div class={styles.cardActions}>
                 <Button variant="primary" size="sm">Deploy</Button>
               </div>
