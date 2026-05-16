@@ -17,6 +17,7 @@ mod forecast;
 mod github;
 mod health;
 mod incidents;
+mod instance_lifecycle_tests;
 mod log_drains;
 mod maintenance;
 mod notifications;
@@ -162,6 +163,13 @@ impl Database for SqliteDatabase {
 
     async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError> {
         apps::list_app_instances(&self.pool, app_id).await
+    }
+
+    async fn list_app_instances_by_server(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<AppInstance>, DbError> {
+        apps::list_app_instances_by_server(&self.pool, server_id).await
     }
 
     async fn update_app_instance(

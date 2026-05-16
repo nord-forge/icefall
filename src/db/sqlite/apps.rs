@@ -333,6 +333,18 @@ pub(super) async fn list_app_instances(
     .await?)
 }
 
+pub(super) async fn list_app_instances_by_server(
+    pool: &SqlitePool,
+    server_id: &str,
+) -> Result<Vec<AppInstance>, DbError> {
+    Ok(sqlx::query_as::<_, AppInstance>(
+        "SELECT * FROM app_instances WHERE server_id = ? ORDER BY app_id, created_at ASC",
+    )
+    .bind(server_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 pub(super) async fn update_app_instance(
     pool: &SqlitePool,
     id: &str,

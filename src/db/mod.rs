@@ -43,6 +43,10 @@ pub trait Database: Send + Sync + 'static {
     async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError>;
     async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError>;
     async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError>;
+    async fn list_app_instances_by_server(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<AppInstance>, DbError>;
     async fn update_app_instance(
         &self,
         id: &str,

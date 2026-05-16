@@ -43,6 +43,12 @@ export default function ServerCard({ server }: Props) {
               {server.app_count} {server.app_count === 1 ? 'app' : 'apps'}
             </span>
           )}
+          {typeof server.instance_count === 'number' && server.instance_count > 0 && (
+            <span class={styles.badgeApps}>
+              {server.instance_count}{' '}
+              {server.instance_count === 1 ? 'instance' : 'instances'}
+            </span>
+          )}
         </div>
 
         {resources && (

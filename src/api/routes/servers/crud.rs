@@ -101,11 +101,19 @@ pub(super) async fn list_servers(
             .filter(|a| a.server_id.as_deref() == Some(&s.id))
             .count();
 
+        let instance_count = state
+            .db
+            .list_app_instances_by_server(&s.id)
+            .await
+            .map(|i| i.len())
+            .unwrap_or(0);
+
         let score = compute_recommendation_score(s.resources.as_deref(), app_count);
 
         let mut val = serde_json::to_value(s).unwrap_or_default();
         if let Some(obj) = val.as_object_mut() {
             obj.insert("app_count".into(), serde_json::json!(app_count));
+            obj.insert("instance_count".into(), serde_json::json!(instance_count));
             obj.insert("recommendation_score".into(), serde_json::json!(score));
         }
         server_data.push(val);
@@ -153,6 +161,43 @@ pub(super) async fn get_server(
     }
 
     Ok(Json(serde_json::json!({ "data": val })))
+}
+
+/// `GET /servers/{id}/instances` — app instances running on this server,
+/// each annotated with its app name for grouping in the UI.
+pub(super) async fn list_server_instances(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&state, &headers).await?;
+
+    state
+        .db
+        .get_server(&id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Server {id} not found")))?;
+
+    let instances = state.db.list_app_instances_by_server(&id).await?;
+    let apps = state.db.list_apps().await?;
+
+    let enriched: Vec<serde_json::Value> = instances
+        .iter()
+        .map(|inst| {
+            let app_name = apps
+                .iter()
+                .find(|a| a.id == inst.app_id)
+                .map(|a| a.name.clone())
+                .unwrap_or_else(|| inst.app_id.clone());
+            let mut val = serde_json::to_value(inst).unwrap_or_default();
+            if let Some(obj) = val.as_object_mut() {
+                obj.insert("app_name".into(), serde_json::json!(app_name));
+            }
+            val
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({ "data": enriched })))
 }
 
 pub(super) async fn update_server(

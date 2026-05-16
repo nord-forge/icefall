@@ -6,6 +6,7 @@ import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import UptimeTimeline from '@islands/shared/UptimeTimeline/UptimeTimeline';
 import DriftBanner from '@islands/app-detail/DriftBanner/DriftBanner';
 import GhostModeSection from './components/GhostModeSection';
+import InstancesSummary from './components/InstancesSummary';
 import styles from './overview-tab.module.css';
 
 type Props = {
@@ -127,6 +128,8 @@ export default function OverviewTab({ app }: Props) {
           </div>
         )}
       </div>
+
+      <InstancesSummary appId={app.id} desiredInstances={app.desired_instances} />
 
       <div class={styles.panel}>
         <h3 class={styles.sectionTitle}>Health</h3>
