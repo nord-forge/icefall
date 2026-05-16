@@ -1,16 +1,67 @@
-:root {
-  --sl-color-accent-low: oklch(0.22 0.05 172.85);
-  --sl-color-accent: oklch(0.5978 0.1135 172.85);
-  --sl-color-accent-high: oklch(0.92 0.03 172.85);
+/* Icefall docs theme — palette mirrors the dashboard design tokens
+   (dashboard/src/styles/tokens.css). Icefall Green is hue 167.16 and is the
+   SAME on light and dark (the dashboard never lightens the primary). Neutrals
+   are tinted with hue 250 (chroma ~0.005-0.015), never pure gray.
+
+   The `:root:root` selector raises specificity above Starlight's own
+   `:root` defaults so the brand accent wins regardless of bundle order. */
+
+:root:root,
+:root:root[data-theme="light"] {
+  /* Icefall Green — identical to dashboard --color-primary */
+  --sl-color-accent-low: oklch(0.94 0.03 167.16);
+  --sl-color-accent: oklch(0.547335 0.111951 167.1607);
+  --sl-color-accent-high: oklch(0.40 0.12 167.16);
+
+  /* Tinted neutral scale (light theme) — hue 250, low chroma */
+  --sl-color-white: oklch(0.15 0.02 250);
+  --sl-color-gray-1: oklch(0.22 0.015 250);
+  --sl-color-gray-2: oklch(0.40 0.015 250);
+  --sl-color-gray-3: oklch(0.44 0.01 250);
+  --sl-color-gray-4: oklch(0.75 0.01 250);
+  --sl-color-gray-5: oklch(0.93 0.005 250);
+  --sl-color-gray-6: oklch(0.96 0.005 250);
+  --sl-color-gray-7: oklch(0.98 0.005 250);
+  --sl-color-black: oklch(1 0 0);
+
   --sl-font: 'Inter', system-ui, -apple-system, sans-serif;
   --sl-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-:root[data-theme="dark"] {
-  --sl-color-accent-low: oklch(0.22 0.05 172.85);
-  /* a11y [WCAG 1.4.3]: raised L from 0.55 to 0.65 for 4.5:1 contrast on dark bg */
-  --sl-color-accent: oklch(0.70 0.11 172.85);
-  --sl-color-accent-high: oklch(0.85 0.06 172.85);
+/* Dark theme — SAME Icefall Green accent (dashboard keeps the primary
+   constant across themes). Only the neutral surfaces change. */
+:root:root[data-theme="dark"] {
+  --sl-color-accent-low: oklch(0.22 0.05 167.16);
+  --sl-color-accent: oklch(0.547335 0.111951 167.1607);
+  --sl-color-accent-high: oklch(0.85 0.06 167.16);
+
+  --sl-color-white: oklch(0.92 0.005 250);
+  --sl-color-gray-1: oklch(0.85 0.01 250);
+  --sl-color-gray-2: oklch(0.62 0.01 250);
+  --sl-color-gray-3: oklch(0.58 0.01 250);
+  --sl-color-gray-4: oklch(0.36 0.015 250);
+  --sl-color-gray-5: oklch(0.22 0.015 250);
+  --sl-color-gray-6: oklch(0.18 0.015 250);
+  --sl-color-black: oklch(0.14 0.015 250);
+}
+
+/* Before Starlight's inline script sets data-theme, apply the dark neutrals
+   on the first paint when the OS prefers dark — so the background does not
+   flash a light value. The accent is theme-independent, so it never flashes. */
+@media (prefers-color-scheme: dark) {
+  :root:root:not([data-theme]) {
+    --sl-color-accent-low: oklch(0.22 0.05 167.16);
+    --sl-color-accent-high: oklch(0.85 0.06 167.16);
+
+    --sl-color-white: oklch(0.92 0.005 250);
+    --sl-color-gray-1: oklch(0.85 0.01 250);
+    --sl-color-gray-2: oklch(0.62 0.01 250);
+    --sl-color-gray-3: oklch(0.58 0.01 250);
+    --sl-color-gray-4: oklch(0.36 0.015 250);
+    --sl-color-gray-5: oklch(0.22 0.015 250);
+    --sl-color-gray-6: oklch(0.18 0.015 250);
+    --sl-color-black: oklch(0.14 0.015 250);
+  }
 }
 
 .site-title.sl-flex {
