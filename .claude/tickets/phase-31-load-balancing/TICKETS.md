@@ -1,5 +1,6 @@
 # Phase 31: Load Balancing
 
+> **Status: SHIPPED** — all tickets complete and merged to `main` (2026-05-18).
 > Priority: v2.0
 > Estimated effort: L (1-2 weeks)
 > Dependencies: Phase 20 (multi-server) — already shipped
@@ -21,14 +22,14 @@ Add load balancing so a single app can run on multiple servers with traffic dist
 
 | ID | Title | Priority | Size | Dependencies | Status |
 |---|---|---|---|---|---|
-| [BE-257](BE-257-multi-instance-app-model.md) | Multi-instance app model | Critical | M | None | Not started |
-| [BE-258](BE-258-multi-instance-deploy-pipeline.md) | Multi-instance deploy pipeline | Critical | L | BE-257 | Not started |
-| [BE-259](BE-259-caddy-multi-upstream-routing.md) | Caddy multi-upstream routing | Critical | M | BE-258 | Not started |
-| [BE-260](BE-260-instance-health-monitoring.md) | Instance health monitoring | High | M | BE-257 | Not started |
-| [BE-261](BE-261-scaling-api.md) | Scaling API | High | S | BE-258 | Not started |
-| [FE-262](FE-262-scaling-instances-ui.md) | Scaling and instances UI | High | L | BE-261 | Not started |
-| [FE-263](FE-263-server-capacity-visualization.md) | Server capacity visualization | Medium | S | BE-261 | Not started |
-| [QA-264](QA-264-load-balancing-tests.md) | Load balancing integration tests | High | M | BE-258, BE-259 | Not started |
+| [BE-257](BE-257-multi-instance-app-model.md) | Multi-instance app model | Critical | M | None | Shipped |
+| [BE-258](BE-258-multi-instance-deploy-pipeline.md) | Multi-instance deploy pipeline | Critical | L | BE-257 | Shipped |
+| [BE-259](BE-259-caddy-multi-upstream-routing.md) | Caddy multi-upstream routing | Critical | M | BE-258 | Shipped |
+| [BE-260](BE-260-instance-health-monitoring.md) | Instance health monitoring | High | M | BE-257 | Shipped |
+| [BE-261](BE-261-scaling-api.md) | Scaling API | High | S | BE-258 | Shipped |
+| [FE-262](FE-262-scaling-instances-ui.md) | Scaling and instances UI | High | L | BE-261 | Shipped |
+| [FE-263](FE-263-server-capacity-visualization.md) | Server capacity visualization | Medium | S | BE-261 | Shipped |
+| [QA-264](QA-264-load-balancing-tests.md) | Load balancing integration tests | High | M | BE-258, BE-259 | Shipped |
 
 ## Dependency Graph
 

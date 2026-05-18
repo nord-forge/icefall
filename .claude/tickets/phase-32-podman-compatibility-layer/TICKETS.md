@@ -1,5 +1,6 @@
 # Phase 32: Podman Compatibility Layer
 
+> **Status: SHIPPED** — all tickets complete and merged to `main` via PR #57 (2026-05-18).
 > Priority: v2.0
 > Estimated effort: L (1-2 weeks)
 > Dependencies: None (builds on the existing `DockerClient` in `src/docker/`)
@@ -52,12 +53,12 @@ and handled, and that is verified by tests."
 
 | ID | Title | Priority | Size | Dependencies | Status |
 |---|---|---|---|---|---|
-| [BE-265](BE-265-runtime-quirks-model.md) | RuntimeQuirks model and detection | Critical | M | None | Not started |
-| [BE-266](BE-266-rootless-socket-detection.md) | Rootless Podman socket detection | Critical | S | None | Not started |
-| [BE-267](BE-267-container-creation-quirks.md) | Quirk-aware container creation | Critical | M | BE-265 | Not started |
-| [BE-268](BE-268-networking-dns-compat.md) | Podman networking & DNS compatibility | High | M | BE-265 | Not started |
-| [BE-269](BE-269-image-transfer-verification.md) | Image transfer Podman verification | High | S | BE-265 | Not started |
-| [QA-270](QA-270-podman-integration-tests.md) | Podman integration test matrix | High | M | BE-267, BE-268 | Not started |
+| [BE-265](BE-265-runtime-quirks-model.md) | RuntimeQuirks model and detection | Critical | M | None | Shipped |
+| [BE-266](BE-266-rootless-socket-detection.md) | Rootless Podman socket detection | Critical | S | None | Shipped |
+| [BE-267](BE-267-container-creation-quirks.md) | Quirk-aware container creation | Critical | M | BE-265 | Shipped |
+| [BE-268](BE-268-networking-dns-compat.md) | Podman networking & DNS compatibility | High | M | BE-265 | Shipped |
+| [BE-269](BE-269-image-transfer-verification.md) | Image transfer Podman verification | High | S | BE-265 | Shipped |
+| [QA-270](QA-270-podman-integration-tests.md) | Podman integration test matrix | High | M | BE-267, BE-268 | Shipped |
 
 ## Dependency Graph
 
