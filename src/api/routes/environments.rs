@@ -36,7 +36,7 @@ async fn list_environments(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let envs = state.db.list_project_environments(&project_id).await?;
     Ok(Json(serde_json::json!({ "data": envs })))
@@ -56,7 +56,7 @@ async fn create_environment(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if body.name.trim().is_empty() {
         return Err(ApiError::BadRequest("name is required".into()));
@@ -83,7 +83,7 @@ async fn update_environment(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if body.name.trim().is_empty() {
         return Err(ApiError::BadRequest("name is required".into()));
@@ -110,7 +110,7 @@ async fn delete_environment(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     state.db.delete_project_environment(&env_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
@@ -123,7 +123,7 @@ async fn list_variables(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     // Project environments use the same env_vars table through the environment_id
     // linkage. The env_id here is a project_environment ID which can be used
@@ -148,7 +148,7 @@ async fn set_variable(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if body.key.trim().is_empty() {
         return Err(ApiError::BadRequest("key is required".into()));
@@ -172,7 +172,7 @@ async fn delete_variable(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     state.db.delete_env_var(&var_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))

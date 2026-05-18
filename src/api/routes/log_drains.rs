@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 use crate::api::error::ApiError;
 use crate::api::routes::auth::authenticate_from_headers;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::NewLogDrain;
 
@@ -19,12 +20,15 @@ pub fn routes() -> Router<AppState> {
 
 async fn list_drains(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: TeamCtx,
     Path(app_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    // H6: read-only — the app must belong to the caller's team (viewer).
+    state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
 
     let drains = state.db.list_log_drains_for_app(&app_id).await?;
     Ok(Json(serde_json::json!({ "data": drains })))
@@ -36,7 +40,7 @@ async fn list_global_drains(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let drains = state.db.list_global_log_drains().await?;
     Ok(Json(serde_json::json!({ "data": drains })))
@@ -53,13 +57,17 @@ struct CreateDrainRequest {
 
 async fn create_drain(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: TeamCtx,
     Path(app_id): Path<String>,
     Json(body): Json<CreateDrainRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    // H6: the app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     if body.name.trim().is_empty() {
         return Err(ApiError::BadRequest("name is required".into()));
@@ -76,25 +84,42 @@ async fn create_drain(
     Ok(Json(serde_json::json!({ "data": drain })))
 }
 
+/// H6: verify a log drain bound to an app belongs to the caller's team.
+/// Drains with no `app_id` are global; they stay accessible to any
+/// authenticated team member (no app to scope against).
+async fn verify_drain_team_access(
+    state: &AppState,
+    ctx: &TeamCtx,
+    drain_app_id: Option<&str>,
+) -> Result<(), ApiError> {
+    if let Some(app_id) = drain_app_id {
+        let app = state
+            .db
+            .get_app_for_team(&ctx.team_id, app_id)
+            .await?
+            .ok_or_else(|| ApiError::NotFound("log drain not found".into()))?;
+        ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+    }
+    Ok(())
+}
+
 async fn update_drain(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: TeamCtx,
     Path(drain_id): Path<String>,
     Json(body): Json<CreateDrainRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    let existing = state
+        .db
+        .get_log_drain(&drain_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::NotFound(format!("log drain {drain_id} not found")))?;
 
-    let existing = state.db.get_log_drain(&drain_id).await?;
-    if existing.is_none() {
-        return Err(ApiError::NotFound(format!(
-            "log drain {drain_id} not found"
-        )));
-    }
+    // H6: drain's parent app (if any) must belong to the caller's team.
+    verify_drain_team_access(&state, &ctx, existing.app_id.as_deref()).await?;
 
     let update = NewLogDrain {
-        app_id: existing.unwrap().app_id,
+        app_id: existing.app_id,
         name: body.name,
         drain_type: body.drain_type,
         config: body.config.to_string(),
@@ -106,12 +131,16 @@ async fn update_drain(
 
 async fn delete_drain(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: TeamCtx,
     Path(drain_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    // H6: drain's parent app (if any) must belong to the caller's team.
+    let existing = state
+        .db
+        .get_log_drain(&drain_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::NotFound(format!("log drain {drain_id} not found")))?;
+    verify_drain_team_access(&state, &ctx, existing.app_id.as_deref()).await?;
 
     state.db.delete_log_drain(&drain_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
@@ -119,21 +148,18 @@ async fn delete_drain(
 
 async fn test_drain(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: TeamCtx,
     Path(drain_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    let drain = state
+        .db
+        .get_log_drain(&drain_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::NotFound(format!("log drain {drain_id} not found")))?;
 
-    let drain = state.db.get_log_drain(&drain_id).await?;
-    if drain.is_none() {
-        return Err(ApiError::NotFound(format!(
-            "log drain {drain_id} not found"
-        )));
-    }
+    // H6: drain's parent app (if any) must belong to the caller's team.
+    verify_drain_team_access(&state, &ctx, drain.app_id.as_deref()).await?;
 
-    let drain = drain.unwrap();
     let config: serde_json::Value = serde_json::from_str(&drain.config).unwrap_or_default();
 
     match drain.drain_type.as_str() {

@@ -20,7 +20,7 @@ pub async fn list_app_config_history(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let limit = query.limit.unwrap_or(50);
     let history = state.db.list_config_history("app", &app_id, limit).await?;
@@ -34,7 +34,7 @@ pub async fn list_deploy_events(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let events = state.db.list_deploy_events(&deploy_id).await?;
     Ok(Json(serde_json::json!({ "data": events })))
@@ -48,7 +48,7 @@ pub async fn approve_deploy(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role != "admin" {
         return Err(ApiError::Forbidden(

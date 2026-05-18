@@ -45,7 +45,7 @@ pub(super) async fn oauth_unlink(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let identities = state.db.list_oauth_identities_for_user(&user.id).await?;
 
@@ -104,7 +104,7 @@ pub(super) async fn list_oauth_identities(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let identities = state.db.list_oauth_identities_for_user(&user.id).await?;
 
@@ -131,7 +131,7 @@ pub(super) async fn get_oauth_settings(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));
@@ -191,7 +191,7 @@ pub(super) async fn update_oauth_settings(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));

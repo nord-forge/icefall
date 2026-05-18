@@ -159,7 +159,7 @@ async fn change_password(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !verify_password(&body.current_password, &user.password_hash) {
         return Err(ApiError::BadRequest("Current password is incorrect".into()));

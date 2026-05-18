@@ -129,7 +129,7 @@ pub(super) async fn oauth_link(
 ) -> Result<Redirect, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let oauth_settings = state
         .db
@@ -276,9 +276,7 @@ async fn handle_link_callback(
 ) -> Result<axum::response::Response, ApiError> {
     let user = authenticate_from_headers(state, headers)
         .await?
-        .ok_or_else(|| {
-            ApiError::BadRequest("Not authenticated. Log in first, then link.".into())
-        })?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated. Log in first, then link.".into()))?;
 
     if let Some(existing) = state
         .db

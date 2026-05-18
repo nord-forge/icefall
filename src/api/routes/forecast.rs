@@ -13,7 +13,7 @@ pub async fn server_forecast(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     let data = state
         .db
         .get_server_metrics_for_forecast(&server_id, 30)

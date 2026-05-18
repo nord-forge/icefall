@@ -34,23 +34,25 @@ async fn terminal_ws(
     headers: HeaderMap,
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, ApiError> {
-    // Authenticate via query param token, or from request cookies/headers
-    let authenticated = if let Some(ref token) = params.token {
-        authenticate_token(&state, token).await?
+    // Authenticate via query-param token (WebSocket clients can't set
+    // Authorization headers) or the session cookie. Resolve to the user id
+    // so we can enforce team access — a valid token alone is not enough.
+    let user_id = if let Some(ref token) = params.token {
+        resolve_user(&state, token).await?
     } else if let Some(session_id) = extract_session_id(&headers) {
-        authenticate_token(&state, &session_id).await?
+        resolve_user(&state, &session_id).await?
     } else {
-        false
+        None
     };
+    let user_id = user_id.ok_or_else(|| ApiError::Forbidden("Authentication required".into()))?;
 
-    if !authenticated {
-        return Err(ApiError::BadRequest("Authentication required".into()));
-    }
-
-    // Verify the app exists
+    // H5: a root shell in a container is one of the most powerful actions in
+    // the product. Verify the caller's team owns this app before allowing it
+    // — previously any authenticated user could open a terminal to ANY app.
+    let team_id = resolve_user_team(&state, &user_id).await?;
     state
         .db
-        .get_app(&id)
+        .get_app_for_team(&team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
 
@@ -68,30 +70,45 @@ async fn terminal_ws(
     Ok(ws.on_upgrade(move |socket| handle_terminal(socket, docker, container_id)))
 }
 
-async fn authenticate_token(state: &AppState, token: &str) -> Result<bool, ApiError> {
-    // Try as API token first (icefall_ prefix)
+/// Resolve a terminal auth token (API token or session id) to the owning
+/// user id. Returns `None` if the token is invalid or expired.
+async fn resolve_user(state: &AppState, token: &str) -> Result<Option<String>, ApiError> {
+    // Try as API token first (icefall_ prefix).
     if token.starts_with("icefall_") {
         let token_hash = sha256_hex(token);
         if let Some(api_token) = state.db.get_api_token_by_hash(&token_hash).await? {
             if let Some(ref exp) = api_token.expires_at {
                 if exp < &crate::db::models::now_iso8601() {
-                    return Ok(false);
+                    return Ok(None);
                 }
             }
             let _ = state.db.update_token_last_used(&api_token.id).await;
-            return Ok(true);
+            return Ok(Some(api_token.user_id));
         }
     }
 
-    // Try as session token
+    // Try as session token.
     if let Some(session) = state.db.get_session(token).await? {
         if session.expires_at >= crate::db::models::now_iso8601() {
-            return Ok(true);
+            return Ok(Some(session.user_id));
         }
         state.db.delete_session(token).await?;
     }
 
-    Ok(false)
+    Ok(None)
+}
+
+/// Resolve the team a user acts under for terminal access — their first
+/// (personal) team. Under the always-a-team model every user owns one.
+async fn resolve_user_team(state: &AppState, user_id: &str) -> Result<String, ApiError> {
+    state
+        .db
+        .list_teams_for_user(user_id)
+        .await?
+        .into_iter()
+        .next()
+        .map(|t| t.id)
+        .ok_or_else(|| ApiError::Forbidden("No team context for this user".into()))
 }
 
 fn sha256_hex(input: &str) -> String {

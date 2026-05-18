@@ -23,7 +23,7 @@ pub(super) async fn invite_user(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));
     }

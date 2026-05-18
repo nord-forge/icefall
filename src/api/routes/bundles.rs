@@ -4,6 +4,7 @@ use axum::Json;
 
 use crate::api::error::ApiError;
 use crate::api::routes::auth::authenticate_from_headers;
+use crate::api::team_auth::TeamCtx;
 use crate::api::AppState;
 use crate::db::models::now_iso8601;
 
@@ -14,7 +15,7 @@ pub async fn export_bundle(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let app = state
         .db
@@ -77,14 +78,11 @@ pub async fn export_bundle(
 
 pub async fn import_bundle(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: TeamCtx,
     Json(bundle): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let user = authenticate_from_headers(&state, &headers)
-        .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
-
-    if user.role == "viewer" {
+    // H6: the imported app is created in the caller's active team.
+    if ctx.user.role == "viewer" {
         return Err(ApiError::Forbidden(
             "Deployer or admin role required to import bundles".into(),
         ));
@@ -101,6 +99,7 @@ pub async fn import_bundle(
 
     let new_app = crate::db::models::NewApp {
         name: name.to_string(),
+        team_id: ctx.team_id.clone(),
         git_repo: app_config
             .get("repo_url")
             .and_then(|v| v.as_str())

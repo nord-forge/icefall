@@ -3,6 +3,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::build::orchestrator::BuildOrchestrator;
 use crate::build::BuildConfig;
@@ -18,14 +19,17 @@ pub(super) struct CreateDeployRequest {
 
 pub(super) async fn create_deploy(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     body: Option<Json<CreateDeployRequest>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: the app must belong to the caller's team, member role to deploy.
     let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let is_compose_deploy = app.compose_content.is_some();
     let is_image_deploy = app.image_ref.is_some();
@@ -379,19 +383,27 @@ pub(super) async fn create_deploy(
 
 pub(super) async fn rollback_deploy(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((app_id, deploy_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: the app must belong to the caller's team, member role to roll back.
     let app = state
         .db
-        .get_app(&app_id)
+        .get_app_for_team(&ctx.team_id, &app_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("app {app_id}")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let target_deploy = state
         .db
         .get_deploy(&deploy_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    // H6/IDOR: the deploy must belong to the app named in the path.
+    if target_deploy.app_id != app_id {
+        return Err(ApiError::NotFound(format!("deploy {deploy_id}")));
+    }
 
     let image_ref = target_deploy
         .image_ref
@@ -457,6 +469,7 @@ pub(super) async fn rollback_deploy(
 
 pub(super) async fn cancel_deploy(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(deploy_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let deploy = state
@@ -464,6 +477,15 @@ pub(super) async fn cancel_deploy(
         .get_deploy(&deploy_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    // H6: resolve the deploy's app and confirm it belongs to the caller's
+    // team (member role); 404 if not, so cross-team deploys stay hidden.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &deploy.app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     match deploy.status.as_str() {
         "pending" | "building" | "deploying" => {}

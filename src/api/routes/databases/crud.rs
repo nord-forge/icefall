@@ -5,6 +5,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::{NewEnvVar, NewManagedDatabase};
 use crate::docker::containers::{ContainerConfig, PortMapping, VolumeMount};
@@ -22,19 +23,23 @@ pub(super) struct CreateDatabaseRequest {
 
 pub(super) async fn list_databases(
     State(state): State<AppState>,
+    ctx: TeamCtx,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let dbs = state.db.list_managed_dbs().await?;
+    // H6: scope the listing to the caller's team.
+    let dbs = state.db.list_managed_dbs_by_team(&ctx.team_id).await?;
     Ok(Json(serde_json::json!({ "data": dbs })))
 }
 
 pub(super) async fn get_database(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let dbs = state.db.list_managed_dbs().await?;
-    let db = dbs
-        .iter()
-        .find(|d| d.id == id)
+    // H6: read-only — the database must belong to the caller's team (viewer).
+    let db = state
+        .db
+        .get_managed_db_for_team(&ctx.team_id, &id)
+        .await?
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
 
     Ok(Json(serde_json::json!({ "data": db })))
@@ -42,8 +47,21 @@ pub(super) async fn get_database(
 
 pub(super) async fn create_database(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Json(body): Json<CreateDatabaseRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: creating a database requires at least member role in the team.
+    ctx.verify_team_access(&ctx.team_id, TeamRole::Member)?;
+
+    // H6: if linking to an app, that app must belong to the caller's team.
+    if let Some(ref app_id) = body.app_id {
+        state
+            .db
+            .get_app_for_team(&ctx.team_id, app_id)
+            .await?
+            .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    }
+
     let configs = db_configs();
     let type_config = configs.get(body.db_type.as_str()).ok_or_else(|| {
         ApiError::BadRequest(format!(
@@ -183,6 +201,7 @@ pub(super) async fn create_database(
             name: body.name,
             db_type: body.db_type,
             app_id: body.app_id.clone(),
+            team_id: ctx.team_id.clone(),
         })
         .await?;
 
@@ -220,13 +239,16 @@ pub(super) async fn create_database(
 
 pub(super) async fn delete_database(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let dbs = state.db.list_managed_dbs().await?;
-    let db = dbs
-        .iter()
-        .find(|d| d.id == id)
+    // H6: destructive — database must belong to the caller's team, admin role.
+    let db = state
+        .db
+        .get_managed_db_for_team(&ctx.team_id, &id)
+        .await?
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
+    ctx.verify_team_access(&db.team_id, TeamRole::Admin)?;
 
     let container_name = format!("icefall-db-{}", db.name.to_lowercase());
     let _ = state.docker.stop_container(&container_name, Some(10)).await;

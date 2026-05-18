@@ -2,16 +2,19 @@ use axum::extract::{Path, State};
 use axum::Json;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::TeamCtx;
 use crate::api::AppState;
 use crate::deploy::drift::compute_config_hash;
 
 pub(super) async fn check_drift(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: read-only — get_app_for_team scopes to the caller's team (viewer).
     let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
 

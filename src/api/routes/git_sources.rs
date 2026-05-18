@@ -22,7 +22,7 @@ async fn list_sources(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let installations = state.db.list_github_installations().await?;
     Ok(Json(serde_json::json!({ "data": installations })))
@@ -35,7 +35,7 @@ async fn delete_source(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     state.db.delete_github_installation(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
@@ -48,7 +48,7 @@ async fn list_repos(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     // Find the installation
     let installations = state.db.list_github_installations().await?;

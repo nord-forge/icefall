@@ -38,7 +38,7 @@ async fn get_schedule(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let schedule = state.db.get_cleanup_schedule().await?;
     match schedule {
@@ -67,7 +67,7 @@ async fn update_schedule(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     // Load existing or use defaults
     let existing = state.db.get_cleanup_schedule().await?;
@@ -118,7 +118,7 @@ async fn run_cleanup(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let schedule = state.db.get_cleanup_schedule().await?;
     let config = schedule.unwrap_or(CleanupSchedule {
@@ -282,7 +282,7 @@ async fn list_history(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let runs = state.db.list_cleanup_runs(10).await?;
     Ok(Json(serde_json::json!({ "data": runs })))

@@ -70,14 +70,12 @@ struct ToolCallRequest {
 
 async fn call_tool(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    ctx: crate::api::team_auth::TeamCtx,
     Json(body): Json<ToolCallRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let user = authenticate_from_headers(&state, &headers)
-        .await?
-        .ok_or_else(|| {
-            ApiError::BadRequest("Authentication required. Pass API token as Bearer header.".into())
-        })?;
+    // H6: resolve the caller's active team — resources created or mutated
+    // through MCP tools are scoped to it.
+    let user = &ctx.user;
 
     let can_write = user.role == "admin" || user.role == "deployer";
     let write_tools = [
@@ -199,6 +197,8 @@ async fn call_tool(
                     name: name.clone(),
                     db_type: db_type.clone(),
                     app_id: None,
+                    // H6: the database belongs to the caller's active team.
+                    team_id: ctx.team_id.clone(),
                 })
                 .await?;
             serde_json::json!({ "database_id": db.id, "name": db.name, "type": db.db_type, "message": format!("Created {db_type} database '{name}'") })
@@ -477,6 +477,8 @@ async fn call_tool(
                 .db
                 .create_app(&crate::db::models::NewApp {
                     name: name.clone(),
+                    // H6: the app belongs to the caller's active team.
+                    team_id: ctx.team_id.clone(),
                     git_repo,
                     git_branch: branch.to_string(),
                     framework,
@@ -599,7 +601,7 @@ async fn read_resource(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Authentication required".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Authentication required".into()))?;
 
     let data = match body.uri.as_str() {
         "icefall://apps" => {

@@ -2,18 +2,22 @@ use axum::extract::{Path, State};
 use axum::Json;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::UpdateApp;
 
 pub(super) async fn start_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state
+    // H6: app must belong to the caller's team, member role to operate.
+    let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let label = format!("icefall.app={id}");
     let containers = state.docker.list_containers(Some(&label)).await?;
@@ -33,13 +37,16 @@ pub(super) async fn start_app(
 
 pub(super) async fn stop_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state
+    // H6: app must belong to the caller's team, member role to operate.
+    let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let label = format!("icefall.app={id}");
     let containers = state.docker.list_containers(Some(&label)).await?;
@@ -59,13 +66,16 @@ pub(super) async fn stop_app(
 
 pub(super) async fn restart_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state
+    // H6: app must belong to the caller's team, member role to operate.
+    let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let label = format!("icefall.app={id}");
     let containers = state.docker.list_containers(Some(&label)).await?;
@@ -85,13 +95,16 @@ pub(super) async fn restart_app(
 
 pub(super) async fn wake_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: app must belong to the caller's team, member role to operate.
     let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     if app.ghost_mode_status != "hibernating" {
         return Ok(Json(

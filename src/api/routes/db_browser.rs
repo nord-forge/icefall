@@ -4,6 +4,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::TeamCtx;
 use crate::api::AppState;
 
 pub fn routes() -> Router<AppState> {
@@ -26,11 +27,12 @@ struct DbInfo {
     connection_string: String,
 }
 
-async fn get_db_info(state: &AppState, id: &str) -> Result<DbInfo, ApiError> {
-    let dbs = state.db.list_managed_dbs().await?;
-    let db = dbs
-        .iter()
-        .find(|d| d.id == id)
+async fn get_db_info(state: &AppState, team_id: &str, id: &str) -> Result<DbInfo, ApiError> {
+    // H6: only resolve the database if it belongs to the caller's team.
+    let db = state
+        .db
+        .get_managed_db_for_team(team_id, id)
+        .await?
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
 
     let creds: serde_json::Value = serde_json::from_str(&db.credentials).unwrap_or_default();
@@ -72,9 +74,11 @@ async fn get_db_info(state: &AppState, id: &str) -> Result<DbInfo, ApiError> {
 
 async fn list_tables(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let info = get_db_info(&state, &id).await?;
+    // H6: get_db_info scopes the database to the caller's team.
+    let info = get_db_info(&state, &ctx.team_id, &id).await?;
 
     let cmd: Vec<String> = match info.db_type.as_str() {
         "postgres" => vec![
@@ -137,11 +141,13 @@ async fn list_tables(
 
 async fn execute_query(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<QueryBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let query = body.query.trim();
-    let info = get_db_info(&state, &id).await?;
+    // H6: get_db_info scopes the database to the caller's team.
+    let info = get_db_info(&state, &ctx.team_id, &id).await?;
 
     match info.db_type.as_str() {
         "postgres" | "mysql" => execute_sql_query(&state, &info, query).await,

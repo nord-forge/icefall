@@ -3,6 +3,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::{NewDeploy, UpdateApp, CONTROL_PLANE_SERVER_ID};
 use crate::deploy::manager::DeployManager;
@@ -16,14 +17,17 @@ pub(super) struct MigrateAppRequest {
 
 pub(super) async fn migrate_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<MigrateAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: app must belong to the caller's team, member role to migrate.
     let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let current_server_id = app.server_id.as_deref().unwrap_or(CONTROL_PLANE_SERVER_ID);
 

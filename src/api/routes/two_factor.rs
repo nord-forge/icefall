@@ -50,7 +50,7 @@ async fn setup_totp(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.totp_enabled {
         return Err(ApiError::BadRequest(
@@ -106,7 +106,7 @@ async fn verify_totp(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.totp_enabled {
         return Err(ApiError::BadRequest(
@@ -217,7 +217,7 @@ async fn regenerate_backup_codes(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !user.totp_enabled {
         return Err(ApiError::BadRequest("2FA is not enabled".into()));
@@ -257,7 +257,7 @@ async fn disable_totp(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !user.totp_enabled {
         return Err(ApiError::BadRequest("2FA is not enabled".into()));

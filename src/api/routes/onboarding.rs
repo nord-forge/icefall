@@ -251,12 +251,17 @@ struct CreateFirstAppRequest {
 
 async fn create_first_app(
     State(state): State<AppState>,
+    ctx: crate::api::team_auth::TeamCtx,
     Json(body): Json<CreateFirstAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H6: the onboarding step runs as the freshly-created admin (who already
+    // has a session from /onboarding/admin); the first app is created in
+    // that admin's personal team.
     let app = state
         .db
         .create_app(&crate::db::models::NewApp {
             name: body.name,
+            team_id: ctx.team_id.clone(),
             git_repo: body.git_repo,
             git_branch: body.git_branch.unwrap_or_else(|| "main".into()),
             framework: None,

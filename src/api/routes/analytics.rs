@@ -21,7 +21,7 @@ pub async fn deploy_analytics(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let to = query.to.unwrap_or_else(crate::db::models::now_iso8601);
     let from = query.from.unwrap_or_else(|| {
