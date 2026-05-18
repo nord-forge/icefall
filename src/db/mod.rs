@@ -275,6 +275,9 @@ pub trait Database: Send + Sync + 'static {
 
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
+    /// Atomically create the first admin account; fails with
+    /// `DbError::Duplicate` if any user already exists (audit H8).
+    async fn create_first_admin(&self, user: &NewUser) -> Result<User, DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, DbError>;
     async fn list_users(&self) -> Result<Vec<User>, DbError>;

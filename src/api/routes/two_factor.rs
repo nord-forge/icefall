@@ -25,8 +25,8 @@ struct VerifyRequest {
 
 #[derive(Deserialize)]
 struct ValidateRequest {
-    /// The user_id from the pending 2FA login flow
-    user_id: String,
+    /// Single-use challenge token issued by the password-verified login step.
+    challenge: String,
     /// Either a 6-digit TOTP code or an 8-char backup code
     code: String,
 }
@@ -146,24 +146,41 @@ async fn verify_totp(
 /// Validates a TOTP code or backup code during login. Creates a session on success.
 async fn validate_totp(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<ValidateRequest>,
 ) -> Result<axum::response::Response, ApiError> {
-    let user = state
-        .db
-        .get_user_by_id(&body.user_id)
-        .await?
-        .ok_or_else(|| ApiError::BadRequest("Invalid user".into()))?;
-
-    if !user.totp_enabled {
-        return Err(ApiError::BadRequest(
-            "2FA is not enabled for this user".into(),
+    // Per-IP rate limit before any work — blocks TOTP brute-force (audit C2).
+    // 5 attempts / 5 min.
+    let ip = crate::api::rate_limit::client_ip(&headers);
+    if !crate::api::rate_limit::TWO_FACTOR.check(&ip).await {
+        return Err(ApiError::TooManyRequests(
+            "Too many 2FA attempts. Try again later.".into(),
         ));
     }
 
-    let secret_base32 = user
-        .totp_secret
-        .as_deref()
-        .ok_or_else(|| ApiError::BadRequest("2FA configuration error".into()))?;
+    // Resolve the user from the challenge token. A missing/expired token, an
+    // unknown user, or a user without 2FA all yield the SAME error so the
+    // endpoint cannot be used to enumerate accounts (audit C2, L4). The token
+    // is only *consumed* (invalidated) once a code actually validates — a
+    // mistyped code does not force re-login; the per-IP rate limit bounds
+    // brute-force.
+    let generic_err = || ApiError::BadRequest("Invalid or expired 2FA challenge".into());
+
+    let user_id = crate::api::routes::two_factor_challenge::peek_challenge(&body.challenge)
+        .await
+        .ok_or_else(generic_err)?;
+
+    let user = state
+        .db
+        .get_user_by_id(&user_id)
+        .await?
+        .ok_or_else(generic_err)?;
+
+    if !user.totp_enabled {
+        return Err(generic_err());
+    }
+
+    let secret_base32 = user.totp_secret.as_deref().ok_or_else(generic_err)?;
 
     let code = body.code.trim();
 
@@ -171,6 +188,7 @@ async fn validate_totp(
     if code.len() == 6 && code.chars().all(|c| c.is_ascii_digit()) {
         let totp = build_totp(secret_base32, &user.email)?;
         if check_totp_code(&totp, code) {
+            crate::api::routes::two_factor_challenge::take_challenge(&body.challenge).await;
             return create_2fa_session(&state, &user).await;
         }
         return Err(ApiError::BadRequest("Invalid 2FA code".into()));
@@ -179,6 +197,7 @@ async fn validate_totp(
     // Try backup code (8 alphanumeric characters)
     if code.len() == 8 && code.chars().all(|c| c.is_ascii_alphanumeric()) {
         if try_use_backup_code(&state, &user, code).await? {
+            crate::api::routes::two_factor_challenge::take_challenge(&body.challenge).await;
             return create_2fa_session(&state, &user).await;
         }
         return Err(ApiError::BadRequest(
@@ -438,10 +457,7 @@ async fn create_2fa_session(
         }
     });
 
-    let cookie = format!(
-        "icefall_session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800",
-        session.id
-    );
+    let cookie = super::auth::session_cookie(&session.id, state.config.base_domain.as_deref());
     let mut headers = axum::http::HeaderMap::new();
     headers.insert(
         "set-cookie",

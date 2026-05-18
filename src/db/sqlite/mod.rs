@@ -650,6 +650,10 @@ impl Database for SqliteDatabase {
         users::create_user(&self.pool, user).await
     }
 
+    async fn create_first_admin(&self, user: &NewUser) -> Result<User, DbError> {
+        users::create_first_admin(&self.pool, user).await
+    }
+
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError> {
         users::get_user_by_email(&self.pool, email).await
     }

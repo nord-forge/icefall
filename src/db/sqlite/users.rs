@@ -41,6 +41,57 @@ pub(super) async fn create_user(pool: &SqlitePool, user: &NewUser) -> Result<Use
     })
 }
 
+/// Atomically create the very first admin account.
+///
+/// `setup_admin` / onboarding's `create_admin` must not create a second
+/// admin if two requests race. Doing a `list_users().is_empty()` check
+/// followed by `create_user` is not atomic (audit H8). This performs the
+/// "no users exist" guard and the insert as a single conditional statement:
+/// `INSERT ... SELECT ... WHERE NOT EXISTS (SELECT 1 FROM users)`. If a
+/// concurrent request won the race, this insert matches zero rows and we
+/// return `DbError::Duplicate`.
+pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Result<User, DbError> {
+    let id = new_id();
+    let now = now_iso8601();
+
+    let result = sqlx::query(
+        "INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
+         SELECT ?, ?, ?, 'admin', ?, ?
+         WHERE NOT EXISTS (SELECT 1 FROM users)",
+    )
+    .bind(&id)
+    .bind(&user.email)
+    .bind(&user.password_hash)
+    .bind(&now)
+    .bind(&now)
+    .execute(pool)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::Database(ref db_err) if db_err.message().contains("UNIQUE") => {
+            DbError::Duplicate("an admin account already exists".to_string())
+        }
+        other => DbError::Sqlx(other),
+    })?;
+
+    if result.rows_affected() == 0 {
+        return Err(DbError::Duplicate(
+            "an admin account already exists".to_string(),
+        ));
+    }
+
+    Ok(User {
+        id,
+        email: user.email.clone(),
+        password_hash: user.password_hash.clone(),
+        role: "admin".to_string(),
+        totp_secret: None,
+        totp_enabled: false,
+        totp_backup_codes: None,
+        created_at: now.clone(),
+        updated_at: now,
+    })
+}
+
 pub(super) async fn get_user_by_email(
     pool: &SqlitePool,
     email: &str,
@@ -232,4 +283,82 @@ pub(super) async fn admin_reset_user_2fa(pool: &SqlitePool, user_id: &str) -> Re
         return Err(DbError::NotFound(format!("user {user_id}")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    async fn pool() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("connect in-memory sqlite");
+        sqlx::migrate!("src/db/migrations")
+            .run(&pool)
+            .await
+            .expect("migrate");
+        pool
+    }
+
+    fn new_admin(email: &str) -> NewUser {
+        NewUser {
+            email: email.to_string(),
+            password_hash: "$argon2id$test".to_string(),
+            role: "admin".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_first_admin_succeeds_on_empty_db() {
+        let pool = pool().await;
+        let user = create_first_admin(&pool, &new_admin("admin@example.com"))
+            .await
+            .expect("first admin created");
+        assert_eq!(user.role, "admin");
+        assert_eq!(user.email, "admin@example.com");
+    }
+
+    #[tokio::test]
+    async fn create_first_admin_rejected_when_a_user_exists() {
+        let pool = pool().await;
+        create_first_admin(&pool, &new_admin("first@example.com"))
+            .await
+            .expect("first admin created");
+
+        // audit H8: a second create_first_admin must not produce another admin.
+        let err = create_first_admin(&pool, &new_admin("second@example.com"))
+            .await
+            .expect_err("second admin must be rejected");
+        assert!(matches!(err, DbError::Duplicate(_)));
+
+        let users = list_users(&pool).await.expect("list users");
+        assert_eq!(users.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_first_admin_is_atomic_under_concurrency() {
+        let pool = pool().await;
+
+        // Fire many concurrent setup requests against the same fresh DB; the
+        // INSERT ... WHERE NOT EXISTS guard must let exactly one through.
+        let mut handles = Vec::new();
+        for i in 0..16 {
+            let pool = pool.clone();
+            handles.push(tokio::spawn(async move {
+                create_first_admin(&pool, &new_admin(&format!("admin{i}@example.com"))).await
+            }));
+        }
+
+        let mut successes = 0;
+        for h in handles {
+            if h.await.expect("join task").is_ok() {
+                successes += 1;
+            }
+        }
+        assert_eq!(successes, 1, "exactly one admin should be created");
+        assert_eq!(list_users(&pool).await.unwrap().len(), 1);
+    }
 }
