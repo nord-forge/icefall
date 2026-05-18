@@ -41,9 +41,25 @@ mod instance_lifecycle {
         SqliteDatabase::new_with_pool(pool, encryptor)
     }
 
+    /// Create a user with a personal team and return that team's id.
+    /// Apps are team-scoped (team_id is NOT NULL), so tests need a real team.
+    async fn create_test_team(db: &SqliteDatabase, email: &str) -> String {
+        let (_user, team) = db
+            .create_user_with_personal_team(&NewUser {
+                email: email.to_string(),
+                password_hash: "$argon2id$test".to_string(),
+                role: "admin".to_string(),
+            })
+            .await
+            .expect("create user with personal team");
+        team.id
+    }
+
     async fn create_test_app(db: &SqliteDatabase, name: &str) -> App {
+        let team_id = create_test_team(db, &format!("{name}@example.com")).await;
         db.create_app(&NewApp {
             name: name.to_string(),
+            team_id,
             git_repo: Some("https://github.com/test/repo".to_string()),
             git_branch: "main".to_string(),
             framework: None,

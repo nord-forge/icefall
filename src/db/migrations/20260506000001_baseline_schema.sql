@@ -1,3 +1,808 @@
+-- Baseline schema (squashed from 51 incremental migrations, pre-launch).
+-- Note: apps.team_id and databases.team_id are NOT NULL to enforce team-scoping.
+
+-- ============================================================
+-- Identity & teams
+-- ============================================================
+
+CREATE TABLE users (
+    id TEXT PRIMARY KEY NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'deployer', 'viewer')),
+    totp_secret TEXT,
+    totp_enabled INTEGER NOT NULL DEFAULT 0,
+    totp_backup_codes TEXT,
+    preferences TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE teams (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    owner_id TEXT NOT NULL REFERENCES users(id),
+    settings TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE team_memberships (
+    id TEXT PRIMARY KEY NOT NULL,
+    team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('owner', 'admin', 'member', 'viewer')),
+    invited_by TEXT REFERENCES users(id),
+    accepted_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(team_id, user_id)
+);
+
+CREATE TABLE team_invitations (
+    id TEXT PRIMARY KEY NOT NULL,
+    team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('admin', 'member', 'viewer')),
+    token TEXT NOT NULL UNIQUE,
+    invited_by TEXT NOT NULL REFERENCES users(id),
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE invitations (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    token TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Sessions, tokens & auth integrations
+-- ============================================================
+
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    active_team_id TEXT REFERENCES teams(id),
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE api_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team_id TEXT REFERENCES teams(id),
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    abilities TEXT,
+    last_used_at TEXT,
+    expires_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE oauth_identities (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    provider_user_id TEXT NOT NULL,
+    provider_email TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(provider, provider_user_id)
+);
+
+CREATE TABLE oauth_settings (
+    id TEXT PRIMARY KEY DEFAULT 'singleton',
+    github_client_id TEXT,
+    github_client_secret_encrypted BLOB,
+    github_enabled INTEGER NOT NULL DEFAULT 0,
+    google_client_id TEXT,
+    google_client_secret_encrypted BLOB,
+    google_enabled INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE ssh_keys (
+    id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team_id TEXT REFERENCES teams(id),
+    name TEXT NOT NULL,
+    public_key TEXT NOT NULL,
+    private_key_encrypted BLOB NOT NULL,
+    fingerprint TEXT NOT NULL,
+    key_type TEXT NOT NULL DEFAULT 'ed25519' CHECK (key_type IN ('ed25519', 'rsa')),
+    last_used_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE github_apps (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    app_id INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    client_secret_encrypted BLOB NOT NULL,
+    private_key_encrypted BLOB NOT NULL,
+    webhook_secret_encrypted BLOB NOT NULL,
+    html_url TEXT NOT NULL DEFAULT 'https://github.com',
+    api_url TEXT NOT NULL DEFAULT 'https://api.github.com',
+    owner_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE github_installations (
+    id TEXT PRIMARY KEY NOT NULL,
+    github_app_id TEXT REFERENCES github_apps(id),
+    installation_id INTEGER NOT NULL UNIQUE,
+    account_login TEXT NOT NULL,
+    account_type TEXT NOT NULL CHECK (account_type IN ('user', 'org')),
+    access_token_encrypted BLOB,
+    token_expires_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Servers & infrastructure
+-- ============================================================
+
+CREATE TABLE servers (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    host TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('control-plane', 'worker')),
+    status TEXT NOT NULL DEFAULT 'online' CHECK (status IN ('online', 'offline', 'enrolling', 'draining')),
+    token_hash TEXT,
+    agent_version TEXT,
+    labels TEXT,
+    resources TEXT,
+    public_key TEXT,
+    disk_alert_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    disk_alert_warning_threshold INTEGER NOT NULL DEFAULT 80,
+    disk_alert_critical_threshold INTEGER NOT NULL DEFAULT 90,
+    disk_alert_state TEXT NOT NULL DEFAULT 'normal',
+    last_heartbeat_at TEXT,
+    registered_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE server_team_access (
+    id TEXT PRIMARY KEY NOT NULL,
+    server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    access_level TEXT NOT NULL CHECK(access_level IN ('deploy', 'read-only')),
+    granted_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    UNIQUE(server_id, team_id)
+);
+
+CREATE TABLE server_metrics (
+    id TEXT PRIMARY KEY NOT NULL,
+    timestamp TEXT NOT NULL,
+    cpu_percent REAL NOT NULL,
+    memory_used_bytes INTEGER NOT NULL,
+    memory_total_bytes INTEGER NOT NULL,
+    disk_used_bytes INTEGER NOT NULL,
+    disk_total_bytes INTEGER NOT NULL
+);
+
+CREATE TABLE server_metrics_history (
+    id TEXT PRIMARY KEY NOT NULL,
+    server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    cpu_percent REAL,
+    ram_used_bytes INTEGER,
+    ram_total_bytes INTEGER,
+    disk_used_bytes INTEGER,
+    disk_total_bytes INTEGER,
+    load_average TEXT,
+    recorded_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Projects & environments
+-- ============================================================
+
+CREATE TABLE projects (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    color TEXT,
+    team_id TEXT REFERENCES teams(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE project_environments (
+    id TEXT PRIMARY KEY NOT NULL,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    color TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE environment_variables_v2 (
+    id TEXT PRIMARY KEY NOT NULL,
+    environment_id TEXT NOT NULL REFERENCES project_environments(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value_encrypted BLOB NOT NULL,
+    is_secret BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE service_templates (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    version TEXT,
+    icon_url TEXT,
+    categories TEXT,
+    website TEXT,
+    required_inputs TEXT NOT NULL,
+    default_env TEXT,
+    min_resources TEXT,
+    compose_content TEXT NOT NULL,
+    readme TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE shared_variables (
+    id TEXT PRIMARY KEY NOT NULL,
+    scope TEXT NOT NULL CHECK(scope IN ('project', 'server')),
+    scope_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value_encrypted BLOB NOT NULL,
+    is_sensitive BOOLEAN NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(scope, scope_id, key)
+);
+
+-- ============================================================
+-- Apps
+-- ============================================================
+
+CREATE TABLE apps (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    project_environment_id TEXT REFERENCES project_environments(id),
+    -- NOT NULL to enforce team-scoping; every app belongs to exactly one team.
+    team_id TEXT NOT NULL REFERENCES teams(id),
+    server_id TEXT REFERENCES servers(id),
+    ssh_key_id TEXT REFERENCES ssh_keys(id),
+    template_id TEXT REFERENCES service_templates(id),
+    template_version TEXT,
+    git_repo TEXT,
+    git_branch TEXT NOT NULL DEFAULT 'main',
+    git_submodules_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    git_lfs_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    git_shallow_clone BOOLEAN NOT NULL DEFAULT TRUE,
+    framework TEXT,
+    build_config TEXT,
+    disable_build_cache BOOLEAN NOT NULL DEFAULT FALSE,
+    base_directory TEXT,
+    pre_deploy_commands TEXT,
+    post_deploy_commands TEXT,
+    resource_limits TEXT,
+    volumes TEXT,
+    image_ref TEXT,
+    compose_content TEXT,
+    deploy_mode TEXT NOT NULL DEFAULT 'auto',
+    preview_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    preview_branch_pattern TEXT,
+    tags TEXT NOT NULL DEFAULT '',
+    webhook_secret TEXT,
+    basic_auth_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    basic_auth_username TEXT,
+    basic_auth_password_hash TEXT,
+    require_deploy_approval BOOLEAN NOT NULL DEFAULT FALSE,
+    canary_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    canary_config TEXT,
+    drift_monitoring_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    log_noise_patterns TEXT,
+    log_highlight_patterns TEXT,
+    last_request_at TEXT,
+    exempt_from_inactivity BOOLEAN NOT NULL DEFAULT FALSE,
+    ghost_mode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    ghost_mode_idle_minutes INTEGER NOT NULL DEFAULT 30,
+    ghost_mode_status TEXT NOT NULL DEFAULT 'active',
+    power_nap_priority TEXT NOT NULL DEFAULT 'standard',
+    power_nap_custom_schedule TEXT,
+    status_page_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    has_custom_proxy_config BOOLEAN NOT NULL DEFAULT FALSE,
+    proxy_presets TEXT,
+    tunnel_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    desired_instances INTEGER NOT NULL DEFAULT 1,
+    lb_policy TEXT NOT NULL DEFAULT 'round_robin'
+        CHECK (lb_policy IN ('round_robin', 'least_conn', 'ip_hash', 'random')),
+    lb_health_check_path TEXT NOT NULL DEFAULT '/',
+    lb_sticky_sessions INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE app_instances (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    server_id TEXT NOT NULL REFERENCES servers(id),
+    status TEXT NOT NULL DEFAULT 'deploying'
+        CHECK (status IN ('deploying', 'running', 'unhealthy', 'stopped', 'failed')),
+    container_id TEXT,
+    host_port INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE environments (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    env_type TEXT NOT NULL CHECK (env_type IN ('production', 'preview')),
+    branch TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE env_vars (
+    id TEXT PRIMARY KEY NOT NULL,
+    environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value_encrypted BLOB NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'shared' CHECK (scope IN ('shared', 'production', 'preview')),
+    created_at TEXT NOT NULL,
+    UNIQUE (environment_id, key, scope)
+);
+
+CREATE TABLE domains (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    domain TEXT NOT NULL UNIQUE,
+    path TEXT,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    ssl_status TEXT NOT NULL DEFAULT 'pending' CHECK (ssl_status IN ('pending', 'active', 'failed')),
+    ssl_issuer TEXT,
+    ssl_expires_at TEXT,
+    ssl_last_checked_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE proxy_config_history (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    config TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Deploys
+-- ============================================================
+
+CREATE TABLE deploys (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+    server_id TEXT REFERENCES servers(id),
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'building', 'deploying', 'running', 'failed', 'stopped', 'cancelled')),
+    git_sha TEXT,
+    tag TEXT,
+    build_log TEXT,
+    image_ref TEXT,
+    container_id TEXT,
+    env_snapshot TEXT,
+    config_hash TEXT,
+    no_cache BOOLEAN NOT NULL DEFAULT FALSE,
+    screenshot_path TEXT,
+    scheduled_at TEXT,
+    started_at TEXT,
+    finished_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE deploy_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    deploy_id TEXT NOT NULL REFERENCES deploys(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    data TEXT NOT NULL,
+    timestamp TEXT NOT NULL
+);
+
+CREATE TABLE deploy_approvals (
+    id TEXT PRIMARY KEY NOT NULL,
+    deploy_id TEXT NOT NULL REFERENCES deploys(id) ON DELETE CASCADE,
+    action TEXT NOT NULL CHECK (action IN ('approved', 'rejected')),
+    user_id TEXT NOT NULL,
+    comment TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE canary_results (
+    id TEXT PRIMARY KEY NOT NULL,
+    deploy_id TEXT NOT NULL REFERENCES deploys(id) ON DELETE CASCADE,
+    p50_ms REAL,
+    p95_ms REAL,
+    p99_ms REAL,
+    error_count INTEGER NOT NULL DEFAULT 0,
+    total_requests INTEGER NOT NULL DEFAULT 0,
+    verdict TEXT NOT NULL CHECK (verdict IN ('pass', 'fail', 'baseline')),
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE drift_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    drifted_fields TEXT NOT NULL,
+    declared_state TEXT,
+    actual_state TEXT,
+    resolved BOOLEAN NOT NULL DEFAULT FALSE,
+    detected_at TEXT NOT NULL
+);
+
+CREATE TABLE bundle_imports (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL,
+    bundle_version TEXT NOT NULL,
+    source_name TEXT,
+    imported_by TEXT,
+    imported_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Databases
+-- ============================================================
+
+CREATE TABLE databases (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    db_type TEXT NOT NULL CHECK (db_type IN ('postgres', 'mysql', 'redis', 'mongo')),
+    container_id TEXT,
+    credentials_encrypted BLOB NOT NULL,
+    backup_schedule TEXT,
+    backup_retention_count INTEGER NOT NULL DEFAULT 7,
+    app_id TEXT REFERENCES apps(id) ON DELETE SET NULL,
+    project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    -- NOT NULL to enforce team-scoping; every database belongs to one team.
+    team_id TEXT NOT NULL REFERENCES teams(id),
+    created_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Health checks
+-- ============================================================
+
+CREATE TABLE health_checks (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    check_type TEXT NOT NULL CHECK (check_type IN ('tcp', 'docker')),
+    config TEXT,
+    interval_secs INTEGER NOT NULL DEFAULT 30,
+    failure_threshold INTEGER NOT NULL DEFAULT 3,
+    auto_restart BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE health_check_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    health_check_id TEXT NOT NULL REFERENCES health_checks(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('healthy', 'unhealthy')),
+    checked_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Notifications & webhooks
+-- ============================================================
+
+CREATE TABLE notifications (
+    id TEXT PRIMARY KEY NOT NULL,
+    channel_type TEXT NOT NULL CHECK (channel_type IN ('smtp', 'webhook', 'plunk')),
+    config_encrypted BLOB NOT NULL,
+    team_id TEXT REFERENCES teams(id),
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE notification_rules (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL CHECK (event_type IN ('deploy_success', 'deploy_failure', 'health_down', 'health_recovered', 'auto_restart'))
+);
+
+CREATE TABLE webhook_endpoints (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT 'POST',
+    secret TEXT,
+    headers TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE webhook_deliveries (
+    id TEXT PRIMARY KEY NOT NULL,
+    endpoint_id TEXT NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
+    event TEXT NOT NULL,
+    status_code INTEGER,
+    response_time_ms INTEGER,
+    attempt INTEGER NOT NULL DEFAULT 1,
+    error TEXT,
+    delivered_at TEXT NOT NULL
+);
+
+CREATE TABLE log_drains (
+    id TEXT PRIMARY KEY NOT NULL,
+    app_id TEXT REFERENCES apps(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    drain_type TEXT NOT NULL CHECK (drain_type IN ('loki', 'axiom', 'http')),
+    config_encrypted BLOB NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    last_sent_at TEXT,
+    error_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Networking
+-- ============================================================
+
+CREATE TABLE public_ports (
+    id TEXT PRIMARY KEY NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    port INTEGER NOT NULL UNIQUE,
+    ip_whitelist TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE registries (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    username_encrypted BLOB NOT NULL,
+    password_encrypted BLOB NOT NULL,
+    registry_type TEXT NOT NULL DEFAULT 'custom' CHECK (registry_type IN ('dockerhub', 'ghcr', 'gitlab', 'custom')),
+    team_id TEXT REFERENCES teams(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Audit, config history & incidents
+-- ============================================================
+
+CREATE TABLE audit_log (
+    id TEXT PRIMARY KEY NOT NULL,
+    server_id TEXT REFERENCES servers(id) ON DELETE SET NULL,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '{}',
+    ip_address TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now') || 'Z')
+);
+
+CREATE TABLE config_history (
+    id TEXT PRIMARY KEY NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    field TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    changed_by TEXT,
+    changed_at TEXT NOT NULL
+);
+
+CREATE TABLE incidents (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'investigating' CHECK (status IN ('investigating', 'identified', 'monitoring', 'resolved')),
+    severity TEXT NOT NULL DEFAULT 'minor' CHECK (severity IN ('minor', 'major', 'critical')),
+    affected_apps TEXT,
+    affected_servers TEXT,
+    root_cause TEXT,
+    started_at TEXT NOT NULL,
+    resolved_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE incident_notes (
+    id TEXT PRIMARY KEY NOT NULL,
+    incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    author_id TEXT,
+    created_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Onboarding, settings & updates
+-- ============================================================
+
+CREATE TABLE onboarding (
+    id TEXT PRIMARY KEY DEFAULT 'singleton',
+    current_step TEXT NOT NULL DEFAULT 'admin_account',
+    completed_steps TEXT NOT NULL DEFAULT '[]',
+    started_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE registration_settings (
+    id TEXT PRIMARY KEY DEFAULT 'singleton',
+    allow_registration BOOLEAN NOT NULL DEFAULT 0,
+    allowed_domains TEXT,
+    default_role TEXT NOT NULL DEFAULT 'viewer',
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now') || 'Z')
+);
+
+CREATE TABLE update_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    highest_seen_version TEXT NOT NULL,
+    available_version TEXT,
+    release_url TEXT,
+    release_notes TEXT,
+    changelog_highlights TEXT,
+    channel TEXT NOT NULL DEFAULT 'stable',
+    download_state TEXT NOT NULL DEFAULT 'none',
+    download_progress INTEGER DEFAULT 0,
+    download_path TEXT,
+    last_check_at TEXT,
+    last_update_at TEXT,
+    last_update_version TEXT,
+    error_message TEXT,
+    auto_update_enabled INTEGER NOT NULL DEFAULT 0,
+    auto_update_channel TEXT NOT NULL DEFAULT 'stable',
+    auto_update_window_start TEXT NOT NULL DEFAULT '03:00',
+    auto_update_window_end TEXT NOT NULL DEFAULT '05:00',
+    auto_update_notify_before_minutes INTEGER NOT NULL DEFAULT 30,
+    auto_update_pre_downloaded INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE skipped_updates (
+    version TEXT PRIMARY KEY,
+    skipped_at TEXT NOT NULL
+);
+
+CREATE TABLE update_history (
+    id TEXT PRIMARY KEY,
+    version TEXT NOT NULL,
+    previous_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    duration_secs REAL,
+    error TEXT,
+    changelog_url TEXT,
+    applied_at TEXT NOT NULL
+);
+
+-- ============================================================
+-- Backups & cleanup
+-- ============================================================
+
+CREATE TABLE instance_backup_config (
+    id TEXT PRIMARY KEY DEFAULT 'singleton',
+    enabled INTEGER NOT NULL DEFAULT 0,
+    cron_schedule TEXT NOT NULL DEFAULT 'daily',
+    retention_count INTEGER NOT NULL DEFAULT 7,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE instance_backup_history (
+    id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'running',
+    error_message TEXT,
+    s3_key TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT
+);
+
+CREATE TABLE cleanup_schedule (
+    id TEXT PRIMARY KEY NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    cron_expression TEXT NOT NULL DEFAULT '0 3 * * *',
+    disk_threshold_percent INTEGER NOT NULL DEFAULT 80,
+    cleanup_dangling_images BOOLEAN NOT NULL DEFAULT TRUE,
+    cleanup_unused_images BOOLEAN NOT NULL DEFAULT FALSE,
+    cleanup_stopped_containers BOOLEAN NOT NULL DEFAULT TRUE,
+    cleanup_unused_volumes BOOLEAN NOT NULL DEFAULT FALSE,
+    cleanup_unused_networks BOOLEAN NOT NULL DEFAULT TRUE,
+    stopped_container_age_hours INTEGER NOT NULL DEFAULT 24,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE cleanup_runs (
+    id TEXT PRIMARY KEY NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    status TEXT NOT NULL DEFAULT 'running',
+    freed_bytes INTEGER NOT NULL DEFAULT 0,
+    removed_items INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    details TEXT
+);
+
+-- ============================================================
+-- Indexes
+-- ============================================================
+
+CREATE INDEX idx_environments_app_id ON environments(app_id);
+CREATE INDEX idx_env_vars_environment_id ON env_vars(environment_id);
+CREATE INDEX idx_domains_app_id ON domains(app_id);
+CREATE INDEX idx_notification_rules_app_id ON notification_rules(app_id);
+CREATE INDEX idx_health_checks_app_id ON health_checks(app_id);
+CREATE INDEX idx_health_check_events_hc_id ON health_check_events(health_check_id);
+CREATE INDEX idx_health_check_events_checked_at ON health_check_events(checked_at);
+CREATE INDEX idx_health_check_events_composite
+    ON health_check_events(health_check_id, checked_at DESC);
+CREATE INDEX idx_server_metrics_ts ON server_metrics(timestamp);
+CREATE INDEX idx_server_metrics_history_server_time
+    ON server_metrics_history(server_id, recorded_at);
+CREATE INDEX idx_audit_log_server_created ON audit_log(server_id, created_at);
+CREATE INDEX idx_audit_log_action ON audit_log(action);
+CREATE INDEX idx_audit_log_created ON audit_log(created_at);
+CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX idx_api_tokens_token_hash ON api_tokens(token_hash);
+CREATE INDEX idx_servers_token_hash ON servers(token_hash);
+CREATE INDEX idx_apps_server_id ON apps(server_id);
+CREATE INDEX idx_apps_team ON apps(team_id);
+CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX idx_deploys_app_id ON deploys(app_id);
+CREATE INDEX idx_deploys_status ON deploys(status);
+CREATE INDEX idx_deploys_server_id ON deploys(server_id);
+CREATE INDEX idx_deploys_created_at ON deploys(created_at);
+CREATE INDEX idx_webhook_deliveries_endpoint ON webhook_deliveries(endpoint_id);
+CREATE INDEX idx_webhook_deliveries_delivered ON webhook_deliveries(delivered_at);
+CREATE INDEX idx_ssh_keys_user_id ON ssh_keys(user_id);
+CREATE INDEX idx_public_ports_resource ON public_ports(resource_type, resource_id);
+CREATE INDEX idx_config_history_resource ON config_history(resource_type, resource_id);
+CREATE INDEX idx_config_history_changed ON config_history(changed_at);
+CREATE INDEX idx_deploy_events_deploy ON deploy_events(deploy_id);
+CREATE INDEX idx_deploy_approvals_deploy ON deploy_approvals(deploy_id);
+CREATE INDEX idx_canary_results_deploy ON canary_results(deploy_id);
+CREATE INDEX idx_drift_events_app ON drift_events(app_id);
+CREATE INDEX idx_incidents_status ON incidents(status);
+CREATE INDEX idx_incident_notes_incident ON incident_notes(incident_id);
+CREATE UNIQUE INDEX idx_project_env_slug ON project_environments(project_id, slug);
+CREATE UNIQUE INDEX idx_env_vars_v2_key ON environment_variables_v2(environment_id, key);
+CREATE INDEX idx_log_drains_app ON log_drains(app_id);
+CREATE INDEX idx_projects_team ON projects(team_id);
+CREATE INDEX idx_databases_team ON databases(team_id);
+CREATE INDEX idx_team_memberships_user ON team_memberships(user_id);
+CREATE INDEX idx_team_memberships_team ON team_memberships(team_id);
+CREATE INDEX idx_team_invitations_email ON team_invitations(email);
+CREATE INDEX idx_team_invitations_token ON team_invitations(token);
+CREATE INDEX idx_server_team_access_server ON server_team_access(server_id);
+CREATE INDEX idx_server_team_access_team ON server_team_access(team_id);
+CREATE INDEX idx_shared_variables_scope ON shared_variables(scope, scope_id);
+CREATE INDEX idx_app_instances_app ON app_instances(app_id);
+CREATE INDEX idx_app_instances_server ON app_instances(server_id);
+
+-- ============================================================
+-- Seed data (carried over from the squashed migrations).
+-- ============================================================
+
+-- The control-plane server: the icefall host itself, always present so
+-- apps created without an explicit server FK-resolve against it.
+INSERT INTO servers (id, name, host, role, status, created_at, updated_at)
+VALUES (
+    'cp_ctrl_0000000001',
+    'Control Plane',
+    'localhost',
+    'control-plane',
+    'online',
+    datetime('now'),
+    datetime('now')
+);
+
 -- Seed the 50 bundled service templates (IF-148)
 -- Targets: solo developers and small teams (1-10 people)
 

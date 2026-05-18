@@ -10,6 +10,8 @@ pub struct ManagedDatabase {
     pub backup_schedule: Option<String>,
     pub app_id: Option<String>,
     pub project_id: Option<String>,
+    /// Owning team. NOT NULL in the schema — every database belongs to a team.
+    pub team_id: String,
     pub backup_retention_count: i32,
     pub created_at: String,
 }
@@ -18,4 +20,6 @@ pub struct NewManagedDatabase {
     pub name: String,
     pub db_type: String,
     pub app_id: Option<String>,
+    /// Owning team — required; every database is team-scoped.
+    pub team_id: String,
 }

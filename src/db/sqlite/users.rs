@@ -41,18 +41,68 @@ pub(super) async fn create_user(pool: &SqlitePool, user: &NewUser) -> Result<Use
     })
 }
 
-/// Atomically create the very first admin account.
+/// Insert a personal team for `user_id` plus an `owner` membership, inside
+/// the given transaction. Every user gets one personal team on creation so
+/// that `team_id` is always resolvable (the "always-a-team" tenancy model);
+/// the team UI only surfaces once a user belongs to more than one team.
+async fn insert_personal_team(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user_id: &str,
+    now: &str,
+) -> Result<Team, DbError> {
+    let team_id = new_id();
+    // Slug must be unique; derive it from the user id so it never collides.
+    let slug = format!("personal-{user_id}");
+
+    sqlx::query(
+        "INSERT INTO teams (id, name, slug, owner_id, created_at, updated_at)
+         VALUES (?, 'Personal', ?, ?, ?, ?)",
+    )
+    .bind(&team_id)
+    .bind(&slug)
+    .bind(user_id)
+    .bind(now)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO team_memberships (id, team_id, user_id, role, accepted_at, created_at)
+         VALUES (?, ?, ?, 'owner', ?, ?)",
+    )
+    .bind(new_id())
+    .bind(&team_id)
+    .bind(user_id)
+    .bind(now)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(Team {
+        id: team_id,
+        name: "Personal".to_string(),
+        slug,
+        owner_id: user_id.to_string(),
+        settings: None,
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
+    })
+}
+
+/// Atomically create the very first admin account, with a personal team.
 ///
 /// `setup_admin` / onboarding's `create_admin` must not create a second
 /// admin if two requests race. Doing a `list_users().is_empty()` check
-/// followed by `create_user` is not atomic (audit H8). This performs the
-/// "no users exist" guard and the insert as a single conditional statement:
+/// followed by `create_user` is not atomic (audit H8). The whole thing —
+/// the "no users exist" guard, the user insert, and the personal team —
+/// runs in one transaction; the guard is the conditional
 /// `INSERT ... SELECT ... WHERE NOT EXISTS (SELECT 1 FROM users)`. If a
-/// concurrent request won the race, this insert matches zero rows and we
-/// return `DbError::Duplicate`.
+/// concurrent request won the race, that insert matches zero rows, the
+/// transaction rolls back, and we return `DbError::Duplicate`.
 pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Result<User, DbError> {
     let id = new_id();
     let now = now_iso8601();
+    let mut tx = pool.begin().await?;
 
     let result = sqlx::query(
         "INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
@@ -64,7 +114,7 @@ pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Res
     .bind(&user.password_hash)
     .bind(&now)
     .bind(&now)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| match e {
         sqlx::Error::Database(ref db_err) if db_err.message().contains("UNIQUE") => {
@@ -79,6 +129,9 @@ pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Res
         ));
     }
 
+    insert_personal_team(&mut tx, &id, &now).await?;
+    tx.commit().await?;
+
     Ok(User {
         id,
         email: user.email.clone(),
@@ -90,6 +143,55 @@ pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Res
         created_at: now.clone(),
         updated_at: now,
     })
+}
+
+/// Create a user together with their personal team, atomically.
+///
+/// This is the standard user-creation path (OAuth sign-up, invitation
+/// accept). Every user owns a personal team so `team_id` is always
+/// resolvable. Returns the new user and their personal team.
+pub(super) async fn create_user_with_personal_team(
+    pool: &SqlitePool,
+    user: &NewUser,
+) -> Result<(User, Team), DbError> {
+    let id = new_id();
+    let now = now_iso8601();
+    let mut tx = pool.begin().await?;
+
+    sqlx::query(
+        "INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(&user.email)
+    .bind(&user.password_hash)
+    .bind(&user.role)
+    .bind(&now)
+    .bind(&now)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::Database(ref db_err) if db_err.message().contains("UNIQUE") => {
+            DbError::Duplicate(format!("user '{}' already exists", user.email))
+        }
+        other => DbError::Sqlx(other),
+    })?;
+
+    let team = insert_personal_team(&mut tx, &id, &now).await?;
+    tx.commit().await?;
+
+    let user = User {
+        id,
+        email: user.email.clone(),
+        password_hash: user.password_hash.clone(),
+        role: user.role.clone(),
+        totp_secret: None,
+        totp_enabled: false,
+        totp_backup_codes: None,
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    Ok((user, team))
 }
 
 pub(super) async fn get_user_by_email(

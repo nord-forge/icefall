@@ -2,6 +2,7 @@ pub mod error;
 pub mod middleware;
 pub mod rate_limit;
 pub mod routes;
+pub mod team_auth;
 pub mod utils;
 
 use std::collections::HashMap;

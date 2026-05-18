@@ -275,9 +275,13 @@ pub trait Database: Send + Sync + 'static {
 
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
-    /// Atomically create the first admin account; fails with
-    /// `DbError::Duplicate` if any user already exists (audit H8).
+    /// Atomically create the first admin account, with its personal team;
+    /// fails with `DbError::Duplicate` if any user already exists (audit H8).
     async fn create_first_admin(&self, user: &NewUser) -> Result<User, DbError>;
+    /// Create a user together with their personal team, atomically. The
+    /// standard user-creation path under the always-a-team tenancy model.
+    async fn create_user_with_personal_team(&self, user: &NewUser)
+        -> Result<(User, Team), DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, DbError>;
     async fn list_users(&self) -> Result<Vec<User>, DbError>;
@@ -669,6 +673,15 @@ pub trait Database: Send + Sync + 'static {
         team_id: &str,
     ) -> Result<Vec<Notification>, DbError>;
     async fn list_api_tokens_by_team(&self, team_id: &str) -> Result<Vec<ApiToken>, DbError>;
+    /// Fetch one app only if it belongs to `team_id`; `None` otherwise
+    /// (covers both "no such app" and "exists in another team").
+    async fn get_app_for_team(&self, team_id: &str, app_id: &str) -> Result<Option<App>, DbError>;
+    /// Fetch one managed database only if it belongs to `team_id`.
+    async fn get_managed_db_for_team(
+        &self,
+        team_id: &str,
+        db_id: &str,
+    ) -> Result<Option<ManagedDatabase>, DbError>;
 
     // Set team_id on resources
     async fn set_app_team(&self, app_id: &str, team_id: &str) -> Result<(), DbError>;

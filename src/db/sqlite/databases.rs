@@ -14,14 +14,15 @@ pub(super) async fn create_managed_db(
     let empty_creds = encryptor.encrypt(b"{}")?;
 
     sqlx::query(
-        "INSERT INTO databases (id, name, db_type, credentials_encrypted, app_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO databases (id, name, db_type, credentials_encrypted, app_id, team_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&db.name)
     .bind(&db.db_type)
     .bind(&empty_creds)
     .bind(&db.app_id)
+    .bind(&db.team_id)
     .bind(&now)
     .execute(pool)
     .await?;
@@ -35,6 +36,7 @@ pub(super) async fn create_managed_db(
         backup_schedule: None,
         app_id: db.app_id.clone(),
         project_id: None,
+        team_id: db.team_id.clone(),
         backup_retention_count: 7,
         created_at: now,
     })
@@ -83,6 +85,7 @@ pub(super) async fn list_managed_dbs(
             backup_schedule: row.get("backup_schedule"),
             app_id: row.get("app_id"),
             project_id: row.get("project_id"),
+            team_id: row.get("team_id"),
             backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
         });
@@ -118,6 +121,7 @@ pub(super) async fn list_managed_dbs_by_project(
             backup_schedule: row.get("backup_schedule"),
             app_id: row.get("app_id"),
             project_id: row.get("project_id"),
+            team_id: row.get("team_id"),
             backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
         });

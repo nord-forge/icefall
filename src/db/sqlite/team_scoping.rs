@@ -36,7 +36,7 @@ pub(super) async fn list_managed_dbs_by_team(
     team_id: &str,
 ) -> Result<Vec<ManagedDatabase>, DbError> {
     let rows = sqlx::query(
-        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, backup_retention_count, created_at
+        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, team_id, backup_retention_count, created_at
          FROM databases WHERE team_id = ? ORDER BY created_at DESC",
     )
     .bind(team_id)
@@ -58,11 +58,69 @@ pub(super) async fn list_managed_dbs_by_team(
             backup_schedule: row.get("backup_schedule"),
             app_id: row.get("app_id"),
             project_id: row.get("project_id"),
+            team_id: row.get("team_id"),
             backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
         });
     }
     Ok(dbs)
+}
+
+// --- Get a single resource scoped to a team ---
+//
+// These return `None` when the id does not exist OR belongs to another team —
+// the handler turns that into a 404, so a caller can never tell the
+// difference between "no such resource" and "exists, but not yours".
+
+pub(super) async fn get_app_for_team(
+    pool: &SqlitePool,
+    team_id: &str,
+    app_id: &str,
+) -> Result<Option<App>, DbError> {
+    Ok(
+        sqlx::query_as::<_, App>("SELECT * FROM apps WHERE id = ? AND team_id = ?")
+            .bind(app_id)
+            .bind(team_id)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+pub(super) async fn get_managed_db_for_team(
+    pool: &SqlitePool,
+    encryptor: &Encryptor,
+    team_id: &str,
+    db_id: &str,
+) -> Result<Option<ManagedDatabase>, DbError> {
+    let row = sqlx::query(
+        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, team_id, backup_retention_count, created_at
+         FROM databases WHERE id = ? AND team_id = ?",
+    )
+    .bind(db_id)
+    .bind(team_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let encrypted: Vec<u8> = row.get("credentials_encrypted");
+    let decrypted = encryptor.decrypt(&encrypted)?;
+    let credentials = String::from_utf8(decrypted).unwrap_or_default();
+
+    Ok(Some(ManagedDatabase {
+        id: row.get("id"),
+        name: row.get("name"),
+        db_type: row.get("db_type"),
+        container_id: row.get("container_id"),
+        credentials,
+        backup_schedule: row.get("backup_schedule"),
+        app_id: row.get("app_id"),
+        project_id: row.get("project_id"),
+        team_id: row.get("team_id"),
+        backup_retention_count: row.get("backup_retention_count"),
+        created_at: row.get("created_at"),
+    }))
 }
 
 pub(super) async fn list_ssh_keys_by_team(

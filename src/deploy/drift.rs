@@ -68,6 +68,7 @@ mod tests {
             image_ref: None,
             compose_content: None,
             project_id: None,
+            team_id: "test-team".into(),
             deploy_mode: "auto".into(),
             server_id: None,
             base_directory: None,

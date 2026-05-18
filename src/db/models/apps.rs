@@ -17,6 +17,8 @@ pub struct App {
     pub image_ref: Option<String>,
     pub compose_content: Option<String>,
     pub project_id: Option<String>,
+    /// Owning team. NOT NULL in the schema — every app belongs to one team.
+    pub team_id: String,
     pub deploy_mode: String,
     pub server_id: Option<String>,
     pub base_directory: Option<String>,
@@ -87,6 +89,8 @@ pub struct UpdateAppInstance {
 
 pub struct NewApp {
     pub name: String,
+    /// Owning team — required; every app is team-scoped.
+    pub team_id: String,
     pub git_repo: Option<String>,
     pub git_branch: String,
     pub framework: Option<String>,
