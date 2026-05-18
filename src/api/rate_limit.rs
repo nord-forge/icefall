@@ -1,10 +1,5 @@
-//! In-memory sliding-window rate limiter.
-//!
-//! Self-contained on purpose: the requirements (per-IP on auth endpoints,
-//! per-user on the authenticated API, and never trusting `X-Forwarded-For`)
-//! are simpler to express directly than to bend a general-purpose crate
-//! around. Follows the same `LazyLock<Mutex<HashMap>>` pattern as
-//! `oauth::pkce`, so the storage shape is consistent across the codebase.
+//! In-memory sliding-window rate limiter (per-IP on auth, per-user on the API,
+//! never trusting `X-Forwarded-For`). Uses the same `LazyLock<Mutex<HashMap>>` pattern as `oauth::pkce`.
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -69,13 +64,8 @@ pub static GLOBAL: Quota = Quota::new(1000, Duration::from_secs(15 * 60));
 /// Authenticated API: 100 req / 15 min, per user. (Used in `require_auth`.)
 pub static API_PER_USER: Quota = Quota::new(100, Duration::from_secs(15 * 60));
 
-/// Extract the trusted client IP from proxy headers.
-///
-/// Per `rules/security.md`: trust `cf-connecting-ip` (Cloudflare) and
-/// `x-real-ip` (set by a trusted reverse proxy like Caddy), but **never**
-/// `x-forwarded-for` — a client can spoof it to dodge per-IP limits.
-/// Falls back to a fixed bucket so a missing header still rate-limits
-/// (fail-closed-ish: shared bucket rather than no limit).
+/// Extract the trusted client IP from proxy headers: trust `cf-connecting-ip` and
+/// `x-real-ip`, never spoofable `x-forwarded-for`. Falls back to a shared bucket.
 pub fn client_ip(headers: &HeaderMap) -> String {
     for name in ["cf-connecting-ip", "x-real-ip"] {
         if let Some(v) = headers.get(name).and_then(|v| v.to_str().ok()) {

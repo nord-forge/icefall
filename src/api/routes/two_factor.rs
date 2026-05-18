@@ -41,9 +41,8 @@ struct DisableRequest {
     code: String,
 }
 
-/// POST /api/v1/auth/2fa/setup
-/// Generates a new TOTP secret and returns a QR code SVG + base32 secret.
-/// Does NOT enable 2FA yet — the user must confirm with /verify.
+/// POST /api/v1/auth/2fa/setup — generates a TOTP secret, returns a QR code SVG +
+/// base32 secret. Does NOT enable 2FA yet; the user must confirm with /verify.
 async fn setup_totp(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -58,7 +57,6 @@ async fn setup_totp(
         ));
     }
 
-    // Generate a random secret
     let secret = Secret::generate_secret();
     let secret_base32 = secret.to_encoded().to_string();
 
@@ -78,7 +76,6 @@ async fn setup_totp(
 
     let otpauth_url = totp.get_url();
 
-    // Generate QR code SVG
     let qr_svg = generate_qr_svg(&otpauth_url)?;
 
     // Store the pending secret (encrypted) on the user record.
@@ -124,7 +121,6 @@ async fn verify_totp(
         return Err(ApiError::BadRequest("Invalid TOTP code".into()));
     }
 
-    // Generate 10 backup codes
     let (plain_codes, hashed_codes_json) = generate_backup_codes()?;
 
     // Enable 2FA and store hashed backup codes
@@ -158,12 +154,8 @@ async fn validate_totp(
         ));
     }
 
-    // Resolve the user from the challenge token. A missing/expired token, an
-    // unknown user, or a user without 2FA all yield the SAME error so the
-    // endpoint cannot be used to enumerate accounts (audit C2, L4). The token
-    // is only *consumed* (invalidated) once a code actually validates — a
-    // mistyped code does not force re-login; the per-IP rate limit bounds
-    // brute-force.
+    // Resolve the user from the challenge token; every failure yields the SAME error (no
+    // account enumeration). The token is consumed only on a valid code, not a mistyped one.
     let generic_err = || ApiError::BadRequest("Invalid or expired 2FA challenge".into());
 
     let user_id = crate::api::routes::two_factor_challenge::peek_challenge(&body.challenge)
@@ -343,9 +335,8 @@ fn generate_qr_svg(data: &str) -> Result<String, ApiError> {
     Ok(svg)
 }
 
-/// Generate 10 random 8-character alphanumeric backup codes.
-/// Returns (plain_codes, hashed_codes_json).
-/// hashed_codes_json is a JSON array of objects: [{"hash": "...", "used": false}, ...]
+/// Generate 10 random 8-character alphanumeric backup codes. Returns `(plain_codes,
+/// hashed_codes_json)` where hashed is a JSON array of `{"hash": ..., "used": false}`.
 fn generate_backup_codes() -> Result<(Vec<String>, String), ApiError> {
     use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
     use rand::RngExt;
@@ -419,7 +410,6 @@ async fn try_use_backup_code(
             .verify_password(code_upper.as_bytes(), &parsed)
             .is_ok()
         {
-            // Mark as used
             entry["used"] = serde_json::Value::Bool(true);
             let updated_json = serde_json::to_string(&entries).map_err(ApiError::internal)?;
             state

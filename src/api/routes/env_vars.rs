@@ -59,7 +59,7 @@ async fn list_env_vars(
     Path(id): Path<String>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — the app must belong to the caller's team (viewer).
+    // Read-only — the app must belong to the caller's team (viewer).
     state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -98,7 +98,7 @@ async fn set_env_var(
     Path(id): Path<String>,
     Json(body): Json<SetEnvVarRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to mutate.
+    // The app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -138,7 +138,7 @@ async fn delete_env_var(
     ctx: TeamCtx,
     Path((id, var_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the parent app must belong to the caller's team, member role to mutate.
+    // The parent app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -146,8 +146,8 @@ async fn delete_env_var(
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
-    // H6/IDOR: the env var must actually belong to one of this app's
-    // environments — otherwise a caller could delete another app's var.
+    // The env var must actually belong to one of this app's environments —
+    // otherwise a caller could delete another app's var.
     let envs = state.db.list_environments(&id).await?;
     let mut belongs = false;
     for env in &envs {
@@ -177,7 +177,7 @@ async fn import_dotenv(
     Path(id): Path<String>,
     Json(body): Json<ImportEnvRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to mutate.
+    // The app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -230,7 +230,7 @@ async fn resolved_env_vars(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — the app must belong to the caller's team (viewer).
+    // Read-only — the app must belong to the caller's team (viewer).
     state
         .db
         .get_app_for_team(&ctx.team_id, &id)

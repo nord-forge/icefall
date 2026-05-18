@@ -327,9 +327,7 @@ async fn handle_branch_delete(state: &AppState, app: &crate::db::models::App, br
 }
 
 /// Handle a GitHub push event for a known app, called from the GitHub App webhook handler.
-///
-/// This reuses the same push/branch-delete logic as the per-app webhook endpoint
-/// but skips signature verification (which was already done by the caller).
+/// Reuses the per-app push/branch-delete logic but skips already-done signature verification.
 pub async fn handle_github_push_for_app(
     state: &AppState,
     app_id: &str,

@@ -119,9 +119,8 @@ pub(super) async fn oauth_authorize(
     Ok(Redirect::temporary(&url))
 }
 
-/// GET /api/v1/auth/oauth/{provider}/link
-/// Same as authorize, but marks the intent as "link" so the callback attaches
-/// the identity to the currently-authenticated user instead of logging in.
+/// GET /api/v1/auth/oauth/{provider}/link — like authorize, but marks intent "link"
+/// so the callback attaches the identity to the current user instead of logging in.
 pub(super) async fn oauth_link(
     State(state): State<AppState>,
     Path(provider): Path<String>,
@@ -326,9 +325,8 @@ async fn handle_login_callback(
             };
 
             match existing_user {
-                // Case 2a: Email matches existing user — do NOT auto-link.
-                // The user must log in normally and link from their profile
-                // to prove they own the existing account.
+                // Case 2a: Email matches existing user — do NOT auto-link. The user must
+                // log in normally and link from their profile to prove account ownership.
                 Some(_) => {
                     tracing::warn!(
                         "OAuth {provider} email matches existing account but identity is not linked; \
@@ -391,10 +389,8 @@ async fn handle_login_callback(
         }
     };
 
-    // If 2FA is enabled, redirect to the 2FA challenge instead of creating a
-    // session. A single-use challenge token is passed in the URL — never the
-    // raw user_id, which would otherwise leak via browser history / referrer
-    // (audit M7). The frontend reads `challenge` and drives /2fa/validate.
+    // If 2FA is enabled, redirect to the 2FA challenge with a single-use challenge
+    // token in the URL — never the raw user_id, which would leak via history/referrer.
     if user.totp_enabled {
         let challenge = crate::api::routes::two_factor_challenge::issue_challenge(&user.id).await;
         return Ok(

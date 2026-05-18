@@ -67,10 +67,7 @@ pub(super) async fn list_managed_dbs_by_team(
 }
 
 // --- Get a single resource scoped to a team ---
-//
-// These return `None` when the id does not exist OR belongs to another team —
-// the handler turns that into a 404, so a caller can never tell the
-// difference between "no such resource" and "exists, but not yours".
+// Return `None` for both "missing" and "in another team" so the 404 leaks nothing.
 
 pub(super) async fn get_app_for_team(
     pool: &SqlitePool,

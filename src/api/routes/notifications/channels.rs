@@ -111,6 +111,7 @@ pub(super) async fn test_channel(
         "test",
         "Test notification from Icefall",
         &serde_json::json!({"message": "If you see this, notifications are working!"}),
+        &state.config.caddy_admin_url,
     )
     .await
     {

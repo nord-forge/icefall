@@ -65,6 +65,7 @@ pub(super) async fn invite_user(
                 "user.invited",
                 &format!("You've been invited to Icefall as {role}"),
                 &details,
+                &state.config.caddy_admin_url,
             )
             .await;
         }

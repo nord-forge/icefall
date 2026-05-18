@@ -53,10 +53,8 @@ pub fn is_systemd_managed() -> bool {
 }
 
 pub fn notify_ready() {
-    // sd-notify 0.5: `notify` no longer takes an `unset_env` flag. The
-    // env-unsetting variant (`notify_and_unset_env`) is `unsafe` because it
-    // mutates the environment, which races other tokio tasks; we don't fork
-    // children that would inherit NOTIFY_SOCKET, so plain `notify` is fine.
+    // Plain `notify` (not the `unsafe` env-unsetting variant): we don't fork
+    // children that inherit NOTIFY_SOCKET, so mutating the environment is unneeded.
     let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
 }
 

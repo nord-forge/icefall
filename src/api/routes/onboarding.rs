@@ -254,9 +254,8 @@ async fn create_first_app(
     ctx: crate::api::team_auth::TeamCtx,
     Json(body): Json<CreateFirstAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the onboarding step runs as the freshly-created admin (who already
-    // has a session from /onboarding/admin); the first app is created in
-    // that admin's personal team.
+    // The onboarding step runs as the freshly-created admin (session from
+    // /onboarding/admin); the first app is created in that admin's personal team.
     let app = state
         .db
         .create_app(&crate::db::models::NewApp {

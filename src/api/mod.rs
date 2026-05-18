@@ -74,12 +74,8 @@ const MAX_BODY_BYTES: usize = 1024 * 1024;
 
 const DASHBOARD_DIST: &str = "dashboard/dist";
 
-/// Dynamic dashboard routes. The Astro build is fully static (no SSR), so
-/// each dynamic route is prerendered to a placeholder shell at
-/// `dist/<prefix>/_/index.html`; the client island reads the real id from
-/// `window.location`. When `ServeDir` cannot find a file for a request,
-/// this maps the URL prefix to the matching shell so e.g. `/teams/abc123`
-/// serves `dist/teams/_/index.html`, not the wrong page.
+/// Dynamic dashboard routes. The Astro build is static, so each dynamic route is a
+/// prerendered shell; this maps a URL prefix to its shell when `ServeDir` finds no file.
 const DYNAMIC_ROUTE_PREFIXES: &[&str] = &["/teams/", "/servers/", "/apps/", "/invitations/"];
 
 /// SPA fallback handler: pick the prerendered shell for an unmatched path.

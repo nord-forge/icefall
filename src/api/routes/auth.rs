@@ -112,10 +112,8 @@ async fn login(
         return Err(ApiError::BadRequest("Invalid email or password".into()));
     }
 
-    // If 2FA is enabled, don't create a session yet — require 2FA validation
-    // first. Hand the client an opaque, single-use challenge token instead of
-    // the user_id: the user_id must never leak (audit C2, L3), and the
-    // /2fa/validate endpoint must not be drivable with an attacker-chosen id.
+    // If 2FA is enabled, hand the client an opaque single-use challenge token instead
+    // of a session: the user_id must never leak and /2fa/validate must not be drivable with an attacker-chosen id.
     if user.totp_enabled {
         let challenge = crate::api::routes::two_factor_challenge::issue_challenge(&user.id).await;
         let body = serde_json::json!({
@@ -331,7 +329,6 @@ pub async fn authenticate_with_team(
         }
     };
 
-    // Get team role
     let team_role = if let Some(ref tid) = team_id {
         state
             .db
@@ -350,17 +347,8 @@ pub async fn authenticate_with_team(
     }))
 }
 
-/// Build the `Set-Cookie` header value for a session.
-///
-/// - `HttpOnly`: not readable from JS — XSS cannot exfiltrate the session.
-/// - `Secure` when a `base_domain` is configured (i.e. behind Caddy with TLS);
-///   omitted in local HTTP dev so the cookie still works (audit L2).
-/// - `SameSite=Lax` rather than `Strict` (audit L1): the OAuth flow returns
-///   the user via a top-level cross-site redirect from the provider, and
-///   `Strict` would drop the session cookie on that navigation. `Lax` still
-///   blocks the cookie on cross-site sub-requests (forms, images, fetch); the
-///   residual top-level-navigation CSRF surface is covered by the
-///   `X-Icefall-Request` header check on all mutating requests.
+/// Build the `Set-Cookie` header for a session: `HttpOnly`, `Secure` behind TLS, and
+/// `SameSite=Lax` so the OAuth top-level redirect keeps the cookie (CSRF covered by header check).
 pub fn session_cookie(session_id: &str, base_domain: Option<&str>) -> String {
     let secure = if base_domain.is_some() {
         "; Secure"

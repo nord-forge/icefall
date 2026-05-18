@@ -69,9 +69,8 @@ pub(super) async fn revoke_token(
         .await?
         .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
-    // H9: verify the token belongs to the caller before deleting. Previously
-    // any authenticated user could revoke any other user's token by id.
-    // A 404 (not 403) avoids confirming the id exists for another user.
+    // Verify the token belongs to the caller before deleting; a 404 (not 403)
+    // avoids confirming the id exists for another user.
     let owns_token = state
         .db
         .list_api_tokens(&user.id)

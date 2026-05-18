@@ -34,9 +34,8 @@ async fn terminal_ws(
     headers: HeaderMap,
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, ApiError> {
-    // Authenticate via query-param token (WebSocket clients can't set
-    // Authorization headers) or the session cookie. Resolve to the user id
-    // so we can enforce team access — a valid token alone is not enough.
+    // Authenticate via query-param token (WebSocket clients can't set Authorization
+    // headers) or session cookie, resolving to a user id so team access is enforced.
     let user_id = if let Some(ref token) = params.token {
         resolve_user(&state, token).await?
     } else if let Some(session_id) = extract_session_id(&headers) {
@@ -46,9 +45,8 @@ async fn terminal_ws(
     };
     let user_id = user_id.ok_or_else(|| ApiError::Forbidden("Authentication required".into()))?;
 
-    // H5: a root shell in a container is one of the most powerful actions in
-    // the product. Verify the caller's team owns this app before allowing it
-    // — previously any authenticated user could open a terminal to ANY app.
+    // A root shell in a container is one of the most powerful actions in the product —
+    // verify the caller's team owns this app before allowing it.
     let team_id = resolve_user_team(&state, &user_id).await?;
     state
         .db

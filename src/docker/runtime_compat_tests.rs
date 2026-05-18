@@ -1,17 +1,6 @@
-//! QA-270: runtime compatibility tests.
-//!
-//! Two layers:
-//!
-//! 1. **Pure logic** — `RuntimeQuirks` detection for every runtime/rootless
-//!    combination. These always run.
-//! 2. **Live runtime** — operations against whatever container runtime is
-//!    actually present on the host. These **skip** (not fail) when no runtime
-//!    socket is reachable, so the suite stays green in environments without
-//!    Docker/Podman (e.g. most CI unit-test jobs).
-//!
-//! The full Docker / rootful-Podman / rootless-Podman matrix is exercised by
-//! the CI integration job and the documented manual checklist; this module is
-//! the part that lives in `cargo test`.
+//! Runtime compatibility tests. Layer 1 is pure `RuntimeQuirks` detection logic
+//! (always runs); layer 2 exercises a live runtime and skips (not fails) when no
+//! Docker/Podman socket is reachable. The full runtime matrix runs in CI.
 
 #[cfg(test)]
 mod runtime_compat {

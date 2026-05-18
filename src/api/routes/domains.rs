@@ -28,7 +28,7 @@ async fn list_domains(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — the app must belong to the caller's team (viewer).
+    // Read-only — the app must belong to the caller's team (viewer).
     state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -45,7 +45,7 @@ async fn add_domain(
     Path(id): Path<String>,
     Json(body): Json<AddDomainRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to mutate.
+    // The app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -93,7 +93,7 @@ async fn remove_domain(
     ctx: TeamCtx,
     Path((app_id, domain_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: parent app must belong to the caller's team, member role to mutate.
+    // Parent app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &app_id)
@@ -118,7 +118,7 @@ async fn verify_domain(
     ctx: TeamCtx,
     Path((app_id, domain_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: parent app must belong to the caller's team, member role to mutate.
+    // Parent app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &app_id)

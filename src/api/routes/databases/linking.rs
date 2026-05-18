@@ -13,7 +13,7 @@ pub(super) async fn link_to_app(
     ctx: TeamCtx,
     Path((id, app_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: both the database and the target app must belong to the caller's
+    // Both the database and the target app must belong to the caller's
     // team, with at least member role to mutate.
     let db = state
         .db
@@ -63,7 +63,7 @@ pub(super) async fn unlink_from_app(
     ctx: TeamCtx,
     Path((id, app_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: both the database and the target app must belong to the caller's
+    // Both the database and the target app must belong to the caller's
     // team, with at least member role to mutate.
     let db = state
         .db

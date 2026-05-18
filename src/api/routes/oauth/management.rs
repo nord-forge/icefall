@@ -31,12 +31,8 @@ pub(super) async fn get_enabled_providers(
     })))
 }
 
-/// DELETE /api/v1/auth/oauth/{provider}/unlink
-/// Unlinks an OAuth provider from the authenticated user.
-///
-/// When the user has other OAuth providers linked, unlinking is allowed freely.
-/// When this is the last provider, the request body must include
-/// `{ "password": "<current>" }` to prove the user can still log in with a password.
+/// DELETE /api/v1/auth/oauth/{provider}/unlink — unlinks an OAuth provider. Unlinking
+/// the last provider requires a `password` in the body to prove the user can still log in.
 pub(super) async fn oauth_unlink(
     State(state): State<AppState>,
     Path(provider): Path<String>,

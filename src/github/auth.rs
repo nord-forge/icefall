@@ -8,10 +8,8 @@ struct Claims {
     exp: i64,
 }
 
-/// Generate a JWT for authenticating as a GitHub App.
-///
-/// The JWT is signed with the app's RSA private key and is valid for 10 minutes.
-/// The `iat` is backdated by 60 seconds to account for clock drift.
+/// Generate a JWT for authenticating as a GitHub App: RSA-signed, valid for
+/// 10 minutes, with `iat` backdated 60s to account for clock drift.
 pub fn generate_jwt(app_id: i64, private_key_pem: &str) -> Result<String, String> {
     let now = chrono::Utc::now().timestamp();
     let claims = Claims {

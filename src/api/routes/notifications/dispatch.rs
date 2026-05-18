@@ -9,16 +9,27 @@ pub async fn dispatch_notification(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     match channel_type {
-        "webhook" => dispatch_webhook(config, event, summary, details).await,
+        "webhook" => dispatch_webhook(config, event, summary, details, caddy_admin_url).await,
         "smtp" => dispatch_smtp(config, event, summary, details).await,
-        "ntfy" => dispatch_ntfy(config, event, summary, details).await,
+        "ntfy" => dispatch_ntfy(config, event, summary, details, caddy_admin_url).await,
         "plunk" => dispatch_plunk(config, event, summary, details).await,
-        "slack" => dispatch_slack(config, event, summary, details).await,
-        "discord" => dispatch_discord(config, event, summary, details).await,
+        "slack" => dispatch_slack(config, event, summary, details, caddy_admin_url).await,
+        "discord" => dispatch_discord(config, event, summary, details, caddy_admin_url).await,
         _ => Err(format!("unknown channel type: {channel_type}")),
     }
+}
+
+/// Reject user-supplied notification URLs that resolve to internal hosts.
+async fn guard_url(url: &str, caddy_admin_url: &str) -> Result<(), String> {
+    crate::api::utils::url_guard::validate_outbound_url(url, caddy_admin_url)
+        .await
+        .map_err(|e| match e {
+            crate::api::error::ApiError::BadRequest(msg) => msg,
+            other => other.to_string(),
+        })
 }
 
 async fn dispatch_webhook(
@@ -26,12 +37,14 @@ async fn dispatch_webhook(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let url = parsed
         .get("url")
         .and_then(|v| v.as_str())
         .ok_or("webhook config missing 'url'")?;
+    guard_url(url, caddy_admin_url).await?;
 
     let payload = serde_json::json!({
         "event": event,
@@ -61,12 +74,14 @@ async fn dispatch_slack(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let webhook_url = parsed
         .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("slack config missing 'webhook_url'")?;
+    guard_url(webhook_url, caddy_admin_url).await?;
 
     let color = event_color_hex(event);
     let timestamp = crate::db::models::now_iso8601();
@@ -118,12 +133,14 @@ async fn dispatch_discord(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let webhook_url = parsed
         .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("discord config missing 'webhook_url'")?;
+    guard_url(webhook_url, caddy_admin_url).await?;
 
     let color = event_color_discord(event);
     let timestamp = crate::db::models::now_iso8601();
@@ -219,6 +236,7 @@ async fn dispatch_ntfy(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let topic = parsed
@@ -235,6 +253,7 @@ async fn dispatch_ntfy(
     }
 
     let url = format!("{}/{}", server.trim_end_matches('/'), topic);
+    guard_url(&url, caddy_admin_url).await?;
 
     let priority = match event {
         "deploy.failed" | "health.down" | "backup.failure" => "high",

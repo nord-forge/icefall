@@ -31,7 +31,7 @@ pub(super) async fn scale_app(
         )));
     }
 
-    // H6: app must belong to the caller's team, member role to scale.
+    // App must belong to the caller's team, member role to scale.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -86,9 +86,8 @@ pub(super) async fn scale_app(
     let deploy_id = deploy.id.clone();
     let response_deploy_id = deploy_id.clone();
 
-    // Build once on the control plane, then distribute across instances.
-    // Serialized per app via the build lock so concurrent scale/deploy
-    // operations on the same app cannot interleave.
+    // Build once on the control plane, then distribute across instances. Serialized
+    // per app via the build lock so concurrent scale/deploy ops can't interleave.
     tokio::spawn(async move {
         let lock = state.build_locks.acquire(&id).await;
         let _guard = lock.lock().await;
@@ -133,7 +132,7 @@ pub(super) async fn list_instances(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — get_app_for_team scopes to the caller's team (viewer).
+    // Read-only — get_app_for_team scopes to the caller's team (viewer).
     state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -151,16 +150,15 @@ pub(super) struct LbConfigRequest {
     sticky_sessions: Option<bool>,
 }
 
-/// `PUT /apps/{id}/lb-config` — update load balancing policy, health check
-/// path, and sticky-session setting. Also re-applies the Caddy route so the
-/// change takes effect immediately for a running multi-instance app.
+/// `PUT /apps/{id}/lb-config` — update LB policy, health check path, and sticky-session
+/// setting. Re-applies the Caddy route so the change takes effect immediately.
 pub(super) async fn update_lb_config(
     State(state): State<AppState>,
     ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<LbConfigRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: app must belong to the caller's team, member role to mutate.
+    // App must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -217,7 +215,7 @@ pub(super) async fn delete_instance(
     ctx: TeamCtx,
     Path((id, instance_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: destructive — parent app must belong to the caller's team, admin role.
+    // Destructive — parent app must belong to the caller's team, admin role.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)

@@ -5,7 +5,7 @@ use crate::api::error::ApiError;
 use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 
-/// H6: resolve a managed DB's container name, but only if the database
+/// Resolve a managed DB's container name, but only if the database
 /// belongs to the caller's team with at least member role.
 async fn resolve_db_container(
     state: &AppState,

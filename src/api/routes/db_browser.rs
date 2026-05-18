@@ -23,10 +23,8 @@ struct QueryBody {
     query: String,
 }
 
-/// Connection details for the database browser.
-/// `user`/`password` are the *least-privileged* credentials available — the
-/// read-only account when one has been provisioned (C3/C4), otherwise the
-/// primary account. The browser always connects with these.
+/// Connection details for the database browser. `user`/`password` are the least-privileged
+/// credentials available — the read-only account when provisioned, else the primary.
 struct DbInfo {
     container_name: String,
     db_type: String,
@@ -38,7 +36,7 @@ struct DbInfo {
 }
 
 async fn get_db_info(state: &AppState, team_id: &str, id: &str) -> Result<DbInfo, ApiError> {
-    // H6: only resolve the database if it belongs to the caller's team.
+    // Only resolve the database if it belongs to the caller's team.
     let db = state
         .db
         .get_managed_db_for_team(team_id, id)
@@ -73,11 +71,8 @@ async fn get_db_info(state: &AppState, team_id: &str, id: &str) -> Result<DbInfo
         .unwrap_or("")
         .to_string();
 
-    // C3/C4: connect as the read-only account. ensure_readonly_user
-    // provisions it on first use for databases created before read-only
-    // support (lazy migration). Engines without a read-only account
-    // (redis &c.) fall back to the primary user — they are guarded by a
-    // command allowlist instead.
+    // Connect as the read-only account, lazily provisioned on first use. Engines
+    // without one fall back to the primary user, guarded by a command allowlist.
     let (user, password) =
         match crate::api::routes::databases::readonly::ensure_readonly_user(state, &db).await? {
             Some(ro) => (ro.user, ro.password),
@@ -94,9 +89,8 @@ async fn get_db_info(state: &AppState, team_id: &str, id: &str) -> Result<DbInfo
     })
 }
 
-/// Rebuild a connection string so it targets `localhost` (the exec runs
-/// inside the container) and uses the given credentials — never the
-/// admin/root account baked into the stored connection string.
+/// Rebuild a connection string to target `localhost` (the exec runs inside the
+/// container) with the given credentials — never the stored admin/root account.
 fn local_conn_string(info: &DbInfo) -> String {
     match info.db_type.as_str() {
         "postgres" => format!(
@@ -113,9 +107,8 @@ fn local_conn_string(info: &DbInfo) -> String {
     }
 }
 
-/// Build a mongodb:// URI for the browser's (read-only) account. The
-/// read-only user is created on the managed database, so that is its
-/// `authSource`; the primary account authenticates against `admin`.
+/// Build a mongodb:// URI for the browser's account. The read-only user's `authSource`
+/// is the managed database; the primary account authenticates against `admin`.
 fn mongo_conn_string(info: &DbInfo) -> String {
     let auth_source = if info.user == super::databases::READONLY_USER {
         info.db_name.as_str()
@@ -133,7 +126,7 @@ async fn list_tables(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: get_db_info scopes the database to the caller's team.
+    // Get_db_info scopes the database to the caller's team.
     let info = get_db_info(&state, &ctx.team_id, &id).await?;
 
     let cmd: Vec<String> = match info.db_type.as_str() {
@@ -202,7 +195,7 @@ async fn execute_query(
     Json(body): Json<QueryBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let query = body.query.trim();
-    // H6: get_db_info scopes the database to the caller's team.
+    // Get_db_info scopes the database to the caller's team.
     let info = get_db_info(&state, &ctx.team_id, &id).await?;
 
     match info.db_type.as_str() {
@@ -217,10 +210,8 @@ async fn execute_query(
     }
 }
 
-/// Tokens that have no place in a read-only browser query. Even though the
-/// browser connects as a read-only account, these are rejected at the app
-/// layer too (defense in depth): file I/O, program execution, and
-/// engine-specific escapes (audit C4).
+/// Tokens that have no place in a read-only browser query — file I/O, program execution,
+/// engine-specific escapes. Rejected at the app layer too, as defense in depth.
 const SQL_FORBIDDEN: &[&str] = &[
     "into outfile",
     "into dumpfile",
@@ -241,9 +232,8 @@ fn validate_sql_query(query: &str) -> Result<String, ApiError> {
     let trimmed = query.trim().trim_end_matches(';');
     let lower = trimmed.to_lowercase();
 
-    // Exactly one statement — `SELECT 1; DROP TABLE users` must not pass.
-    // psql/mysql -e both execute stacked statements, so reject any
-    // embedded semicolon.
+    // Exactly one statement — psql/mysql -e execute stacked statements, so reject
+    // any embedded semicolon (`SELECT 1; DROP TABLE users` must not pass).
     if trimmed.contains(';') {
         return Err(ApiError::BadRequest(
             "Only a single statement is allowed".into(),
@@ -337,14 +327,8 @@ async fn execute_sql_query(
     ))
 }
 
-/// Structured MongoDB query (audit C3).
-///
-/// The old browser passed the user's raw input straight into
-/// `mongosh --eval`, which is JavaScript — `require('child_process')` and
-/// friends meant full RCE on the database container. There is no safe way to
-/// eval attacker JS. Instead the client now sends a *structured* query:
-/// validated parts that are JSON-serialized (JSON is a safe JS literal) into
-/// a fixed `find()` expression. No user-controlled JavaScript is executed.
+/// Structured MongoDB query: validated parts are JSON-serialized into a fixed `find()`
+/// expression so no user-controlled JavaScript is executed (raw `mongosh --eval` was RCE).
 #[derive(Deserialize)]
 struct MongoQueryBody {
     collection: String,
@@ -376,7 +360,7 @@ async fn execute_mongo_query_route(
     Path(id): Path<String>,
     Json(body): Json<MongoQueryBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: get_db_info scopes the database to the caller's team.
+    // Get_db_info scopes the database to the caller's team.
     let info = get_db_info(&state, &ctx.team_id, &id).await?;
     if info.db_type != "mongo" {
         return Err(ApiError::BadRequest(

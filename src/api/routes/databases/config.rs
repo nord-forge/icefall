@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 
-/// Builds the in-container commands that create a read-only account.
-/// Args: `(admin_user, admin_password, ro_user, ro_password, db_name)`.
-/// Each inner `Vec` is one `exec_in_container` invocation.
+/// Builds the in-container commands creating a read-only account, args
+/// `(admin_user, admin_password, ro_user, ro_password, db_name)`. Each inner `Vec` is one exec.
 type ReadonlySetupFn = fn(&str, &str, &str, &str, &str) -> Vec<Vec<String>>;
 
-/// How the db_browser connects: a read-only account when one has been
-/// provisioned (audit C3/C4 defense-in-depth), falling back to the primary
-/// account for engines where a read-only user is not provisioned.
+/// How the db_browser connects: a read-only account when one has been provisioned,
+/// falling back to the primary account for engines without a read-only user.
 pub(super) struct DbTypeConfig {
     pub image: &'static str,
     pub port: u16,
@@ -15,11 +13,8 @@ pub(super) struct DbTypeConfig {
     pub connection_string: fn(&str, &str, &str, &str) -> String,
     pub default_memory_mb: i64,
     pub env_var_name: &'static str,
-    /// Creates a least-privilege, read-only account. `None` for engines
-    /// where the db_browser relies on a verb allowlist instead (redis and
-    /// friends). Statements are passed as separate args (never
-    /// shell-concatenated) so the generated password cannot break out. The
-    /// commands are idempotent — safe to re-run.
+    /// Creates a least-privilege read-only account (`None` for engines using a verb
+    /// allowlist). Statements are separate args (never shell-concatenated) and idempotent.
     pub readonly_setup: Option<ReadonlySetupFn>,
 }
 
@@ -45,10 +40,8 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 1024,
             env_var_name: "DATABASE_URL",
-            // Create a LOGIN role with SELECT-only on the public schema.
-            // `CREATE ROLE` has no `IF NOT EXISTS`, so it is wrapped in a
-            // DO block that swallows duplicate_object — making the whole
-            // thing idempotent. The default DB is named after the admin user.
+            // Create a LOGIN role with SELECT-only on the public schema. `CREATE ROLE` has
+            // no `IF NOT EXISTS`, so a DO block swallows duplicate_object to stay idempotent.
             readonly_setup: Some(|admin_user, _admin_pass, ro_user, ro_pass, _db| {
                 let sql = format!(
                     "DO $$ BEGIN \
@@ -141,10 +134,8 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 512,
             env_var_name: "MONGODB_URL",
-            // The read-only user gets the built-in `read` role on the
-            // managed database. createUser errors if the user already
-            // exists, so the eval catches that to stay idempotent. This
-            // --eval contains NO user input — it is safe.
+            // The read-only user gets the built-in `read` role; the eval catches a
+            // duplicate-user error to stay idempotent. Contains NO user input — safe.
             readonly_setup: Some(|admin_user, admin_pass, ro_user, ro_pass, db| {
                 let conn = format!(
                     "mongodb://{admin_user}:{admin_pass}@localhost:27017/admin?authSource=admin"

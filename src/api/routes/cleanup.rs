@@ -135,7 +135,6 @@ async fn run_cleanup(
         updated_at: String::new(),
     });
 
-    // Record cleanup run start
     let run = state.db.create_cleanup_run().await?;
 
     let mut images_removed: u64 = 0;

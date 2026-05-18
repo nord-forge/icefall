@@ -125,9 +125,8 @@ async fn list_variables(
         .await?
         .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
-    // Project environments use the same env_vars table through the environment_id
-    // linkage. The env_id here is a project_environment ID which can be used
-    // as the environment_id for env_vars storage.
+    // Project environments share the env_vars table: the env_id here is a
+    // project_environment ID used directly as the environment_id for storage.
     let vars = state.db.get_env_vars(&env_id).await?;
     Ok(Json(serde_json::json!({ "data": vars })))
 }

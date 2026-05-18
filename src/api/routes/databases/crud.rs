@@ -25,7 +25,7 @@ pub(super) async fn list_databases(
     State(state): State<AppState>,
     ctx: TeamCtx,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: scope the listing to the caller's team.
+    // Scope the listing to the caller's team.
     let dbs = state.db.list_managed_dbs_by_team(&ctx.team_id).await?;
     Ok(Json(serde_json::json!({ "data": dbs })))
 }
@@ -35,7 +35,7 @@ pub(super) async fn get_database(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — the database must belong to the caller's team (viewer).
+    // Read-only — the database must belong to the caller's team (viewer).
     let db = state
         .db
         .get_managed_db_for_team(&ctx.team_id, &id)
@@ -50,10 +50,10 @@ pub(super) async fn create_database(
     ctx: TeamCtx,
     Json(body): Json<CreateDatabaseRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: creating a database requires at least member role in the team.
+    // Creating a database requires at least member role in the team.
     ctx.verify_team_access(&ctx.team_id, TeamRole::Member)?;
 
-    // H6: if linking to an app, that app must belong to the caller's team.
+    // If linking to an app, that app must belong to the caller's team.
     if let Some(ref app_id) = body.app_id {
         state
             .db
@@ -195,11 +195,8 @@ pub(super) async fn create_database(
         "port": type_config.port,
     });
 
-    // C3/C4: provision a read-only account the db_browser connects as, so a
-    // query-validation bypass cannot mutate or escape the database. Engines
-    // without a read-only setup (redis &c.) return None and rely on their
-    // verb allowlist instead. A provisioning failure fails the request —
-    // better than a database that silently only has admin access.
+    // Provision a read-only account the db_browser connects as, so a query-validation
+    // bypass can't mutate the database. Provisioning failure fails the request.
     if let Some(ro) = super::readonly::provision_readonly_user(
         &state,
         &container_name,
@@ -265,7 +262,7 @@ pub(super) async fn delete_database(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: destructive — database must belong to the caller's team, admin role.
+    // Destructive — database must belong to the caller's team, admin role.
     let db = state
         .db
         .get_managed_db_for_team(&ctx.team_id, &id)

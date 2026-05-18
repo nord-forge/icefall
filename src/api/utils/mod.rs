@@ -1,3 +1,5 @@
+pub mod url_guard;
+
 use std::net::IpAddr;
 
 pub fn hash_password(password: &str) -> Result<String, String> {

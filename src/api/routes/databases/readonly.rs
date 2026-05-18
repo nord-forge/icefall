@@ -1,11 +1,5 @@
-//! Provisioning of least-privilege, read-only database accounts.
-//!
-//! The database browser executes user-supplied queries. Even with query
-//! validation, connecting as the database's admin/root account means a
-//! validation bypass is catastrophic (audit C3/C4). Defense in depth: each
-//! managed database gets a second, SELECT/read-only account, and the browser
-//! connects as that. The read-only credentials are stored alongside the
-//! primary ones in the encrypted `credentials` JSON under a `readonly` key.
+//! Provisioning of least-privilege, read-only database accounts — defense in depth for the
+//! query browser. Stored in the encrypted `credentials` JSON under a `readonly` key.
 
 use std::time::Duration;
 
@@ -28,13 +22,8 @@ pub(crate) struct ReadonlyCreds {
     pub password: String,
 }
 
-/// Provision a read-only account inside an already-running database
-/// container. Polls for readiness, then runs the engine's idempotent setup
-/// commands. Returns the read-only credentials, or `None` for engines that
-/// have no read-only-user setup (redis &c. — guarded by a verb allowlist).
-///
-/// Errors are surfaced to the caller: a database created without a working
-/// read-only account would otherwise silently fall back to admin access.
+/// Provision a read-only account in a running container: polls readiness then runs idempotent
+/// setup. `None` for engines without support; errors surface rather than fall back to admin.
 pub(super) async fn provision_readonly_user(
     state: &AppState,
     container_name: &str,
@@ -76,10 +65,8 @@ pub(super) async fn provision_readonly_user(
     }))
 }
 
-/// Poll the container until the database accepts a command, up to
-/// `READINESS_TIMEOUT`. A freshly-started DB container is not immediately
-/// ready; running setup against it would fail. We probe with the engine's
-/// own client (the first setup command's program) doing a trivial check.
+/// Poll the container until the database accepts a command, up to `READINESS_TIMEOUT` —
+/// a freshly-started DB isn't immediately ready. Probes with the engine's own client.
 async fn wait_for_ready(
     state: &AppState,
     container_name: &str,
@@ -121,12 +108,8 @@ async fn wait_for_ready(
     }
 }
 
-/// Return the read-only credentials for a managed database, provisioning
-/// them on first use if the database predates read-only support (lazy
-/// migration). Returns `None` for engines without a read-only account.
-///
-/// On success the merged credentials JSON is persisted so the work is done
-/// at most once per database.
+/// Return the read-only credentials for a managed database, lazily provisioning them
+/// on first use (persisted, so done at most once). `None` for engines without one.
 pub(crate) async fn ensure_readonly_user(
     state: &AppState,
     db: &ManagedDatabase,

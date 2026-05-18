@@ -11,7 +11,7 @@ pub(super) async fn check_drift(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — get_app_for_team scopes to the caller's team (viewer).
+    // Read-only — get_app_for_team scopes to the caller's team (viewer).
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)

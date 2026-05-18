@@ -81,7 +81,7 @@ pub async fn import_bundle(
     ctx: TeamCtx,
     Json(bundle): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the imported app is created in the caller's active team.
+    // The imported app is created in the caller's active team.
     if ctx.user.role == "viewer" {
         return Err(ApiError::Forbidden(
             "Deployer or admin role required to import bundles".into(),

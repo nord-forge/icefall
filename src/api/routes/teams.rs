@@ -522,9 +522,8 @@ async fn decline_invitation(
 
 // --- Server sharing endpoints ---
 
-/// Servers are global infrastructure (no per-server owner column), so
-/// granting/revoking team access to a server is an administrator action.
-/// M5: previously any authenticated user — even a viewer — could do this.
+/// Servers are global infrastructure (no per-server owner column), so granting or
+/// revoking a team's access to a server is an administrator-only action.
 fn require_global_admin(user: &crate::db::models::User) -> Result<(), ApiError> {
     if user.role == "admin" {
         Ok(())

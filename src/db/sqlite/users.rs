@@ -41,10 +41,8 @@ pub(super) async fn create_user(pool: &SqlitePool, user: &NewUser) -> Result<Use
     })
 }
 
-/// Insert a personal team for `user_id` plus an `owner` membership, inside
-/// the given transaction. Every user gets one personal team on creation so
-/// that `team_id` is always resolvable (the "always-a-team" tenancy model);
-/// the team UI only surfaces once a user belongs to more than one team.
+/// Insert a personal team for `user_id` plus an `owner` membership inside the
+/// given transaction, so `team_id` is always resolvable ("always-a-team" model).
 async fn insert_personal_team(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     user_id: &str,
@@ -89,16 +87,8 @@ async fn insert_personal_team(
     })
 }
 
-/// Atomically create the very first admin account, with a personal team.
-///
-/// `setup_admin` / onboarding's `create_admin` must not create a second
-/// admin if two requests race. Doing a `list_users().is_empty()` check
-/// followed by `create_user` is not atomic (audit H8). The whole thing —
-/// the "no users exist" guard, the user insert, and the personal team —
-/// runs in one transaction; the guard is the conditional
-/// `INSERT ... SELECT ... WHERE NOT EXISTS (SELECT 1 FROM users)`. If a
-/// concurrent request won the race, that insert matches zero rows, the
-/// transaction rolls back, and we return `DbError::Duplicate`.
+/// Atomically create the very first admin account with a personal team. The
+/// `INSERT ... WHERE NOT EXISTS` guard gives racing losers `DbError::Duplicate`.
 pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Result<User, DbError> {
     let id = new_id();
     let now = now_iso8601();
@@ -145,11 +135,8 @@ pub(super) async fn create_first_admin(pool: &SqlitePool, user: &NewUser) -> Res
     })
 }
 
-/// Create a user together with their personal team, atomically.
-///
-/// This is the standard user-creation path (OAuth sign-up, invitation
-/// accept). Every user owns a personal team so `team_id` is always
-/// resolvable. Returns the new user and their personal team.
+/// Create a user together with their personal team, atomically — the standard
+/// user-creation path (OAuth sign-up, invitation accept).
 pub(super) async fn create_user_with_personal_team(
     pool: &SqlitePool,
     user: &NewUser,

@@ -1,10 +1,6 @@
-/// A trusted Ed25519 public key for verifying release manifests.
-///
-/// Multiple keys are supported for key rotation. When rotating:
-/// 1. Add the new key at position 0
-/// 2. Release a version signed with the OLD key that includes the new key
-/// 3. Switch CI to sign with the new key
-/// 4. After sufficient adoption, remove the old key
+/// A trusted Ed25519 public key for verifying release manifests. To rotate:
+/// add the new key at index 0, release once signed with the old key, switch CI,
+/// then drop the old key after adoption.
 #[derive(Debug, Clone)]
 pub struct TrustedKey {
     pub id: &'static str,

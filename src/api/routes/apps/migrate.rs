@@ -21,7 +21,7 @@ pub(super) async fn migrate_app(
     Path(id): Path<String>,
     Json(body): Json<MigrateAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: app must belong to the caller's team, member role to migrate.
+    // App must belong to the caller's team, member role to migrate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)

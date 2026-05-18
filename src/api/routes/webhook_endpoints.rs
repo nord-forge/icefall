@@ -65,6 +65,13 @@ pub async fn test_endpoint(
         .find(|e| e.id == id)
         .ok_or_else(|| ApiError::NotFound(format!("webhook endpoint {id}")))?;
 
+    // Block SSRF — the endpoint URL is user-supplied.
+    crate::api::utils::url_guard::validate_outbound_url(
+        &endpoint.url,
+        &state.config.caddy_admin_url,
+    )
+    .await?;
+
     let payload = serde_json::json!({
         "event": "test",
         "summary": "Test webhook delivery",

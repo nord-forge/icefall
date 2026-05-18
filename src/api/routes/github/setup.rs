@@ -20,11 +20,8 @@ pub fn routes() -> Router<AppState> {
         .route("/github/apps/{id}", delete(delete_app))
 }
 
-/// Returns the GitHub App Manifest and form action URL.
-///
-/// The frontend should render an HTML form that POSTs the manifest
-/// to the `form_action` URL. GitHub will create the app and redirect
-/// back to our callback URL with a `code` parameter.
+/// Returns the GitHub App Manifest and form action URL. The frontend POSTs the manifest
+/// to `form_action`; GitHub creates the app and redirects back with a `code` parameter.
 async fn get_manifest(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -82,10 +79,8 @@ struct CallbackParams {
     code: String,
 }
 
-/// Handles the callback from GitHub after the user creates an app via the manifest flow.
-///
-/// Exchanges the code for app credentials, stores them encrypted, and redirects
-/// the user to install the app on their GitHub account/organization.
+/// Handles the GitHub callback after manifest-flow app creation: exchanges the code for
+/// credentials, stores them encrypted, and redirects the user to install the app.
 async fn handle_callback(
     State(state): State<AppState>,
     headers: HeaderMap,

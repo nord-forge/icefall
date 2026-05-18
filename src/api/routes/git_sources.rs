@@ -50,7 +50,6 @@ async fn list_repos(
         .await?
         .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
-    // Find the installation
     let installations = state.db.list_github_installations().await?;
     let installation = installations
         .iter()

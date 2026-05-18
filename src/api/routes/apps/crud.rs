@@ -69,7 +69,7 @@ pub(super) async fn list_apps(
     ctx: TeamCtx,
     Query(query): Query<ListAppsQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: scope the listing to the caller's team, then apply the
+    // Scope the listing to the caller's team, then apply the
     // existing project/tag filters in memory.
     let mut apps = state.db.list_apps_by_team(&ctx.team_id).await?;
 
@@ -98,7 +98,7 @@ pub(super) async fn create_app(
     ctx: TeamCtx,
     Json(body): Json<CreateAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: creating an app requires at least member role in the team.
+    // Creating an app requires at least member role in the team.
     ctx.verify_team_access(&ctx.team_id, TeamRole::Member)?;
 
     if body.name.trim().is_empty() {
@@ -187,7 +187,7 @@ pub(super) async fn get_app(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: only return the app if it belongs to the caller's team.
+    // Only return the app if it belongs to the caller's team.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -202,7 +202,7 @@ pub(super) async fn update_app(
     Path(id): Path<String>,
     Json(body): Json<UpdateAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to mutate.
+    // The app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -274,7 +274,7 @@ pub(super) async fn delete_app(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: destructive delete — app must belong to the caller's team, admin role.
+    // Destructive delete — app must belong to the caller's team, admin role.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)

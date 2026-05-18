@@ -16,9 +16,8 @@ use crate::config::IcefallConfig;
 
 static X_REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
 
-/// Custom header the dashboard sends on every request. Mutating requests are
-/// rejected without it — a lightweight CSRF defence (a cross-site `<form>` or
-/// image cannot set custom headers; only same-origin `fetch`/XHR can). H2.
+/// Custom header the dashboard sends on every request — a lightweight CSRF
+/// defence: cross-site forms/images can't set custom headers, only same-origin fetch/XHR.
 static X_ICEFALL_REQUEST: HeaderName = HeaderName::from_static("x-icefall-request");
 
 const PUBLIC_PATHS: &[&str] = &[
@@ -33,8 +32,7 @@ const PUBLIC_PATHS: &[&str] = &[
     "/api/v1/github/events",
     "/api/v1/github/callback",
     // Onboarding: only status + first-admin creation are public; every other
-    // onboarding endpoint is gated behind auth (audit H4). create_admin has
-    // its own empty-users guard.
+    // onboarding endpoint is gated behind auth. create_admin has its own empty-users guard.
     "/api/v1/onboarding/status",
     "/api/v1/onboarding/admin",
 ];
@@ -46,14 +44,8 @@ const PUBLIC_PREFIXES: &[&str] = &[
     "/api/v1/invitations/",
 ];
 
-/// OAuth browser-redirect endpoints that must be reachable without a session
-/// (the user has no session yet — the callback is what creates it). Matched
-/// with a `{provider}` wildcard segment. `link`/`unlink`/`identities` are
-/// deliberately NOT here: they require an existing authenticated session.
-///
-/// (The previous `/api/v1/oauth/` public prefix matched nothing — the routes
-/// are mounted at `/api/v1/auth/oauth/...` — which silently put OAuth sign-in
-/// behind auth. This fixes that.)
+/// OAuth browser-redirect endpoints reachable without a session (the callback is
+/// what creates it). `link`/`unlink`/`identities` are NOT here — they require auth.
 fn is_public_oauth_path(path: &str) -> bool {
     let Some(rest) = path.strip_prefix("/api/v1/auth/oauth/") else {
         return false;
@@ -73,9 +65,8 @@ fn is_public_path(path: &str) -> bool {
     if is_public_oauth_path(path) {
         return true;
     }
-    // Terminal and SSE endpoints handle their own auth. Use suffix matching
-    // (not `contains`) so an arbitrary path can't smuggle past auth by merely
-    // including the substring "/terminal" or "/events" (audit M3).
+    // Terminal and SSE endpoints handle their own auth. Suffix matching (not
+    // `contains`) so an arbitrary path can't smuggle past auth by including the substring.
     if path.ends_with("/terminal") || path.ends_with("/events") {
         return true;
     }
@@ -105,8 +96,7 @@ pub async fn require_auth(
     let headers = req.headers();
 
     // CSRF defence: mutating requests must carry the X-Icefall-Request header.
-    // Webhook/agent callbacks are exempt (they're machine-to-machine and live
-    // under public prefixes that authenticate via signatures/tokens instead).
+    // Webhook/agent callbacks are exempt — machine-to-machine, authenticated via signatures/tokens.
     if is_mutating(&method)
         && path.starts_with("/api/")
         && !is_public_path(&path)
@@ -216,14 +206,8 @@ fn sha256_hex(input: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-/// Content-Security-Policy. Strict on `script-src` (hash-pinned inline
-/// scripts, no `unsafe-inline` — the real XSS vector); `style-src` allows
-/// `unsafe-inline` for Astro's scoped styles (low risk, decided trade-off).
-///
-/// Inline-script hashes are produced by `dashboard/scripts/csp-hashes.mjs`
-/// at build time and read from `<dashboard_dir>/csp-hashes.json`. If the file
-/// is absent the policy omits inline scripts entirely — the dashboard breaks
-/// loudly rather than silently weakening the CSP.
+/// Content-Security-Policy: hash-pinned inline `script-src`, `unsafe-inline` `style-src`
+/// for Astro. Hashes come from `csp-hashes.json`; if absent, inline scripts are omitted.
 static CSP_VALUE: LazyLock<String> = LazyLock::new(|| {
     let hashes = load_csp_script_hashes();
     let script_src = if hashes.is_empty() {
@@ -296,9 +280,8 @@ fn security_header_layers(config: &IcefallConfig) -> Vec<SetResponseHeaderLayer<
         ));
     }
 
-    // HSTS only when a base_domain is configured — that's when the deployment
-    // is behind Caddy with TLS. Sending HSTS over plain HTTP (local dev) would
-    // wrongly pin the browser to HTTPS for a host with no certificate.
+    // HSTS only when a base_domain is configured — that's when behind Caddy with TLS.
+    // Sending it over plain HTTP (local dev) would wrongly pin the browser to HTTPS.
     if config.base_domain.is_some() {
         if let Ok(hsts) = HeaderValue::from_str("max-age=31536000; includeSubDomains") {
             layers.push(SetResponseHeaderLayer::overriding(
@@ -311,19 +294,8 @@ fn security_header_layers(config: &IcefallConfig) -> Vec<SetResponseHeaderLayer<
     layers
 }
 
-/// Build the CORS layer.
-///
-/// The dashboard is served same-origin from this same binary, so in
-/// production no cross-origin browser request is ever legitimate. We keep a
-/// `CorsLayer` (declarative, single source of truth, fails closed on
-/// misconfiguration) but restrict it to an explicit origin allowlist instead
-/// of the previous `Any` wildcard (audit C1):
-///
-/// - production: `https://<base_domain>`
-/// - dev (no base_domain): `http://localhost:<port>` + `http://127.0.0.1:<port>`
-///
-/// `allow_credentials(true)` is required for cookie auth and is incompatible
-/// with a wildcard origin — another reason the wildcard had to go.
+/// Build the CORS layer, restricted to an explicit allowlist (prod base_domain, or
+/// localhost in dev) — `allow_credentials` for cookie auth is incompatible with a wildcard.
 fn cors_layer(config: &IcefallConfig) -> CorsLayer {
     let origins: Vec<HeaderValue> = match config.base_domain.as_deref() {
         Some(domain) => vec![format!("https://{domain}")],

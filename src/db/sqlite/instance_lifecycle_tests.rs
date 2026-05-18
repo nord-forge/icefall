@@ -1,12 +1,5 @@
-//! QA-264: integration tests for the multi-instance / load-balancing data
-//! lifecycle.
-//!
-//! These exercise the parts of Phase 31 that do not require a live Docker or
-//! Caddy: the `app_instances` data model, scale-up / scale-down state
-//! transitions, per-server instance queries, and the Caddy multi-upstream
-//! config generation. Docker- and Caddy-network-dependent scenarios (real
-//! zero-downtime rolling deploys, live traffic distribution) are out of scope
-//! for unit-level tests and are covered by manual / staging verification.
+//! QA-264: integration tests for the multi-instance / load-balancing data lifecycle.
+//! Covers Docker/Caddy-independent parts only; live scenarios are out of scope.
 
 #[cfg(test)]
 mod instance_lifecycle {

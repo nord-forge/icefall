@@ -27,9 +27,8 @@ pub enum VerifyError {
     SemverParse(#[from] semver::Error),
 }
 
-/// Verify an Ed25519 signature on manifest bytes against the set of trusted keys.
-///
-/// Tries each valid key until one succeeds. Returns the matching key ID on success.
+/// Verify an Ed25519 signature on manifest bytes, trying each valid trusted key
+/// until one succeeds. Returns the matching key ID on success.
 pub fn verify_manifest_signature(
     manifest_bytes: &[u8],
     signature_b64: &str,

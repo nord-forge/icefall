@@ -23,7 +23,7 @@ pub(super) async fn create_deploy(
     Path(id): Path<String>,
     body: Option<Json<CreateDeployRequest>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to deploy.
+    // The app must belong to the caller's team, member role to deploy.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -386,7 +386,7 @@ pub(super) async fn rollback_deploy(
     ctx: TeamCtx,
     Path((app_id, deploy_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to roll back.
+    // The app must belong to the caller's team, member role to roll back.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &app_id)
@@ -400,7 +400,7 @@ pub(super) async fn rollback_deploy(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
 
-    // H6/IDOR: the deploy must belong to the app named in the path.
+    // IDOR: the deploy must belong to the app named in the path.
     if target_deploy.app_id != app_id {
         return Err(ApiError::NotFound(format!("deploy {deploy_id}")));
     }
@@ -478,7 +478,7 @@ pub(super) async fn cancel_deploy(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
 
-    // H6: resolve the deploy's app and confirm it belongs to the caller's
+    // Resolve the deploy's app and confirm it belongs to the caller's
     // team (member role); 404 if not, so cross-team deploys stay hidden.
     let app = state
         .db

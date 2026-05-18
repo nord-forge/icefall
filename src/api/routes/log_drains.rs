@@ -23,7 +23,7 @@ async fn list_drains(
     ctx: TeamCtx,
     Path(app_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — the app must belong to the caller's team (viewer).
+    // Read-only — the app must belong to the caller's team (viewer).
     state
         .db
         .get_app_for_team(&ctx.team_id, &app_id)
@@ -61,7 +61,7 @@ async fn create_drain(
     Path(app_id): Path<String>,
     Json(body): Json<CreateDrainRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: the app must belong to the caller's team, member role to mutate.
+    // The app must belong to the caller's team, member role to mutate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &app_id)
@@ -84,9 +84,8 @@ async fn create_drain(
     Ok(Json(serde_json::json!({ "data": drain })))
 }
 
-/// H6: verify a log drain bound to an app belongs to the caller's team.
-/// Drains with no `app_id` are global; they stay accessible to any
-/// authenticated team member (no app to scope against).
+/// Verify a log drain bound to an app belongs to the caller's team. Drains with no
+/// `app_id` are global and stay accessible to any authenticated team member.
 async fn verify_drain_team_access(
     state: &AppState,
     ctx: &TeamCtx,
@@ -115,7 +114,7 @@ async fn update_drain(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("log drain {drain_id} not found")))?;
 
-    // H6: drain's parent app (if any) must belong to the caller's team.
+    // Drain's parent app (if any) must belong to the caller's team.
     verify_drain_team_access(&state, &ctx, existing.app_id.as_deref()).await?;
 
     let update = NewLogDrain {
@@ -134,7 +133,7 @@ async fn delete_drain(
     ctx: TeamCtx,
     Path(drain_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: drain's parent app (if any) must belong to the caller's team.
+    // Drain's parent app (if any) must belong to the caller's team.
     let existing = state
         .db
         .get_log_drain(&drain_id)
@@ -157,7 +156,7 @@ async fn test_drain(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("log drain {drain_id} not found")))?;
 
-    // H6: drain's parent app (if any) must belong to the caller's team.
+    // Drain's parent app (if any) must belong to the caller's team.
     verify_drain_team_access(&state, &ctx, drain.app_id.as_deref()).await?;
 
     let config: serde_json::Value = serde_json::from_str(&drain.config).unwrap_or_default();
@@ -171,6 +170,9 @@ async fn test_drain(
                     "HTTP drain has no URL configured".into(),
                 ));
             }
+            // Block SSRF — the drain URL is user-supplied.
+            crate::api::utils::url_guard::validate_outbound_url(url, &state.config.caddy_admin_url)
+                .await?;
             let client = reqwest::Client::new();
             let test_payload = serde_json::json!({
                 "message": "Test log from Icefall",
@@ -200,6 +202,9 @@ async fn test_drain(
                     "Loki drain has no URL configured".into(),
                 ));
             }
+            // Block SSRF — the drain URL is user-supplied.
+            crate::api::utils::url_guard::validate_outbound_url(url, &state.config.caddy_admin_url)
+                .await?;
             let push_url = format!("{}/loki/api/v1/push", url.trim_end_matches('/'));
             let payload = serde_json::json!({
                 "streams": [{

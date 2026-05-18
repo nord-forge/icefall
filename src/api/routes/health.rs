@@ -89,7 +89,6 @@ async fn update_health(
             .await?;
         Ok(Json(serde_json::json!({ "data": check })))
     } else {
-        // Update existing health check
         let check = &checks[0];
         state
             .db

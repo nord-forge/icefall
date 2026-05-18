@@ -1,11 +1,5 @@
-//! Per-request team context and team-scoped authorization (audit H6).
-//!
-//! Every tenant-scoped resource (`apps`, `databases`, and everything reached
-//! through them) belongs to exactly one team. Handlers must not just check
-//! "is the caller authenticated" — they must check "does the caller's team
-//! own this resource, with sufficient role". `TeamCtx` is the request
-//! extractor that resolves the caller's active team; `verify_team_access`
-//! is the gate every tenant-scoped handler runs before touching a resource.
+//! Per-request team context and team-scoped authorization. `TeamCtx` resolves the caller's
+//! active team; `verify_team_access` gates handlers on team ownership and role.
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -37,12 +31,8 @@ impl TeamRole {
     }
 }
 
-/// The authenticated caller plus their resolved active team.
-///
-/// Used as an axum extractor on tenant-scoped handlers. Construction fails
-/// with 401 if the request is unauthenticated, or 403 if the user somehow
-/// has no team — under the always-a-team model every user owns a personal
-/// team, so the 403 branch is a defensive backstop, not a normal path.
+/// The authenticated caller plus their resolved active team — an axum extractor for
+/// tenant-scoped handlers. Fails 401 if unauthenticated, 403 (defensive) if teamless.
 pub struct TeamCtx {
     pub user: User,
     pub team_id: String,
@@ -50,11 +40,8 @@ pub struct TeamCtx {
 }
 
 impl TeamCtx {
-    /// Return `Ok` only if this caller's team owns `resource_team_id` with at
-    /// least `min_role`. The not-found case returns **404**, not 403, so the
-    /// endpoint never reveals that a resource exists in another team
-    /// (resource-existence is itself sensitive). Insufficient role within the
-    /// caller's own team returns **403**.
+    /// Return `Ok` only if the caller's team owns `resource_team_id` with at least `min_role`.
+    /// Wrong-team returns **404** (never revealing existence); insufficient role returns **403**.
     pub fn verify_team_access(
         &self,
         resource_team_id: &str,

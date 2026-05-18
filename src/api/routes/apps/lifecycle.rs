@@ -11,7 +11,7 @@ pub(super) async fn start_app(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: app must belong to the caller's team, member role to operate.
+    // App must belong to the caller's team, member role to operate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -40,7 +40,7 @@ pub(super) async fn stop_app(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: app must belong to the caller's team, member role to operate.
+    // App must belong to the caller's team, member role to operate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -69,7 +69,7 @@ pub(super) async fn restart_app(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: app must belong to the caller's team, member role to operate.
+    // App must belong to the caller's team, member role to operate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -98,7 +98,7 @@ pub(super) async fn wake_app(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: app must belong to the caller's team, member role to operate.
+    // App must belong to the caller's team, member role to operate.
     let app = state
         .db
         .get_app_for_team(&ctx.team_id, &id)

@@ -16,7 +16,7 @@ pub(super) async fn list_deploys(
     ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H6: read-only — the app must belong to the caller's team (viewer).
+    // Read-only — the app must belong to the caller's team (viewer).
     state
         .db
         .get_app_for_team(&ctx.team_id, &id)
@@ -39,7 +39,7 @@ pub(super) async fn get_latest_deploys(
         .filter(|s| !s.is_empty())
         .collect();
 
-    // H6: only query deploys for apps that belong to the caller's team.
+    // Only query deploys for apps that belong to the caller's team.
     let team_apps: std::collections::HashSet<String> = state
         .db
         .list_apps_by_team(&ctx.team_id)
