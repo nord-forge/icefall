@@ -1,6 +1,55 @@
 ---
-title: "tokens"
-description: "Icefall documentation"
+title: API tokens
+description: Create and use API tokens for scripts, CI, and the MCP server.
 ---
 
-Documentation coming soon.
+API tokens let scripts, CI pipelines, and the [MCP server](/api/mcp/)
+authenticate to the Icefall API without a password or a browser session.
+
+## Creating a token
+
+Create tokens in the dashboard under **Settings → API Tokens**. You give the
+token a name and, optionally, an expiry date.
+
+Icefall shows the token value — a string beginning with `icefall_` — **once, at
+creation**. Copy it then; it is stored only as a hash and cannot be retrieved
+again. If you lose it, delete the token and create a new one.
+
+## Using a token
+
+Send the token as a bearer token in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer icefall_xxxxxxxx" \
+  https://your-icefall-server/api/v1/apps
+```
+
+The same header works for the [REST API](/api/rest/) and the
+[MCP server](/api/mcp/). Each request updates the token's "last used" timestamp,
+visible in the dashboard.
+
+## Expiry
+
+A token can have an optional expiry date. After it passes, the token is rejected.
+There is no automatic cleanup of expired tokens — delete them yourself when you
+no longer need them.
+
+## Revoking a token
+
+Delete a token from the dashboard. Revocation is immediate — the next request
+using it fails.
+
+## Team-scoped tokens
+
+If your instance uses teams, a token can be tied to a specific team. Requests
+made with a team-scoped token act within that team — they see and manage only
+that team's resources. A token without a team uses the owning user's active team
+context.
+
+## Good practice
+
+- One token per integration, named for what it does — so you can revoke it
+  without affecting anything else.
+- Set an expiry on tokens used for short-lived tasks.
+- Store tokens in your CI provider's secret store, never in a repository.
+- Treat a token like a password: it carries the role of the user who created it.

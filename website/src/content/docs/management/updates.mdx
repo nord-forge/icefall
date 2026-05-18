@@ -1,6 +1,69 @@
 ---
-title: "updates"
-description: "Icefall documentation"
+title: Updates
+description: Keep Icefall up to date, and roll back if you need to.
 ---
 
-Documentation coming soon.
+Icefall updates itself in place. `icefall update` downloads the new release,
+verifies it, swaps the binary, and restarts the daemon — your apps keep running
+across the update.
+
+## Checking for updates
+
+See whether a newer release exists without installing it:
+
+```bash
+icefall update check
+```
+
+## Updating
+
+```bash
+icefall update
+```
+
+This updates to the latest release on your channel. Useful flags:
+
+| Flag | Effect |
+|------|--------|
+| `--yes` | Skip the confirmation prompt — for unattended updates |
+| `--channel <stable\|beta>` | Update from the stable or beta channel |
+| `--json` | Emit structured JSON, for scripting |
+
+Every release is signed; Icefall verifies the signature before applying an
+update, so a tampered or corrupt download is rejected rather than installed.
+
+## Release channels
+
+- **stable** — the default. Tested releases, recommended for production.
+- **beta** — earlier access to new features, less settled. Use it on a
+  non-critical server if you want to try things ahead of stable.
+
+## Rolling back
+
+If an update causes a problem, return to the previous version:
+
+```bash
+icefall update rollback
+```
+
+Icefall keeps the prior binary so a rollback is immediate and does not need a
+network connection.
+
+## Air-gapped servers
+
+A server with no internet access can be updated from a release downloaded
+elsewhere:
+
+```bash
+icefall update from-file <tarball> --manifest <path> --signature <path>
+```
+
+The manifest and signature are checked exactly as for an online update — an
+air-gapped update is not an unverified one.
+
+## Updates and multi-server
+
+On a [multi-server](/concepts/architecture/) setup, update the control plane
+and each worker. Keep them on the same version so the control plane and workers
+speak the same protocol; update the workers in step with the control plane
+rather than letting versions drift.

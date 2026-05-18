@@ -1,8 +1,67 @@
 ---
-title: "Deploy nodejs"
-description: "How to deploy a nodejs app on Icefall."
+title: Deploy Node.js
+description: How to deploy a Node.js app or API on Icefall.
 ---
 
-Guide coming soon. Icefall auto-detects nodejs projects and generates an optimized Dockerfile.
+Icefall detects a plain Node.js project and generates a Dockerfile that
+installs dependencies and runs your app — no configuration needed for the
+common case.
 
-See [Introduction](/docs/getting-started/introduction) for the general deployment workflow.
+## Auto-detection
+
+Icefall treats a project as Node.js when it finds a `package.json` with no
+higher-level framework (Next.js, Nuxt, Astro, …) detected first. It then reads:
+
+| Setting | Detected from |
+|---------|---------------|
+| Build command | `build` script in `package.json`, if present |
+| Start command | `start` script in `package.json` |
+| Port | `PORT` environment variable, default `3000` |
+| Package manager | the committed lockfile (`bun.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) |
+
+## Deploying
+
+Push your code and deploy:
+
+```bash
+icefall deploy
+```
+
+Icefall generates a multi-stage Dockerfile that installs dependencies, runs the
+build script if there is one, and starts the app with your `start` script.
+
+## Listen on the right host and port
+
+Your app must listen on `0.0.0.0` and on the port Icefall gives it via the
+`PORT` environment variable — not a hard-coded port:
+
+```js
+const port = process.env.PORT || 3000;
+app.listen(port, "0.0.0.0");
+```
+
+An app bound to `127.0.0.1` or a fixed port will build but fail its
+[health check](/monitoring/health-checks/).
+
+## Override defaults
+
+If detection gets something wrong, set it explicitly with a `.icefall.toml` in
+your repo or in the dashboard:
+
+```toml
+[build]
+build_command = "npm run build"
+start_command = "node dist/server.js"
+port = 8080
+```
+
+## Common issues
+
+**Build fails with "Cannot find module"** — commit your lockfile so the build
+installs the exact dependency tree.
+
+**Health check never passes** — the app is not listening on `0.0.0.0:$PORT`.
+See above.
+
+See [Introduction](/getting-started/introduction/) for the general deployment
+workflow.

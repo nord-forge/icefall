@@ -1,6 +1,55 @@
 ---
-title: "logs"
-description: "Icefall documentation"
+title: Logs
+description: View and search your application logs.
 ---
 
-Documentation coming soon.
+Icefall collects the stdout and stderr of every app container, so you can read
+what your app is doing without touching the server.
+
+## Viewing logs
+
+From the dashboard, open an app and select its logs. From the CLI:
+
+```bash
+icefall logs myapp
+```
+
+This streams the log live — new lines appear as the app writes them. Stop
+streaming with `Ctrl-C`.
+
+## Searching
+
+To find specific lines, filter as you stream:
+
+```bash
+icefall logs myapp --search "error"
+```
+
+Only lines matching the term are shown. The dashboard offers the same filtering
+in its log viewer.
+
+## What is captured
+
+Logs are whatever your app writes to **stdout** and **stderr** — the standard
+container convention. Write your application logs there (most frameworks do by
+default) and Icefall picks them up. Anything written to a file inside the
+container is not collected.
+
+## Build logs
+
+The output of a deploy — cloning, framework detection, the build itself — is
+kept separately as the build log for that deploy. Open a deploy in the dashboard
+to see why a build succeeded or failed. See [builds](/concepts/builds/) for the
+pipeline those logs come from.
+
+## Retention
+
+Logs are rotated so they cannot fill the disk. For long-term storage or
+analysis, ship logs from your app to an external log service the way you would
+anywhere else — Icefall's log view is for live debugging, not archival.
+
+## Multi-server
+
+On a [multi-server](/concepts/architecture/) setup, logs are read from the
+worker running the instance and streamed back through the control plane, so
+`icefall logs` works the same regardless of which server an app runs on.

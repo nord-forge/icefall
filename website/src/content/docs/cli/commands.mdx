@@ -1,6 +1,135 @@
 ---
-title: "commands"
-description: "Icefall documentation"
+title: CLI commands
+description: Every Icefall CLI command and its options.
 ---
 
-Documentation coming soon.
+The `icefall` binary is the daemon, the agent, and the CLI — the subcommand
+decides the mode. This page covers the commands you run day to day.
+
+## daemon
+
+Manage the Icefall daemon.
+
+```bash
+icefall daemon start    # start the daemon in the foreground
+icefall daemon stop     # stop the running daemon
+icefall daemon status   # check whether the daemon is running
+```
+
+On a normal install the daemon runs under systemd (or OpenRC on Alpine), so you
+will usually use `systemctl` rather than `daemon start` directly.
+
+## init
+
+Initialize Icefall configuration. Interactive — it prompts for the data
+directory, listen port, base domain, and container runtime, generates an
+encryption key, and writes a `config.toml`.
+
+```bash
+icefall init
+```
+
+## login
+
+Authenticate the CLI against your Icefall server.
+
+```bash
+icefall login
+```
+
+## deploy
+
+Deploy the current project.
+
+```bash
+icefall deploy              # build and deploy
+icefall deploy --no-cache   # force a clean build, ignoring the layer cache
+```
+
+## status
+
+Show a server status overview — version, CPU, memory, and disk.
+
+```bash
+icefall status
+```
+
+## apps
+
+Manage applications.
+
+```bash
+icefall apps list           # list all applications
+icefall apps info myapp     # show details for one app
+```
+
+## logs
+
+Stream an application's logs.
+
+```bash
+icefall logs myapp                    # stream live logs
+icefall logs myapp --search "error"   # filter to matching lines
+```
+
+## env
+
+Manage environment variables.
+
+```bash
+icefall env set myapp DATABASE_URL=postgres://...   # set a variable
+icefall env list myapp                              # list variables
+```
+
+## domains
+
+Manage custom domains.
+
+```bash
+icefall domains add myapp app.example.com   # attach a domain
+icefall domains list myapp                  # list an app's domains
+```
+
+## db
+
+Manage [managed databases](/databases/provisioning/).
+
+```bash
+icefall db create postgres   # provision a database (postgres, mysql, redis, mongo, …)
+icefall db list              # list managed databases
+icefall db backup mydb       # trigger a manual backup
+```
+
+## migrate
+
+Export or import a full server state — see
+[server migration](/management/migration/).
+
+```bash
+icefall migrate export --output icefall-backup.tar.gz
+icefall migrate export --output s3://my-bucket/icefall-backup.tar.gz
+icefall migrate import --from icefall-backup.tar.gz
+```
+
+Add `--dry-run` to either to preview without making changes.
+
+## update
+
+Self-update Icefall — see [updates](/management/updates/).
+
+```bash
+icefall update            # update to the latest release
+icefall update check      # check for updates without applying
+icefall update rollback   # roll back to the previous version
+```
+
+Global flags for `update`:
+
+| Flag | Effect |
+|------|--------|
+| `--yes` | Skip the confirmation prompt |
+| `--channel <stable\|beta>` | Choose the release channel |
+| `--json` | Emit structured JSON output |
+
+For air-gapped servers, `icefall update from-file <tarball> --manifest <path>
+--signature <path>` applies a pre-downloaded, signed release.

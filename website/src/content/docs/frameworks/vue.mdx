@@ -1,8 +1,58 @@
 ---
-title: "Deploy vue"
-description: "How to deploy a vue app on Icefall."
+title: Deploy Vue
+description: How to deploy a Vue single-page app on Icefall.
 ---
 
-Guide coming soon. Icefall auto-detects vue projects and generates an optimized Dockerfile.
+A Vue app built with Vite is a static site once built — Icefall builds it and
+serves the output with Caddy. For server-rendered Vue, see
+[Nuxt](/frameworks/nuxt/).
 
-See [Introduction](/docs/getting-started/introduction) for the general deployment workflow.
+## Auto-detection
+
+Icefall detects Vue when it finds `vue` in `package.json` with a Vite build
+setup.
+
+| Setting | Value |
+|---------|-------|
+| Build command | `build` script in `package.json` |
+| Output directory | `dist/` |
+| Port | 80 |
+| Served by | Caddy (static files) |
+
+## Deploying
+
+```bash
+icefall deploy
+```
+
+Icefall generates a multi-stage Dockerfile that installs dependencies, runs the
+build, and copies `dist/` into a Caddy container.
+
+## SPA routing
+
+Caddy falls back to `index.html` for unknown paths, so Vue Router works on
+direct navigation and refresh without extra configuration.
+
+## Build-time environment variables
+
+A built SPA has no server, so environment variables are baked in at build time.
+Vite exposes variables prefixed with `VITE_`. Set them in the dashboard before
+deploying, and never put secrets in a client build — anything bundled ships to
+the browser.
+
+## Override defaults
+
+```toml
+[build]
+build_command = "npm run build"
+output_dir = "dist"
+```
+
+## Common issues
+
+**Routes 404 on refresh** — confirm the build is detected as a static Vue SPA.
+
+**Build fails with "Cannot find module"** — commit your lockfile.
+
+See [Introduction](/getting-started/introduction/) for the general deployment
+workflow.

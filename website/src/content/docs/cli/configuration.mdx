@@ -1,6 +1,113 @@
 ---
-title: "configuration"
-description: "Icefall documentation"
+title: Configuration
+description: The Icefall config file, every setting, and environment overrides.
 ---
 
-Documentation coming soon.
+Icefall reads a single TOML config file. `icefall init` (and the installer)
+generate one for you; this page documents every field so you can tune it.
+
+## Config file location
+
+Icefall looks for its config in this order:
+
+1. The path in the `ICEFALL_CONFIG` environment variable
+2. `/etc/icefall/config.toml`
+3. `$XDG_CONFIG_HOME/icefall/config.toml` (usually `~/.config/icefall/config.toml`)
+
+## Settings
+
+```toml title="config.toml"
+listen_addr      = "0.0.0.0"
+listen_port      = 3000
+data_dir         = "/var/lib/icefall"
+sqlite_path      = "/var/lib/icefall/icefall.db"
+runtime          = "docker"
+container_socket = "/var/run/docker.sock"
+caddy_admin_url  = "http://localhost:2019"
+encryption_key   = "…base64, 32 bytes…"
+log_level        = "info"
+pid_file         = "/var/run/icefall.pid"
+
+# base_domain = "apps.example.com"
+```
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `listen_addr` | string | `0.0.0.0` | Address the HTTP server binds |
+| `listen_port` | number | `3000` | Dashboard / API port |
+| `data_dir` | path | `/var/lib/icefall` | Where Icefall stores data |
+| `sqlite_path` | path | `{data_dir}/icefall.db` | SQLite database file |
+| `runtime` | `docker` \| `podman` | `docker` | Container runtime |
+| `container_socket` | string | auto-detected | Runtime API socket |
+| `caddy_admin_url` | string | `http://localhost:2019` | Caddy admin API |
+| `base_domain` | string | _(none)_ | Base domain for app subdomains and previews |
+| `encryption_key` | string | _(required)_ | Base64-encoded 256-bit key for at-rest encryption |
+| `log_level` | string | `info` | `trace`, `debug`, `info`, `warn`, or `error` |
+| `pid_file` | path | `/var/run/icefall.pid` | Daemon PID file |
+| `build_timeout_secs` | number | `600` | Maximum build duration |
+| `keep_images` | number | `5` | Old images to retain before pruning |
+| `health_check_attempts` | number | `30` | Post-deploy health check retries |
+| `health_check_interval_ms` | number | `1000` | Delay between health checks |
+| `deploy_stop_timeout_secs` | number | `10` | Grace period when stopping old containers |
+| `ssl_check_interval_hours` | number | `24` | How often to check certificate expiry |
+| `image_transfer_chunk_bytes` | number | `8388608` | Chunk size for multi-server image transfer (8 MB) |
+
+### SMTP
+
+Optional — required only if you send email notifications.
+
+```toml
+[smtp]
+host         = "smtp.example.com"
+port         = 587
+username     = "icefall@example.com"
+password     = "…"
+from_address = "icefall@example.com"
+```
+
+### Backups
+
+```toml
+[backup]
+interval_hours = 24
+retain_count   = 7
+# s3_bucket    = "my-backups"
+# s3_endpoint  = "https://s3.example.com"
+```
+
+## Environment variable overrides
+
+Any of these override the config file — useful for containers, CI, and
+cloud-init:
+
+| Variable | Overrides |
+|----------|-----------|
+| `ICEFALL_CONFIG` | Path to the config file |
+| `ICEFALL_LISTEN_ADDR` | `listen_addr` |
+| `ICEFALL_PORT` | `listen_port` |
+| `ICEFALL_DATA_DIR` | `data_dir` |
+| `ICEFALL_SQLITE_PATH` | `sqlite_path` |
+| `ICEFALL_RUNTIME` | `runtime` |
+| `ICEFALL_CONTAINER_SOCKET` | `container_socket` |
+| `ICEFALL_CADDY_URL` | `caddy_admin_url` |
+| `ICEFALL_BASE_DOMAIN` | `base_domain` |
+| `ICEFALL_ENCRYPTION_KEY` | `encryption_key` |
+| `ICEFALL_LOG_LEVEL` | `log_level` |
+| `ICEFALL_PID_FILE` | `pid_file` |
+
+## The encryption key
+
+`encryption_key` is required. It must be a base64-encoded 32-byte (256-bit)
+value, and it encrypts credentials, tokens, and database passwords at rest.
+`icefall init` generates one automatically.
+
+:::caution
+Back up your encryption key. If you lose it, encrypted data — including managed
+database credentials — cannot be recovered.
+:::
+
+## Container runtime detection
+
+When `container_socket` is not set, Icefall probes, in order: a rootless Podman
+socket under `XDG_RUNTIME_DIR`, the rootful Podman socket, then the Docker
+socket. See the [Podman runtime](/reference/podman/) page for details.

@@ -1,6 +1,89 @@
 ---
-title: "backups"
-description: "Icefall documentation"
+title: Database backups
+description: Automatic and manual backups of your managed databases.
 ---
 
-Documentation coming soon.
+Every [managed database](/databases/provisioning/) Icefall runs is backed up —
+on a schedule, and on demand. Backups are plain dump files you can keep, copy,
+and restore from yourself.
+
+## Where backups go
+
+Each backup is a compressed dump written to:
+
+```
+/data/backups/<database-id>/<database-id>_<YYYYMMDD_HHMMSS>.sql.gz
+```
+
+The timestamp is the moment the backup started, so the directory listing for a
+database is its backup history in chronological order.
+
+## Backup format per engine
+
+Icefall uses the engine's own dump tool, so a backup is exactly what that
+engine's standard tooling produces:
+
+| Engine | Dump tool | Restores with |
+|--------|-----------|---------------|
+| PostgreSQL, CockroachDB | `pg_dumpall` | `psql` |
+| MySQL, MariaDB | `mysqldump` | `mysql` |
+| MongoDB | `mongodump` | `mongorestore` |
+| Redis, KeyDB, Valkey, Dragonfly | `BGSAVE` + copy of `dump.rdb` | replace `dump.rdb` |
+| ClickHouse | `clickhouse-client` export | `clickhouse-client` import |
+| Cassandra | `nodetool snapshot` | snapshot restore |
+
+Because the output is the engine's native format, you are never locked into
+Icefall — any of these files can be restored with the standard client, with or
+without Icefall in the picture.
+
+## Manual backups
+
+Trigger a backup at any time from the dashboard or the CLI:
+
+```bash
+icefall db backup mydb
+```
+
+The backup runs against the live container; the database stays available while
+it runs.
+
+## Automatic backups
+
+Icefall takes scheduled backups of each database without you doing anything.
+By default it keeps the **last 7** backups per database and deletes older ones
+as new ones are written. Change how many to keep with `backup_retention_count`
+in [`config.toml`](/cli/configuration/).
+
+## Restoring
+
+A backup is just a file, so a restore is a manual operation — there is no
+"restore" button. Decompress the dump and feed it to the engine's client. For
+PostgreSQL:
+
+```bash
+gunzip -c /data/backups/<id>/<id>_<timestamp>.sql.gz \
+  | psql "postgresql://icefall:<password>@icefall-db-mydb:5432/icefall"
+```
+
+Use the connection string from the database's page in the dashboard. For other
+engines, use the matching client from the table above.
+
+## Instance backups
+
+Database backups cover one database. An **instance backup** is a separate,
+full-system snapshot of the whole Icefall server:
+
+- the encrypted SQLite database (apps, settings, users, credentials),
+- `config.toml`,
+- a dump of every managed database,
+- application data volumes,
+- logs.
+
+Instance backups run daily, weekly, or monthly depending on your configuration,
+and also keep the last 7 by default. They are written either to S3 — set
+`ICEFALL_BACKUP_S3_BUCKET` — or, with no bucket configured, to
+`<data-dir>/instance-backups/`.
+
+For moving an entire server to new hardware, see
+[server migration](/management/migration/), which produces a single portable
+archive of the same state.

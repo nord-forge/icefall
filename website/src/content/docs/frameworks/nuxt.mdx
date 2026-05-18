@@ -1,8 +1,61 @@
 ---
-title: "Deploy nuxt"
-description: "How to deploy a nuxt app on Icefall."
+title: Deploy Nuxt
+description: How to deploy a Nuxt site or SSR app on Icefall.
 ---
 
-Guide coming soon. Icefall auto-detects nuxt projects and generates an optimized Dockerfile.
+Icefall detects Nuxt and builds it for whichever mode it is configured in —
+server-rendered or fully static.
 
-See [Introduction](/docs/getting-started/introduction) for the general deployment workflow.
+## Auto-detection
+
+Icefall detects Nuxt when it finds `nuxt` in `package.json` or a
+`nuxt.config.ts/js` file.
+
+| Setting | SSR (default) | Static |
+|---------|---------------|--------|
+| Build command | `bun run build` | `bun run generate` |
+| Output | `.output/` | `dist/` |
+| Port | 3000 | 80 |
+| Served by | Node.js | Caddy (static files) |
+
+## SSR Nuxt (default)
+
+A standard Nuxt project is server-rendered. `nuxt build` produces a Node server
+in `.output/`, which Icefall runs:
+
+```bash
+icefall deploy
+```
+
+The app listens on port `3000`. Nuxt reads `PORT` from the environment, so it
+binds to the port Icefall provides.
+
+## Static Nuxt
+
+If you generate a fully static site (`nuxt generate`), Icefall serves the
+output with Caddy instead of running a Node server. Set the build command to
+the generate script:
+
+```toml
+[build]
+build_command = "bun run generate"
+output_dir = "dist"
+```
+
+## Override defaults
+
+```toml
+[build]
+build_command = "bun run build"
+port = 3000
+```
+
+## Common issues
+
+**Wrong mode deployed** — Icefall builds for SSR by default. For a static site,
+set `build_command` to your `generate` script as shown above.
+
+**Build fails with "Cannot find module"** — commit your lockfile.
+
+See [Introduction](/getting-started/introduction/) for the general deployment
+workflow.

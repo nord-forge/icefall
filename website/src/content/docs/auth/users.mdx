@@ -1,6 +1,76 @@
 ---
-title: "users"
-description: "Icefall documentation"
+title: Users & roles
+description: Accounts, roles, sessions, and two-factor authentication in Icefall.
 ---
 
-Documentation coming soon.
+Icefall has its own user accounts. The first account is the administrator; you
+add the rest.
+
+## The first account
+
+When you open a fresh Icefall instance, the dashboard prompts you to create the
+initial **admin** account. The setup password must be at least 12 characters.
+There is no separate "register" step for the first user — whoever completes
+setup owns the instance.
+
+## Roles
+
+Every user has one of three roles:
+
+| Role | Can do |
+|------|--------|
+| `admin` | Everything — manage apps, servers, databases, **and** other users |
+| `deployer` | Manage and deploy apps, databases, and domains |
+| `viewer` | Read-only access |
+
+Only an admin can list users, change a user's role, deactivate a user, reset a
+password, or disable another user's two-factor authentication.
+
+## Adding users
+
+Admins invite users from the dashboard. An invitation carries the role the new
+user will have; new accounts default to `viewer` unless the invitation says
+otherwise.
+
+## Sessions
+
+Logging in creates a session stored server-side and tracked by an HTTP-only
+cookie. Sessions last **7 days**, after which you log in again. Logging out
+deletes the session immediately.
+
+## Two-factor authentication
+
+Icefall supports TOTP-based two-factor authentication — the same six-digit codes
+used by Google Authenticator, 1Password, Authy, and similar apps.
+
+### Enabling 2FA
+
+1. Start setup in the dashboard. Icefall shows a QR code (and an `otpauth://`
+   URL).
+2. Scan it with your authenticator app.
+3. Enter the current six-digit code to confirm.
+4. Icefall generates **ten backup codes**. Save them somewhere safe — each works
+   once if you lose your authenticator.
+
+### Logging in with 2FA
+
+After your email and password, Icefall asks for a code. You can enter either a
+six-digit TOTP code or one of your backup codes.
+
+### Backup codes
+
+Backup codes are single-use. Regenerate the full set from the dashboard at any
+time (you will need a current TOTP code to do it) — regenerating invalidates the
+old set.
+
+### Recovering a locked-out account
+
+If a user loses both their authenticator and their backup codes, an admin can
+disable 2FA on that account. The locked-out user can then log in with their
+password and set up 2FA again.
+
+## Password security
+
+Passwords are hashed with Argon2 and never stored or returned in plaintext.
+Login errors are deliberately generic ("invalid email or password") so they do
+not reveal whether an email is registered.

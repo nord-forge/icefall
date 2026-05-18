@@ -1,6 +1,74 @@
 ---
-title: "architecture"
-description: "Icefall documentation"
+title: Architecture
+description: How Icefall is put together — the daemon, agents, and the components it manages.
 ---
 
-Documentation coming soon.
+Icefall is a single Rust binary that runs as a long-lived daemon. It manages
+containerized deployments on the server it runs on, and — optionally — across a
+fleet of additional worker servers.
+
+## The big picture
+
+```
+                        ┌───────────────────────────┐
+   git push ───────────▶│   Control plane (daemon)   │
+                        │                            │
+   browser / CLI ──────▶│  REST API + dashboard      │
+                        │  build engine              │
+                        │  SQLite (encrypted)        │
+                        └───┬───────────┬────────────┘
+                            │           │
+                  Caddy admin API   Docker / Podman socket
+                            │           │
+                            ▼           ▼
+                     reverse proxy   app containers
+                       (auto HTTPS)
+
+   worker servers ──── WebSocket ───▶ control plane
+```
+
+## Components
+
+**Control plane (daemon)** — one Axum HTTP server. On startup it connects to
+the database, the container runtime, and Caddy, then spawns background workers
+for health checks, metrics, log capture, backups, SSL renewal, and self-update.
+It serves the REST API under `/api/v1/` and the dashboard.
+
+**Container runtime** — Docker or Podman, driven over a Unix socket (never the
+CLI). Icefall detects which runtime is present and adapts to its quirks,
+including rootless Podman. See the [Podman runtime](/reference/podman/) page.
+
+**Caddy** — the reverse proxy. Icefall programs it through its admin API:
+every app domain becomes a Caddy route pointing at the app's container. Caddy
+also obtains and renews Let's Encrypt certificates automatically.
+
+**Database** — SQLite, stored in your data directory. Sensitive columns
+(passwords, tokens, database credentials) are encrypted with an AES-256 key
+from your config. SQLite means zero external dependencies; the SQL is kept
+Postgres-compatible for future clustering.
+
+**Worker servers (agents)** — each additional server runs the Icefall *agent*,
+a lightweight binary that connects back to the control plane over a persistent
+WebSocket. The control plane sends build and deploy instructions through that
+connection; the agent reports heartbeats, metrics, and status. See
+[multi-server](/troubleshooting/multi-server/).
+
+## Request lifecycle for a deploy
+
+1. A webhook (or a manual trigger) tells the daemon to deploy an app.
+2. The build engine clones the repo, detects the framework, generates a
+   Dockerfile, and builds an image — locally or on a designated build server.
+3. The image starts as a container on the target server.
+4. A health check confirms the container is serving traffic.
+5. Caddy is updated to route the app's domain to the new container.
+6. The old container is stopped.
+
+If the health check fails, Icefall rolls back to the previous deploy
+automatically.
+
+## Why one binary
+
+The daemon, the CLI, and the agent are all the same `icefall` executable — the
+subcommand decides the mode. There is nothing to orchestrate, no message broker,
+no separate database server. Install the binary, point it at a container
+runtime, and it runs.

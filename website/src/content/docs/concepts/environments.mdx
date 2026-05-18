@@ -1,6 +1,71 @@
 ---
-title: "environments"
-description: "Icefall documentation"
+title: Environments
+description: Production and preview environments, and how environment variables are scoped.
 ---
 
-Documentation coming soon.
+An **environment** is a deployable target for an app. Every app has at least a
+production environment; preview environments are created automatically for
+feature branches.
+
+## Production
+
+The production environment tracks your main branch (for example `main`). A push
+to that branch triggers a build and deploy. It is the environment served at your
+app's primary domain.
+
+## Preview environments
+
+Preview environments give every feature branch its own running copy with its own
+URL. Push to `feature/auth` and Icefall deploys it to a generated subdomain such
+as:
+
+```
+feature-auth--myapp.your-base-domain.com
+```
+
+Preview environments are **off by default** to avoid surprise resource use. Turn
+them on per app, and optionally restrict them with a branch pattern (for example
+`feature/*`) so only matching branches deploy. A preview environment is torn
+down automatically when its branch is merged or deleted.
+
+Each preview gets its own container and its own scoped environment variables, so
+a preview can safely point at a staging database while production does not.
+
+## Environment variables
+
+Environment variables are injected into the container at deploy time. They are
+scoped, so the same key can hold different values in different places:
+
+- **App / environment scope** — variables set on a specific app environment.
+  These are the most specific and win over broader scopes.
+- **Project environment scope** — variables shared by every app in a project
+  environment (see Projects below).
+- **Shared variables** — values shared across a project or a server, useful for
+  things like a common API endpoint.
+
+When an app deploys, Icefall resolves the full set of variables for the target
+environment and passes them to the container. More specific scopes override
+broader ones.
+
+Manage variables in the dashboard, or from the CLI:
+
+```bash
+icefall env set myapp DATABASE_URL=postgres://...
+icefall env list myapp
+```
+
+`PORT` and `HOST` are injected automatically if you do not set them, so most
+apps just need to listen on `$PORT` / `0.0.0.0`.
+
+## Projects and project environments
+
+A **project** groups related apps. A **project environment** (for example
+`staging`, `production`) is a named, team-scoped target shared across the apps in
+a project — handy when several services share the same staging configuration.
+
+## Secrets
+
+Environment variables are stored in the encrypted SQLite database. Values are
+masked in the dashboard and in API responses by default. Treat any variable
+holding a credential as a secret — Icefall does, but the value still ends up
+inside the running container as an ordinary environment variable.
