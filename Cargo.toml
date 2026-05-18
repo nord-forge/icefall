@@ -44,7 +44,7 @@ aes-gcm = "0.10"
 rand = "0.9"
 base64 = "0.22"
 argon2 = "0.5"
-bcrypt = "0.16"
+bcrypt = "0.19"
 
 # TOTP / 2FA
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
