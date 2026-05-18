@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import { Shield, Save, CheckCircle, XCircle } from 'lucide-preact';
+import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -16,12 +17,11 @@ export default function CloudflareTunnelSection({ onSaveMessage }: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch('/api/v1/settings/tunnel', { credentials: 'same-origin' })
-      .then((r) => r.json())
+    api.getTunnelSettings()
       .then((d) => {
         if (d.data) {
           setTunnelId(d.data.tunnel_id || '');
-          setTunnelStatus(d.data.status || 'unknown');
+          setTunnelStatus((d.data.status as 'connected' | 'disconnected' | 'unknown') || 'unknown');
           if (d.data.has_token) setTunnelToken('********');
         }
       })
@@ -31,16 +31,11 @@ export default function CloudflareTunnelSection({ onSaveMessage }: Props) {
   async function handleSave() {
     setSaving(true);
     try {
-      const body: Record<string, string> = { tunnel_id: tunnelId };
+      const body: { tunnel_id: string; tunnel_token?: string } = { tunnel_id: tunnelId };
       if (tunnelToken && tunnelToken !== '********') {
         body.tunnel_token = tunnelToken;
       }
-      await fetch('/api/v1/settings/tunnel', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-      });
+      await api.updateTunnelSettings(body);
       onSaveMessage('Tunnel settings saved');
     } catch {
       onSaveMessage('Failed to save tunnel settings');

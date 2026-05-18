@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
 import { User, Server, Globe, GitBranch, Rocket, Check, ArrowRight } from 'lucide-preact';
 import Input from '@islands/shared/Input/Input';
+import { api, ApiError } from '@lib/api';
 import styles from './onboarding.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -40,8 +41,7 @@ export default function OnboardingWizard() {
 
   async function fetchStatus() {
     try {
-      const res = await fetch('/api/v1/onboarding/status');
-      const data = await res.json();
+      const data = await api.getOnboardingStatus();
       if (data.is_complete) {
         window.location.href = '/';
         return;
@@ -58,21 +58,11 @@ export default function OnboardingWizard() {
     setSubmitting(true);
     setError('');
     try {
-      const res = await fetch(`/api/v1${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong');
-        setSubmitting(false);
-        return null;
-      }
+      const data = await api.onboardingAction(path, body);
       setSubmitting(false);
       return data;
     } catch (e) {
-      setError('Connection failed');
+      setError(e instanceof ApiError ? e.message : 'Connection failed');
       setSubmitting(false);
       return null;
     }

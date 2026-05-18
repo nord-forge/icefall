@@ -5,6 +5,7 @@ import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Bell, Plus, Trash2, Send } from 'lucide-preact';
+import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -80,7 +81,7 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
   const [testing, setTesting] = useState('');
 
   useEffect(() => {
-    fetch('/api/v1/notifications/channels', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    api.listNotificationChannels().then(d => {
       const data = d.data || [];
       setChannels(data);
       $channels.set(data);
@@ -97,13 +98,8 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
   async function addChannel() {
     setSaving(true);
     try {
-      await fetch('/api/v1/notifications/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel_type: newChannelType, config: newChannelConfig }),
-      });
-      const res = await fetch('/api/v1/notifications/channels');
-      const d = await res.json();
+      await api.createNotificationChannel({ channel_type: newChannelType, config: newChannelConfig });
+      const d = await api.listNotificationChannels();
       updateChannels(d.data || []);
       setShowAddChannel(false);
       setNewChannelType('webhook');
@@ -115,7 +111,7 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
 
   async function deleteChannel(id: string) {
     try {
-      await fetch(`/api/v1/notifications/channels/${id}`, { method: 'DELETE' });
+      await api.deleteNotificationChannel(id);
       updateChannels(channels.filter(c => c.id !== id));
     } catch {}
   }
@@ -123,7 +119,7 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
   async function testChannel(id: string) {
     setTesting(id);
     try {
-      await fetch(`/api/v1/notifications/channels/${id}/test`, { method: 'POST' });
+      await api.testNotificationChannel(id);
       onSaveMessage('Test notification sent');
     } catch { onSaveMessage('Test failed'); }
     setTesting('');

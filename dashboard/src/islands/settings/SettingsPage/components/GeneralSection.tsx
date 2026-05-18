@@ -6,6 +6,7 @@ import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Save, Globe } from 'lucide-preact';
 import { TIMEZONES } from '@lib/timezones';
+import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -27,7 +28,7 @@ export default function GeneralSection({ onSaveMessage }: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch('/api/v1/settings', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    api.getSettings().then(d => {
       $settings.set(d.data);
       if (d.data.base_domain) setBaseDomain(d.data.base_domain);
     }).catch(() => {});
@@ -36,11 +37,7 @@ export default function GeneralSection({ onSaveMessage }: Props) {
   async function handleSave() {
     setSaving(true);
     try {
-      await fetch('/api/v1/settings/base-domain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base_domain: baseDomain }),
-      });
+      await api.updateBaseDomain(baseDomain);
       onSaveMessage('Domain saved');
     } catch { onSaveMessage('Save failed'); }
     setSaving(false);

@@ -1,11 +1,14 @@
 pub mod error;
 pub mod middleware;
+pub mod rate_limit;
 pub mod routes;
 pub mod utils;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use axum::extract::DefaultBodyLimit;
+use axum::response::IntoResponse;
 use axum::Router;
 use tokio::sync::{Mutex, RwLock};
 use tower_http::services::ServeDir;
@@ -64,8 +67,47 @@ impl BuildLockMap {
     }
 }
 
+/// 1 MiB cap on request bodies (audit H10). Generous for JSON API payloads;
+/// upload-style routes can raise it locally with their own `DefaultBodyLimit`.
+const MAX_BODY_BYTES: usize = 1024 * 1024;
+
+const DASHBOARD_DIST: &str = "dashboard/dist";
+
+/// Dynamic dashboard routes. The Astro build is fully static (no SSR), so
+/// each dynamic route is prerendered to a placeholder shell at
+/// `dist/<prefix>/_/index.html`; the client island reads the real id from
+/// `window.location`. When `ServeDir` cannot find a file for a request,
+/// this maps the URL prefix to the matching shell so e.g. `/teams/abc123`
+/// serves `dist/teams/_/index.html`, not the wrong page.
+const DYNAMIC_ROUTE_PREFIXES: &[&str] = &["/teams/", "/servers/", "/apps/", "/invitations/"];
+
+/// SPA fallback handler: pick the prerendered shell for an unmatched path.
+async fn dashboard_fallback(uri: axum::http::Uri) -> axum::response::Response {
+    let path = uri.path();
+    let shell = DYNAMIC_ROUTE_PREFIXES
+        .iter()
+        .find(|p| path.starts_with(*p))
+        .map_or_else(
+            || format!("{DASHBOARD_DIST}/index.html"),
+            |prefix| format!("{DASHBOARD_DIST}{prefix}_/index.html"),
+        );
+
+    match tokio::fs::read(&shell).await {
+        Ok(bytes) => (
+            [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => (axum::http::StatusCode::NOT_FOUND, "dashboard not built").into_response(),
+    }
+}
+
 pub fn build_router(state: AppState) -> Router {
     let api_routes = routes::api_routes();
+
+    let serve_dir = ServeDir::new(DASHBOARD_DIST)
+        .append_index_html_on_directories(true)
+        .fallback(axum::routing::get(dashboard_fallback));
 
     let router = Router::new()
         .nest("/api/v1", api_routes)
@@ -73,7 +115,8 @@ pub fn build_router(state: AppState) -> Router {
             state.clone(),
             middleware::require_auth,
         ))
-        .fallback_service(ServeDir::new("dashboard/dist").append_index_html_on_directories(true));
+        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+        .fallback_service(serve_dir);
 
     middleware::apply_middleware(router, &state.config).with_state(state)
 }

@@ -21,15 +21,22 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     if (cached !== null) return cached;
   }
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    // CSRF defence: the server requires this header on mutating requests.
+    // A cross-site form/image cannot set custom headers; only same-origin
+    // fetch/XHR can. Sent on every request for simplicity.
+    'X-Icefall-Request': '1',
+  };
   if (options?.body) {
     headers['Content-Type'] = 'application/json';
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
-    headers,
     ...options,
+    // Spread our headers AFTER options so a caller-supplied `headers` is
+    // merged in, not silently dropped — and our defaults still apply.
+    headers: { ...headers, ...(options?.headers as Record<string, string>) },
   });
   if (!res.ok) {
     if ((res.status === 401 || res.status === 400) && !path.startsWith('/auth/')) {
@@ -59,7 +66,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 
 export const api = {
   logout: async () => {
-    await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'same-origin' });
+    await request('/auth/logout', { method: 'POST' }).catch(() => {});
     window.location.href = '/login';
   },
 
@@ -187,6 +194,29 @@ export const api = {
   unlinkDatabase: (dbId: string, appId: string) =>
     request<{ message: string }>(`/databases/${dbId}/link/${appId}`, { method: 'DELETE' }),
 
+  deleteDatabase: (dbId: string) =>
+    request<{ message: string }>(`/databases/${dbId}`, { method: 'DELETE' }),
+
+  listDatabaseBackups: (dbId: string) =>
+    request<{
+      data: Array<{
+        id: string;
+        filename: string;
+        size_bytes: number;
+        created_at: string;
+        status: string;
+      }>;
+    }>(`/databases/${dbId}/backups`),
+
+  createDatabaseBackup: (dbId: string) =>
+    request<{ message: string }>(`/databases/${dbId}/backup`, { method: 'POST' }),
+
+  restoreDatabaseBackup: (dbId: string, backupId: string) =>
+    request<{ message: string }>(`/databases/${dbId}/backups/${backupId}/restore`, { method: 'POST' }),
+
+  deleteDatabaseBackup: (dbId: string, backupId: string) =>
+    request<{ message: string }>(`/databases/${dbId}/backups/${backupId}`, { method: 'DELETE' }),
+
   startDatabase: (dbId: string) =>
     request<{ message: string }>(`/databases/${dbId}/start`, { method: 'POST' }),
 
@@ -198,6 +228,11 @@ export const api = {
 
   getHealth: (appId: string) =>
     request<{ data: HealthCheckResult[] }>(`/apps/${appId}/health`),
+
+  getHealthEvents: (appId: string, limit?: number) =>
+    request<{ data: Array<{ recent_events?: Array<{ status: string; checked_at: string }> }> }>(
+      `/apps/${appId}/health${limit ? `?limit=${limit}` : ''}`
+    ),
 
   updateHealth: (appId: string, body: {
     check_type?: string;
@@ -456,6 +491,12 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ path }) },
     ),
 
+  uploadVolumeFile: (appId: string, mountIndex: number, path: string, filename: string, data: ArrayBuffer) =>
+    request<{ message: string }>(
+      `/apps/${appId}/volumes/${mountIndex}/upload?path=${encodeURIComponent(path)}&filename=${encodeURIComponent(filename)}`,
+      { method: 'POST', body: data },
+    ),
+
   // Profile
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ message: string }>(
@@ -555,6 +596,58 @@ export const api = {
         target_server_id: targetServerId,
         acknowledge_volume_loss: acknowledgeVolumeLoss,
       }),
+    }),
+
+  // General settings
+  getSettings: () =>
+    request<{ data: { base_domain: string | null; version: string } }>('/settings'),
+
+  updateBaseDomain: (baseDomain: string) =>
+    request<{ message: string }>('/settings/base-domain', {
+      method: 'POST',
+      body: JSON.stringify({ base_domain: baseDomain }),
+    }),
+
+  // Cloudflare tunnel
+  getTunnelSettings: () =>
+    request<{ data: { tunnel_id: string | null; status: string; has_token: boolean } }>(
+      '/settings/tunnel'
+    ),
+
+  updateTunnelSettings: (body: { tunnel_id: string; tunnel_token?: string }) =>
+    request<{ message: string }>('/settings/tunnel', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  // Notification channels
+  listNotificationChannels: () =>
+    request<{ data: Array<{ id: string; channel_type: string; config: Record<string, string>; created_at: string }> }>(
+      '/notifications/channels'
+    ),
+
+  createNotificationChannel: (body: { channel_type: string; config: Record<string, string> }) =>
+    request<{ message: string }>('/notifications/channels', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteNotificationChannel: (id: string) =>
+    request<{ message: string }>(`/notifications/channels/${id}`, { method: 'DELETE' }),
+
+  testNotificationChannel: (id: string) =>
+    request<{ message: string }>(`/notifications/channels/${id}/test`, { method: 'POST' }),
+
+  // Onboarding
+  getOnboardingStatus: () =>
+    request<{ current_step: string; completed_steps: string[]; is_complete: boolean }>(
+      '/onboarding/status'
+    ),
+
+  onboardingAction: <T = any>(path: string, body?: object) =>
+    request<T>(path, {
+      method: 'POST',
+      ...(body ? { body: JSON.stringify(body) } : {}),
     }),
 
   // Self-update

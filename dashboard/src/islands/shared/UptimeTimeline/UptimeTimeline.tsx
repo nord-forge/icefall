@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { api } from '@lib/api';
 import styles from './uptime-timeline.module.css';
 
 type HealthEvent = {
@@ -30,10 +31,9 @@ export default function UptimeTimeline({ appId }: Props) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch(`/api/v1/apps/${appId}/health?limit=1000`)
-      .then((r) => r.json())
+    api.getHealthEvents(appId, 1000)
       .then((data) => {
-        const allEvents = data.data?.flatMap((c: any) => c.recent_events || []) || [];
+        const allEvents = data.data?.flatMap((c) => c.recent_events || []) || [];
         setEvents(allEvents);
       })
       .catch(() => {});
