@@ -1,5 +1,6 @@
 # Phase 30: Teams & Multi-Tenancy
 
+> **Status: SHIPPED** — all tickets complete and merged to `main` (2026-05-18).
 > Priority: v2.0
 > Estimated effort: XL (6-8 weeks)
 > Dependencies: None (multi-server already shipped in Phase 20)
@@ -20,15 +21,15 @@ Add team-based resource ownership and multi-tenant isolation to Icefall. Current
 
 | ID | Title | Priority | Size | Dependencies | Status |
 |---|---|---|---|---|---|
-| [BE-248](BE-248-team-database-schema.md) | Team database schema and model | Critical | L | None | Not started |
-| [BE-249](BE-249-team-scoped-queries.md) | Team-scoped queries and middleware | Critical | XL | BE-248 | Not started |
-| [BE-250](BE-250-team-crud-api.md) | Team CRUD API | High | M | BE-248 | Not started |
-| [BE-251](BE-251-team-membership-invitation-api.md) | Team membership and invitation API | High | M | BE-250 | Not started |
-| [BE-252](BE-252-team-scoped-api-tokens.md) | Team-scoped API tokens | Medium | S | BE-249 | Not started |
-| [FE-253](FE-253-team-management-ui.md) | Team management UI | High | L | BE-250, BE-251 | Not started |
-| [FE-254](FE-254-team-onboarding-flow.md) | Team onboarding flow | Medium | S | FE-253 | Not started |
-| [BE-255](BE-255-cross-team-resource-sharing.md) | Cross-team resource sharing | Low | M | BE-249 | Not started |
-| [QA-256](QA-256-team-isolation-tests.md) | Team isolation integration tests | High | M | BE-249, BE-251 | Not started |
+| [BE-248](BE-248-team-database-schema.md) | Team database schema and model | Critical | L | None | Shipped |
+| [BE-249](BE-249-team-scoped-queries.md) | Team-scoped queries and middleware | Critical | XL | BE-248 | Shipped |
+| [BE-250](BE-250-team-crud-api.md) | Team CRUD API | High | M | BE-248 | Shipped |
+| [BE-251](BE-251-team-membership-invitation-api.md) | Team membership and invitation API | High | M | BE-250 | Shipped |
+| [BE-252](BE-252-team-scoped-api-tokens.md) | Team-scoped API tokens | Medium | S | BE-249 | Shipped |
+| [FE-253](FE-253-team-management-ui.md) | Team management UI | High | L | BE-250, BE-251 | Shipped |
+| [FE-254](FE-254-team-onboarding-flow.md) | Team onboarding flow | Medium | S | FE-253 | Shipped |
+| [BE-255](BE-255-cross-team-resource-sharing.md) | Cross-team resource sharing | Low | M | BE-249 | Shipped |
+| [QA-256](QA-256-team-isolation-tests.md) | Team isolation integration tests | High | M | BE-249, BE-251 | Shipped |
 
 ## Dependency Graph
 
