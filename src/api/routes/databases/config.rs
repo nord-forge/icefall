@@ -1,5 +1,13 @@
 use std::collections::HashMap;
 
+/// Builds the in-container commands that create a read-only account.
+/// Args: `(admin_user, admin_password, ro_user, ro_password, db_name)`.
+/// Each inner `Vec` is one `exec_in_container` invocation.
+type ReadonlySetupFn = fn(&str, &str, &str, &str, &str) -> Vec<Vec<String>>;
+
+/// How the db_browser connects: a read-only account when one has been
+/// provisioned (audit C3/C4 defense-in-depth), falling back to the primary
+/// account for engines where a read-only user is not provisioned.
 pub(super) struct DbTypeConfig {
     pub image: &'static str,
     pub port: u16,
@@ -7,7 +15,16 @@ pub(super) struct DbTypeConfig {
     pub connection_string: fn(&str, &str, &str, &str) -> String,
     pub default_memory_mb: i64,
     pub env_var_name: &'static str,
+    /// Creates a least-privilege, read-only account. `None` for engines
+    /// where the db_browser relies on a verb allowlist instead (redis and
+    /// friends). Statements are passed as separate args (never
+    /// shell-concatenated) so the generated password cannot break out. The
+    /// commands are idempotent — safe to re-run.
+    pub readonly_setup: Option<ReadonlySetupFn>,
 }
+
+/// The fixed username for the read-only db_browser account.
+pub(crate) const READONLY_USER: &str = "icefall_ro";
 
 pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
     let mut m = HashMap::new();
@@ -28,6 +45,33 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 1024,
             env_var_name: "DATABASE_URL",
+            // Create a LOGIN role with SELECT-only on the public schema.
+            // `CREATE ROLE` has no `IF NOT EXISTS`, so it is wrapped in a
+            // DO block that swallows duplicate_object — making the whole
+            // thing idempotent. The default DB is named after the admin user.
+            readonly_setup: Some(|admin_user, _admin_pass, ro_user, ro_pass, _db| {
+                let sql = format!(
+                    "DO $$ BEGIN \
+                       IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{ro_user}') THEN \
+                         CREATE ROLE {ro_user} LOGIN PASSWORD '{ro_pass}'; \
+                       END IF; \
+                     END $$; \
+                     GRANT CONNECT ON DATABASE {admin_user} TO {ro_user}; \
+                     GRANT USAGE ON SCHEMA public TO {ro_user}; \
+                     GRANT SELECT ON ALL TABLES IN SCHEMA public TO {ro_user}; \
+                     ALTER DEFAULT PRIVILEGES IN SCHEMA public \
+                       GRANT SELECT ON TABLES TO {ro_user};"
+                );
+                vec![vec![
+                    "psql".to_string(),
+                    "-U".to_string(),
+                    admin_user.to_string(),
+                    "-v".to_string(),
+                    "ON_ERROR_STOP=1".to_string(),
+                    "-c".to_string(),
+                    sql,
+                ]]
+            }),
         },
     );
     m.insert(
@@ -48,6 +92,22 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 1024,
             env_var_name: "DATABASE_URL",
+            // `CREATE USER IF NOT EXISTS` + `GRANT SELECT` is idempotent.
+            // The managed database is named after `db`.
+            readonly_setup: Some(|admin_user, admin_pass, ro_user, ro_pass, db| {
+                let sql = format!(
+                    "CREATE USER IF NOT EXISTS '{ro_user}'@'%' IDENTIFIED BY '{ro_pass}'; \
+                     GRANT SELECT ON `{db}`.* TO '{ro_user}'@'%'; \
+                     FLUSH PRIVILEGES;"
+                );
+                vec![vec![
+                    "mysql".to_string(),
+                    format!("-u{admin_user}"),
+                    format!("-p{admin_pass}"),
+                    "-e".to_string(),
+                    sql,
+                ]]
+            }),
         },
     );
     m.insert(
@@ -61,6 +121,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 256,
             env_var_name: "REDIS_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -80,6 +141,28 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 512,
             env_var_name: "MONGODB_URL",
+            // The read-only user gets the built-in `read` role on the
+            // managed database. createUser errors if the user already
+            // exists, so the eval catches that to stay idempotent. This
+            // --eval contains NO user input — it is safe.
+            readonly_setup: Some(|admin_user, admin_pass, ro_user, ro_pass, db| {
+                let conn = format!(
+                    "mongodb://{admin_user}:{admin_pass}@localhost:27017/admin?authSource=admin"
+                );
+                let js = format!(
+                    "try {{ db.getSiblingDB('admin').createUser({{ \
+                       user: '{ro_user}', pwd: '{ro_pass}', \
+                       roles: [{{ role: 'read', db: '{db}' }}] }}); }} \
+                     catch (e) {{ if (e.codeName !== 'DuplicateKey') throw e; }}"
+                );
+                vec![vec![
+                    "mongosh".to_string(),
+                    "--quiet".to_string(),
+                    conn,
+                    "--eval".to_string(),
+                    js,
+                ]]
+            }),
         },
     );
     m.insert(
@@ -100,6 +183,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 1024,
             env_var_name: "DATABASE_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -120,6 +204,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 2048,
             env_var_name: "CLICKHOUSE_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -133,6 +218,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 256,
             env_var_name: "REDIS_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -146,6 +232,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 512,
             env_var_name: "REDIS_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -159,6 +246,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 256,
             env_var_name: "REDIS_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -172,6 +260,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 2048,
             env_var_name: "DATABASE_URL",
+            readonly_setup: None,
         },
     );
     m.insert(
@@ -191,6 +280,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             },
             default_memory_mb: 2048,
             env_var_name: "CASSANDRA_URL",
+            readonly_setup: None,
         },
     );
     m

@@ -2,6 +2,10 @@ mod config;
 mod crud;
 mod lifecycle;
 mod linking;
+pub(crate) mod readonly;
+
+/// The fixed username of the read-only db_browser account (see `config`).
+pub(crate) use config::READONLY_USER;
 
 use axum::routing::{delete, get, post};
 use axum::Router;

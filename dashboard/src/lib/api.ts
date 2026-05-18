@@ -378,6 +378,17 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ query }) },
     ),
 
+  // Structured MongoDB query — the server no longer accepts raw query
+  // strings for Mongo (they were eval'd as JavaScript = RCE).
+  queryMongo: (
+    dbId: string,
+    body: { collection: string; filter?: unknown; projection?: unknown; sort?: unknown; limit?: number },
+  ) =>
+    request<{ documents?: any[]; row_count: number }>(
+      `/databases/${dbId}/mongo-query`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   // Projects
   listProjects: () =>
     request<{ data: Project[] }>('/projects'),

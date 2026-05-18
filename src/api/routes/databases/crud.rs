@@ -187,13 +187,36 @@ pub(super) async fn create_database(
     let connection_string =
         (type_config.connection_string)(&container_name, "", db_user, &password);
 
-    let credentials = serde_json::json!({
+    let mut credentials = serde_json::json!({
         "user": db_user,
         "password": password,
         "connection_string": connection_string,
         "host": container_name,
         "port": type_config.port,
     });
+
+    // C3/C4: provision a read-only account the db_browser connects as, so a
+    // query-validation bypass cannot mutate or escape the database. Engines
+    // without a read-only setup (redis &c.) return None and rely on their
+    // verb allowlist instead. A provisioning failure fails the request —
+    // better than a database that silently only has admin access.
+    if let Some(ro) = super::readonly::provision_readonly_user(
+        &state,
+        &container_name,
+        &body.db_type,
+        db_user,
+        &password,
+        &body.name,
+    )
+    .await?
+    {
+        if let Some(obj) = credentials.as_object_mut() {
+            obj.insert(
+                "readonly".to_string(),
+                serde_json::json!({ "user": ro.user, "password": ro.password }),
+            );
+        }
+    }
 
     let managed_db = state
         .db
