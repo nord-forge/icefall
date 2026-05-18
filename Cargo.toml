@@ -57,7 +57,7 @@ sha2 = "0.11"
 hex = "0.4"
 
 # JWT (GitHub App authentication)
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # Self-update & release verification
 ed25519-dalek = { version = "2", features = ["pkcs8", "pem"] }
