@@ -67,3 +67,9 @@
 .site-title.sl-flex {
   gap: 0.25rem;
 }
+
+/* Keep inline code (flags, env vars, identifiers) on one line. Never break a
+   token like `--runtime=NAME` across lines. Block code keeps normal wrapping. */
+:not(pre) > code {
+  white-space: nowrap;
+}
