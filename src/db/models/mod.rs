@@ -73,7 +73,7 @@ pub fn now_iso8601() -> String {
 }
 
 pub fn new_id() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut rng = rand::rng();
     let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
     (0..20)

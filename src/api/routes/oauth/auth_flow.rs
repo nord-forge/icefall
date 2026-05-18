@@ -55,7 +55,7 @@ pub(super) async fn oauth_authorize(
     use sha2::Digest;
 
     let (code_verifier, code_challenge, state_token) = {
-        use rand::RngCore;
+        use rand::Rng;
         let mut rng = rand::rng();
         let mut verifier_bytes = [0u8; 32];
         rng.fill_bytes(&mut verifier_bytes);

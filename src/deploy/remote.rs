@@ -197,7 +197,7 @@ impl RemoteExecutor {
 
         // Fresh random transfer id per attempt.
         let transfer_id: [u8; 16] = {
-            use rand::Rng;
+            use rand::RngExt;
             rand::rng().random()
         };
         let transfer_hex = hex_encode(&transfer_id);

@@ -329,7 +329,7 @@ fn generate_qr_svg(data: &str) -> Result<String, ApiError> {
 /// hashed_codes_json is a JSON array of objects: [{"hash": "...", "used": false}, ...]
 fn generate_backup_codes() -> Result<(Vec<String>, String), ApiError> {
     use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
-    use rand::Rng;
+    use rand::RngExt;
 
     let mut rng = rand::rng();
     let charset: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No 0, O, 1, I for readability

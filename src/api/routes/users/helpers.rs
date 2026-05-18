@@ -11,7 +11,7 @@ pub(super) fn verify_password(password: &str, hash: &str) -> bool {
 }
 
 pub(super) fn generate_temp_password(len: usize) -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let charset: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     let mut rng = rand::rng();
     (0..len)
@@ -23,7 +23,7 @@ pub(super) fn generate_temp_password(len: usize) -> String {
 }
 
 pub(super) fn generate_random_hex(len: usize) -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut rng = rand::rng();
     (0..len)
         .map(|_| format!("{:02x}", rng.random::<u8>()))

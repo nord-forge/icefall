@@ -231,7 +231,7 @@ async fn enroll(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;
-    use rand::Rng;
+    use rand::RngExt;
 
     let mut hasher = sha2::Sha256::new();
     hasher.update(body.enrollment_token.as_bytes());
