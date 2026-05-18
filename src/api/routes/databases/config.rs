@@ -197,7 +197,7 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
 }
 
 pub(super) fn generate_password() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut rng = rand::rng();
     (0..32)
         .map(|_| {

@@ -30,7 +30,7 @@ pub fn encrypt_env_vars(
     let server_public = PublicKey::from(server_pub_bytes);
 
     let mut ephemeral_bytes = [0u8; 32];
-    rand::Rng::fill(&mut rand::rng(), &mut ephemeral_bytes);
+    rand::RngExt::fill(&mut rand::rng(), &mut ephemeral_bytes);
     let ephemeral_secret = x25519_dalek::StaticSecret::from(ephemeral_bytes);
     let ephemeral_public = x25519_dalek::PublicKey::from(&ephemeral_secret);
 
@@ -43,7 +43,7 @@ pub fn encrypt_env_vars(
         .map_err(|e| DeployError::EnvelopeEncrypt(format!("AES key init failed: {e}")))?;
 
     let mut nonce_bytes = [0u8; 12];
-    rand::Rng::fill(&mut rand::rng(), &mut nonce_bytes);
+    rand::RngExt::fill(&mut rand::rng(), &mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     let plaintext = serde_json::to_vec(env_vars)
@@ -119,7 +119,7 @@ mod tests {
     fn round_trip_encrypt_decrypt() {
         let secret = {
             let mut bytes = [0u8; 32];
-            rand::Rng::fill(&mut rand::rng(), &mut bytes);
+            rand::RngExt::fill(&mut rand::rng(), &mut bytes);
             x25519_dalek::StaticSecret::from(bytes)
         };
         let public = x25519_dalek::PublicKey::from(&secret);
@@ -142,14 +142,14 @@ mod tests {
     fn wrong_key_fails() {
         let secret = {
             let mut bytes = [0u8; 32];
-            rand::Rng::fill(&mut rand::rng(), &mut bytes);
+            rand::RngExt::fill(&mut rand::rng(), &mut bytes);
             x25519_dalek::StaticSecret::from(bytes)
         };
         let public = x25519_dalek::PublicKey::from(&secret);
 
         let wrong_secret = {
             let mut bytes = [0u8; 32];
-            rand::Rng::fill(&mut rand::rng(), &mut bytes);
+            rand::RngExt::fill(&mut rand::rng(), &mut bytes);
             x25519_dalek::StaticSecret::from(bytes)
         };
 

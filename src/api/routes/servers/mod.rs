@@ -50,7 +50,7 @@ pub(crate) async fn require_admin(state: &AppState, headers: &HeaderMap) -> Resu
 pub(crate) fn generate_enrollment_token() -> (String, String) {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;
-    use rand::Rng;
+    use rand::RngExt;
 
     let random_bytes: [u8; 32] = rand::rng().random();
     let token = URL_SAFE_NO_PAD.encode(random_bytes);
