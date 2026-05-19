@@ -407,7 +407,7 @@ export const api = {
 
   // 2FA
   setup2fa: () =>
-    request<{ data: { secret: string; qr_svg: string; otpauth_url: string } }>(
+    request<{ data: { secret: string; otpauth_url: string } }>(
       '/auth/2fa/setup',
       { method: 'POST' },
     ),

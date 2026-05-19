@@ -217,16 +217,17 @@ impl ComposeDeployer {
 
         // Update the deploy record with the first container's ID (for compatibility)
         if let Some(first) = results.first() {
-            let _ = self
-                .db
-                .update_deploy_container_id(deploy_id, &first.container_id)
-                .await;
+            let _ = crate::deploy::retry_state_write("compose update_deploy_container_id", || {
+                self.db
+                    .update_deploy_container_id(deploy_id, &first.container_id)
+            })
+            .await;
         }
 
-        let _ = self
-            .db
-            .update_deploy_status(deploy_id, "running", None)
-            .await;
+        let _ = crate::deploy::retry_state_write("compose update_deploy_status running", || {
+            self.db.update_deploy_status(deploy_id, "running", None)
+        })
+        .await;
 
         self.emit_event(app, deploy_id, "running");
 

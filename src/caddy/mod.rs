@@ -24,8 +24,13 @@ pub struct CaddyClient {
 
 impl CaddyClient {
     pub fn new(admin_url: &str) -> Self {
+        // A hung Caddy admin API must not block an async worker forever.
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default();
         Self {
-            client: reqwest::Client::new(),
+            client,
             base_url: admin_url.trim_end_matches('/').to_string(),
         }
     }

@@ -227,7 +227,11 @@ async fn exchange_and_fetch(
     let base = build_base_url(state);
     let redirect_uri = format!("{base}/api/v1/auth/oauth/{provider}/callback");
 
-    let http_client = reqwest::Client::new();
+    // A slow OAuth provider must not block the callback handler indefinitely.
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(ApiError::internal)?;
     let token_response = http_client
         .post(prov_config.token_url)
         .header("Accept", "application/json")

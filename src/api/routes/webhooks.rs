@@ -72,15 +72,16 @@ async fn github_webhook(
         return StatusCode::NOT_FOUND;
     };
 
-    if let Some(ref secret) = app.webhook_secret {
-        let signature = headers
-            .get("X-Hub-Signature-256")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-
-        if !validate_github_signature(secret, signature, &body) {
-            return StatusCode::UNAUTHORIZED;
-        }
+    // Fail closed: an app with no webhook secret cannot accept webhooks.
+    let Some(ref secret) = app.webhook_secret else {
+        return StatusCode::UNAUTHORIZED;
+    };
+    let signature = headers
+        .get("X-Hub-Signature-256")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !validate_github_signature(secret, signature, &body) {
+        return StatusCode::UNAUTHORIZED;
     }
 
     let event: GitHubPushEvent = match serde_json::from_slice(&body) {
@@ -121,15 +122,16 @@ async fn gitlab_webhook(
         return StatusCode::NOT_FOUND;
     };
 
-    if let Some(ref secret) = app.webhook_secret {
-        let token = headers
-            .get("X-Gitlab-Token")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-
-        if !validate_gitlab_token(secret, token) {
-            return StatusCode::UNAUTHORIZED;
-        }
+    // Fail closed: an app with no webhook secret cannot accept webhooks.
+    let Some(ref secret) = app.webhook_secret else {
+        return StatusCode::UNAUTHORIZED;
+    };
+    let token = headers
+        .get("X-Gitlab-Token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !validate_gitlab_token(secret, token) {
+        return StatusCode::UNAUTHORIZED;
     }
 
     let event: GitLabPushEvent = match serde_json::from_slice(&body) {
@@ -365,28 +367,34 @@ pub fn validate_github_signature(secret: &str, signature_header: &str, body: &[u
         .strip_prefix("sha256=")
         .unwrap_or(signature_header);
 
+    // Decode to raw bytes and let Hmac's own verify do a fixed-length,
+    // constant-time compare — a hex-string compare leaks the digest length.
+    let Ok(expected) = hex::decode(expected_hex) else {
+        return false;
+    };
+
     let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else {
         return false;
     };
     mac.update(body);
-    let result = mac.finalize().into_bytes();
-    let computed = hex::encode(result);
-
-    constant_time_eq(computed.as_bytes(), expected_hex.as_bytes())
+    mac.verify_slice(&expected).is_ok()
 }
 
 pub fn validate_gitlab_token(secret: &str, token: &str) -> bool {
-    constant_time_eq(secret.as_bytes(), token.as_bytes())
-}
-
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
+    // HMAC both sides under the same key, then compare the fixed-length
+    // digests — comparing the raw strings would leak the secret's length.
+    let digest = |s: &str| {
+        HmacSha256::new_from_slice(secret.as_bytes())
+            .ok()
+            .map(|mut mac| {
+                mac.update(s.as_bytes());
+                mac.finalize().into_bytes()
+            })
+    };
+    match (digest(secret), digest(token)) {
+        (Some(a), Some(b)) => a == b,
+        _ => false,
     }
-    a.iter()
-        .zip(b.iter())
-        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
-        == 0
 }
 
 pub fn extract_branch_from_ref(git_ref: &str) -> Option<&str> {
@@ -435,9 +443,16 @@ mod tests {
     }
 
     #[test]
-    fn constant_time_eq_works() {
-        assert!(constant_time_eq(b"hello", b"hello"));
-        assert!(!constant_time_eq(b"hello", b"world"));
-        assert!(!constant_time_eq(b"hello", b"hell"));
+    fn github_signature_rejects_malformed_hex() {
+        // A non-hex or wrong-length signature must be rejected, not panic.
+        assert!(!validate_github_signature("secret", "sha256=zzzz", b"body"));
+        assert!(!validate_github_signature("secret", "sha256=", b"body"));
+    }
+
+    #[test]
+    fn gitlab_token_rejects_length_variants() {
+        // A token of a different length than the secret is still rejected.
+        assert!(!validate_gitlab_token("my-token", "my-token-longer"));
+        assert!(!validate_gitlab_token("my-token", ""));
     }
 }

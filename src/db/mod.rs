@@ -19,6 +19,8 @@ pub enum DbError {
     Sqlx(#[from] sqlx::Error),
     #[error("migration error: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
 }
 
 #[async_trait]

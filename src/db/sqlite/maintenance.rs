@@ -91,7 +91,28 @@ pub(super) async fn prune_server_metrics_history(
 // --- Backup (VACUUM) ---
 
 pub(super) async fn vacuum_into(pool: &SqlitePool, path: &str) -> Result<(), DbError> {
-    sqlx::query(&format!("VACUUM INTO '{}'", path.replace('\'', "''")))
+    // VACUUM INTO interpolates a path into SQL. The target file must not yet
+    // exist, so canonicalize its parent dir and require the resolved path to
+    // stay inside it — defence in depth if `path` ever takes user input.
+    let target = std::path::Path::new(path);
+    let parent = target
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .ok_or_else(|| DbError::InvalidInput("VACUUM path has no parent directory".into()))?;
+    let file_name = target
+        .file_name()
+        .ok_or_else(|| DbError::InvalidInput("VACUUM path has no file name".into()))?;
+    let canonical_parent = std::fs::canonicalize(parent)
+        .map_err(|e| DbError::InvalidInput(format!("VACUUM parent directory unresolved: {e}")))?;
+    let safe_path = canonical_parent.join(file_name);
+    if !safe_path.starts_with(&canonical_parent) {
+        return Err(DbError::InvalidInput(
+            "VACUUM path escapes its directory".into(),
+        ));
+    }
+
+    let safe_str = safe_path.to_string_lossy();
+    sqlx::query(&format!("VACUUM INTO '{}'", safe_str.replace('\'', "''")))
         .execute(pool)
         .await?;
     Ok(())

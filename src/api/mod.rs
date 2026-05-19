@@ -62,6 +62,9 @@ impl BuildLockMap {
 
     pub async fn acquire(&self, app_id: &str) -> Arc<Mutex<()>> {
         let mut map = self.locks.lock().await;
+        // Prune entries no caller still references (strong count 1 = only the
+        // map), so the map does not grow unbounded as apps come and go.
+        map.retain(|_, lock| Arc::strong_count(lock) > 1);
         map.entry(app_id.to_string())
             .or_insert_with(|| Arc::new(Mutex::new(())))
             .clone()
