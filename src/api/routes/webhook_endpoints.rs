@@ -65,8 +65,9 @@ pub async fn test_endpoint(
         .find(|e| e.id == id)
         .ok_or_else(|| ApiError::NotFound(format!("webhook endpoint {id}")))?;
 
-    // Block SSRF — the endpoint URL is user-supplied.
-    crate::api::utils::url_guard::validate_outbound_url(
+    // Block SSRF — the endpoint URL is user-supplied. The guarded client is
+    // pinned to the validated IP and refuses redirects.
+    let target = crate::api::utils::url_guard::validate_outbound_url(
         &endpoint.url,
         &state.config.caddy_admin_url,
     )
@@ -79,9 +80,9 @@ pub async fn test_endpoint(
         "timestamp": crate::db::models::now_iso8601(),
     });
 
-    let client = reqwest::Client::new();
+    let client = crate::api::utils::url_guard::guarded_client(&target)?;
     let mut request = client
-        .request(reqwest::Method::POST, &endpoint.url)
+        .request(reqwest::Method::POST, target.url.clone())
         .json(&payload)
         .timeout(std::time::Duration::from_secs(10));
 

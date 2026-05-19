@@ -34,9 +34,16 @@ function extractTimestamp(line: string): number | null {
   return isNaN(ms) ? null : ms;
 }
 
+/** Patterns longer than this are matched literally — a guard against ReDoS
+ *  from a catastrophic-backtracking regex in user-supplied log patterns. */
+const MAX_REGEX_PATTERN_LENGTH = 200;
+
 function matchesAny(line: string, patterns: string[]): boolean {
   return patterns.some((p) => {
     if (!p) return false;
+    if (p.length > MAX_REGEX_PATTERN_LENGTH) {
+      return line.toLowerCase().includes(p.toLowerCase());
+    }
     try {
       return new RegExp(p, 'i').test(line);
     } catch {

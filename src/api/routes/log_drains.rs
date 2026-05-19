@@ -170,10 +170,13 @@ async fn test_drain(
                     "HTTP drain has no URL configured".into(),
                 ));
             }
-            // Block SSRF — the drain URL is user-supplied.
-            crate::api::utils::url_guard::validate_outbound_url(url, &state.config.caddy_admin_url)
-                .await?;
-            let client = reqwest::Client::new();
+            // Block SSRF — the drain URL is user-supplied. The guarded client is pinned to the validated IP and refuses redirects.
+            let target = crate::api::utils::url_guard::validate_outbound_url(
+                url,
+                &state.config.caddy_admin_url,
+            )
+            .await?;
+            let client = crate::api::utils::url_guard::guarded_client(&target)?;
             let test_payload = serde_json::json!({
                 "message": "Test log from Icefall",
                 "level": "info",
@@ -181,8 +184,20 @@ async fn test_drain(
                 "source": "icefall-test"
             });
             let resp = match method {
-                "PUT" => client.put(url).json(&test_payload).send().await,
-                _ => client.post(url).json(&test_payload).send().await,
+                "PUT" => {
+                    client
+                        .put(target.url.clone())
+                        .json(&test_payload)
+                        .send()
+                        .await
+                }
+                _ => {
+                    client
+                        .post(target.url.clone())
+                        .json(&test_payload)
+                        .send()
+                        .await
+                }
             };
             match resp {
                 Ok(r) if r.status().is_success() => Ok(Json(serde_json::json!({
@@ -202,9 +217,12 @@ async fn test_drain(
                     "Loki drain has no URL configured".into(),
                 ));
             }
-            // Block SSRF — the drain URL is user-supplied.
-            crate::api::utils::url_guard::validate_outbound_url(url, &state.config.caddy_admin_url)
-                .await?;
+            // Block SSRF — the drain URL is user-supplied. The guarded client is pinned to the validated IP and refuses redirects.
+            let target = crate::api::utils::url_guard::validate_outbound_url(
+                url,
+                &state.config.caddy_admin_url,
+            )
+            .await?;
             let push_url = format!("{}/loki/api/v1/push", url.trim_end_matches('/'));
             let payload = serde_json::json!({
                 "streams": [{
@@ -215,7 +233,7 @@ async fn test_drain(
                     ]]
                 }]
             });
-            let client = reqwest::Client::new();
+            let client = crate::api::utils::url_guard::guarded_client(&target)?;
             let mut req = client.post(&push_url).json(&payload);
             if let Some(tenant) = config["tenant_id"].as_str() {
                 req = req.header("X-Scope-OrgID", tenant);

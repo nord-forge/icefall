@@ -22,14 +22,17 @@ pub async fn dispatch_notification(
     }
 }
 
-/// Reject user-supplied notification URLs that resolve to internal hosts.
-async fn guard_url(url: &str, caddy_admin_url: &str) -> Result<(), String> {
-    crate::api::utils::url_guard::validate_outbound_url(url, caddy_admin_url)
+/// Validate a user-supplied notification URL against SSRF and return a reqwest
+/// client pinned to the validated IP that refuses redirects.
+async fn guarded_client(url: &str, caddy_admin_url: &str) -> Result<reqwest::Client, String> {
+    let to_msg = |e: crate::api::error::ApiError| match e {
+        crate::api::error::ApiError::BadRequest(msg) => msg,
+        other => other.to_string(),
+    };
+    let target = crate::api::utils::url_guard::validate_outbound_url(url, caddy_admin_url)
         .await
-        .map_err(|e| match e {
-            crate::api::error::ApiError::BadRequest(msg) => msg,
-            other => other.to_string(),
-        })
+        .map_err(to_msg)?;
+    crate::api::utils::url_guard::guarded_client(&target).map_err(to_msg)
 }
 
 async fn dispatch_webhook(
@@ -44,7 +47,7 @@ async fn dispatch_webhook(
         .get("url")
         .and_then(|v| v.as_str())
         .ok_or("webhook config missing 'url'")?;
-    guard_url(url, caddy_admin_url).await?;
+    let client = guarded_client(url, caddy_admin_url).await?;
 
     let payload = serde_json::json!({
         "event": event,
@@ -53,7 +56,6 @@ async fn dispatch_webhook(
         "timestamp": crate::db::models::now_iso8601(),
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(url)
         .json(&payload)
@@ -81,7 +83,7 @@ async fn dispatch_slack(
         .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("slack config missing 'webhook_url'")?;
-    guard_url(webhook_url, caddy_admin_url).await?;
+    let client = guarded_client(webhook_url, caddy_admin_url).await?;
 
     let color = event_color_hex(event);
     let timestamp = crate::db::models::now_iso8601();
@@ -112,7 +114,6 @@ async fn dispatch_slack(
         "attachments": [{ "color": color }]
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(webhook_url)
         .json(&payload)
@@ -140,7 +141,7 @@ async fn dispatch_discord(
         .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("discord config missing 'webhook_url'")?;
-    guard_url(webhook_url, caddy_admin_url).await?;
+    let client = guarded_client(webhook_url, caddy_admin_url).await?;
 
     let color = event_color_discord(event);
     let timestamp = crate::db::models::now_iso8601();
@@ -161,7 +162,6 @@ async fn dispatch_discord(
         }]
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(webhook_url)
         .json(&payload)
@@ -253,7 +253,7 @@ async fn dispatch_ntfy(
     }
 
     let url = format!("{}/{}", server.trim_end_matches('/'), topic);
-    guard_url(&url, caddy_admin_url).await?;
+    let client = guarded_client(&url, caddy_admin_url).await?;
 
     let priority = match event {
         "deploy.failed" | "health.down" | "backup.failure" => "high",
@@ -278,7 +278,6 @@ async fn dispatch_ntfy(
 
     let body = format!("{summary}\nApp: {app_name}");
 
-    let client = reqwest::Client::new();
     let mut req = client
         .post(&url)
         .header("Title", format!("[Icefall] {event}"))
