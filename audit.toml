@@ -5,6 +5,7 @@
 # This file exists as documentation of why each advisory is ignored.
 #
 # RUSTSEC-2023-0071: Marvin Attack in `rsa` crate (severity: medium).
-#   Transitive dependency from sqlx-mysql, pulled by sqlx's macro crate
-#   regardless of features. We only use SQLite — the rsa crate is never invoked.
-#   No fixed version exists upstream.
+#   Transitive dependency from sqlx-mysql, which sqlx-macros-core depends on
+#   unconditionally — so `rsa` is compiled regardless of enabled features.
+#   We only ever open SQLite connections, so the vulnerable RSA decryption
+#   path is never executed at runtime. No fixed version exists upstream.
