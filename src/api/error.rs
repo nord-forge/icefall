@@ -23,6 +23,8 @@ pub enum ApiError {
     Internal(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("{0}")]
     ServiceUnavailable(String),
+    #[error("{0}")]
+    TooManyRequests(String),
 }
 
 impl IntoResponse for ApiError {
@@ -43,6 +45,11 @@ impl IntoResponse for ApiError {
             ApiError::ServiceUnavailable(msg) => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "service_unavailable",
+                msg.clone(),
+            ),
+            ApiError::TooManyRequests(msg) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "too_many_requests",
                 msg.clone(),
             ),
         };

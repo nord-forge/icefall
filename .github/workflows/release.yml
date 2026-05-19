@@ -94,9 +94,11 @@ jobs:
         run: |
           VERSION="${{ needs.validate-tag.outputs.version }}"
           ARTIFACT="icefall-v${VERSION}-${{ matrix.artifact_name }}"
-          mkdir -p staging
+          mkdir -p staging/dashboard
           cp "target/${{ matrix.target }}/release/icefall" staging/
-          cp -r dashboard/dist staging/dashboard
+          # Runtime serves "dashboard/dist" (see src/api/mod.rs); mirror that
+          # layout in the tarball.
+          cp -r dashboard/dist staging/dashboard/dist
           cd staging
           tar czf "../${ARTIFACT}.tar.gz" .
           cd ..

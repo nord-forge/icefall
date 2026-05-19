@@ -1,1 +1,0 @@
-ALTER TABLE domains ADD COLUMN path TEXT;

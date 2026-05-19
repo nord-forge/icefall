@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { X, FolderOpen, File, Download, Trash2, Upload, ChevronRight, HardDrive, FolderUp, AlertTriangle } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
+import { api } from '@lib/api';
 import styles from './volume-browser.module.css';
 
 type FileEntry = {
@@ -52,15 +53,7 @@ export default function VolumeBrowser({ appId, mountIndex, volume, onClose }: Pr
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(
-        `${API_BASE}/apps/${appId}/volumes/${mountIndex}/browse?path=${encodeURIComponent(path)}`,
-        { credentials: 'same-origin' }
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error || 'Failed to browse volume');
-      }
-      const json = await res.json();
+      const json = await api.browseVolume(appId, mountIndex, path);
       setEntries(json.data || []);
       setCurrentPath(path);
     } catch (err: any) {
@@ -73,14 +66,8 @@ export default function VolumeBrowser({ appId, mountIndex, volume, onClose }: Pr
 
   const fetchSize = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${API_BASE}/apps/${appId}/volumes/${mountIndex}/size`,
-        { credentials: 'same-origin' }
-      );
-      if (res.ok) {
-        const json = await res.json();
-        setVolumeSize(json.data?.bytes_used ?? null);
-      }
+      const json = await api.volumeSize(appId, mountIndex);
+      setVolumeSize(json.data?.bytes_used ?? null);
     } catch {
       // Size tracking is non-critical
     }
@@ -171,18 +158,7 @@ export default function VolumeBrowser({ appId, mountIndex, volume, onClose }: Pr
     setUploading(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const res = await fetch(
-        `${API_BASE}/apps/${appId}/volumes/${mountIndex}/upload?path=${encodeURIComponent(currentPath)}&filename=${encodeURIComponent(selectedFile.name)}`,
-        {
-          method: 'POST',
-          credentials: 'same-origin',
-          body: arrayBuffer,
-        }
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error || 'Upload failed');
-      }
+      await api.uploadVolumeFile(appId, mountIndex, currentPath, selectedFile.name, arrayBuffer);
       setShowUpload(false);
       setSelectedFile(null);
       fetchEntries(currentPath);
@@ -201,19 +177,7 @@ export default function VolumeBrowser({ appId, mountIndex, volume, onClose }: Pr
       const filePath = currentPath === '/'
         ? '/' + deleteTarget
         : currentPath + '/' + deleteTarget;
-      const res = await fetch(
-        `${API_BASE}/apps/${appId}/volumes/${mountIndex}/delete`,
-        {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: filePath }),
-        }
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error || 'Delete failed');
-      }
+      await api.deleteVolumeFile(appId, mountIndex, filePath);
       setDeleteTarget(null);
       fetchEntries(currentPath);
       fetchSize();

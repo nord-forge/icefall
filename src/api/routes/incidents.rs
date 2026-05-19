@@ -22,7 +22,7 @@ async fn list_incidents(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let incidents = state.db.list_incidents(50).await?;
     Ok(Json(serde_json::json!({ "data": incidents })))
@@ -43,7 +43,7 @@ async fn create_incident(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role == "viewer" {
         return Err(ApiError::Forbidden(
@@ -76,7 +76,7 @@ async fn update_status(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role == "viewer" {
         return Err(ApiError::Forbidden(
@@ -101,7 +101,7 @@ async fn add_note(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let note = state
         .db

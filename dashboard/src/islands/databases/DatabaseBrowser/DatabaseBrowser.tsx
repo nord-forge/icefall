@@ -32,7 +32,7 @@ const PAGE_SIZE = 25;
 const LABELS: Record<string, { items: string; placeholder: string }> = {
   postgres: { items: 'Tables', placeholder: 'SELECT * FROM users WHERE active = true LIMIT 50' },
   mysql: { items: 'Tables', placeholder: 'SELECT * FROM users WHERE active = true LIMIT 50' },
-  mongo: { items: 'Collections', placeholder: 'db.users.find({ active: true }).limit(50)' },
+  mongo: { items: 'Collections', placeholder: '{ "active": true }' },
   redis: { items: 'Keys', placeholder: 'GET mykey' },
 };
 
@@ -73,7 +73,6 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
 
   function defaultQuery(item: string): string {
     switch (dbType) {
-      case 'mongo': return `db.getCollection("${item}").find({}).limit(100)`;
       case 'redis': {
         const type = itemTypes[item] || 'string';
         return (REDIS_COMMANDS[type] || REDIS_COMMANDS.string)(item);
@@ -90,7 +89,13 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
     setSearchQuery('');
     setPage(0);
     setExpandedDocs(new Set());
-    await runQuery(defaultQuery(item));
+    if (isMongo) {
+      // Mongo browse = a find({}) on the collection. The server takes a
+      // structured query, never a raw string.
+      await runMongoQuery(item, {});
+    } else {
+      await runQuery(defaultQuery(item));
+    }
   }
 
   async function runQuery(q: string) {
@@ -111,12 +116,48 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
     setLoading(false);
   }
 
+  async function runMongoQuery(collection: string, filter: unknown) {
+    setLoading(true);
+    setError('');
+    setTableResult(null);
+    setDocResult(null);
+    try {
+      const data = await api.queryMongo(dbId, { collection, filter, limit: 100 });
+      setDocResult({ documents: data.documents || [], row_count: data.row_count });
+    } catch (e: any) {
+      setError(e.message || 'Query failed');
+    }
+    setLoading(false);
+  }
+
   async function runCustom() {
-    if (!customQuery.trim()) return;
-    setSelectedItem('');
     setSort(null);
     setPage(0);
     setExpandedDocs(new Set());
+
+    if (isMongo) {
+      // The custom panel for Mongo is a JSON filter against the selected
+      // collection — parsed and validated client-side before sending.
+      if (!selectedItem) {
+        setError('Select a collection first.');
+        return;
+      }
+      let filter: unknown = {};
+      const text = customQuery.trim();
+      if (text) {
+        try {
+          filter = JSON.parse(text);
+        } catch {
+          setError('Filter must be valid JSON, e.g. { "active": true }');
+          return;
+        }
+      }
+      await runMongoQuery(selectedItem, filter);
+      return;
+    }
+
+    if (!customQuery.trim()) return;
+    setSelectedItem('');
     await runQuery(customQuery);
   }
 
@@ -204,7 +245,13 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
       {showCustom && (
         <div class={styles.queryCard}>
           <Textarea
-            label={dbType === 'redis' ? 'Redis command (read-only)' : dbType === 'mongo' ? 'MongoDB query (read-only)' : 'SQL query (read-only)'}
+            label={
+              dbType === 'redis'
+                ? 'Redis command (read-only)'
+                : dbType === 'mongo'
+                  ? `JSON filter for ${selectedItem || 'a selected collection'} (read-only)`
+                  : 'SQL query (read-only)'
+            }
             name="custom-query"
             id="custom-query"
             value={customQuery}
@@ -213,7 +260,13 @@ export default function DatabaseBrowser({ dbId, dbType }: Props) {
             rows={3}
           />
           <div class={styles.queryActions}>
-            <Button variant="primary" size="sm" onClick={runCustom} loading={loading} disabled={!customQuery.trim()}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={runCustom}
+              loading={loading}
+              disabled={isMongo ? !selectedItem : !customQuery.trim()}
+            >
               <Play size={12} aria-hidden="true" /> Run
             </Button>
           </div>

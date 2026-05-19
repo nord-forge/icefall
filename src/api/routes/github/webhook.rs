@@ -39,10 +39,8 @@ struct SenderPayload {
     login: String,
 }
 
-/// Handles incoming webhook events from GitHub Apps.
-///
-/// This endpoint verifies the webhook signature using the stored webhook secret
-/// for the GitHub App, then dispatches based on event type.
+/// Handles incoming webhook events from GitHub Apps: verifies the signature against the
+/// stored webhook secret, then dispatches based on event type.
 async fn github_app_events(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -72,10 +70,8 @@ async fn github_app_events(
     }
 }
 
-/// Verify the webhook signature against all known GitHub Apps.
-///
-/// Since the webhook URL is shared across all apps for this instance,
-/// we try each app's webhook secret until one validates.
+/// Verify the webhook signature against all known GitHub Apps. The webhook URL is shared,
+/// so each app's secret is tried until one validates.
 async fn verify_signature(state: &AppState, headers: &HeaderMap, body: &[u8]) -> Option<String> {
     let signature = headers
         .get("X-Hub-Signature-256")
@@ -142,7 +138,6 @@ async fn handle_installation_event(
 
             let matching_app = apps.iter().find(|a| a.app_id == event.installation.app_id);
 
-            // Create the installation record
             match state
                 .db
                 .create_github_installation(
@@ -222,9 +217,8 @@ async fn handle_push_event(state: &AppState, headers: &HeaderMap, body: &Bytes) 
         return StatusCode::UNAUTHORIZED;
     }
 
-    // For push events from GitHub Apps, we delegate to the existing webhook
-    // infrastructure. The push payload contains repository info that lets us
-    // find the matching app and trigger a deploy.
+    // Delegate push events to the existing webhook infrastructure — the payload's
+    // repository info finds the matching app and triggers a deploy.
     let push: serde_json::Value = match serde_json::from_slice(body) {
         Ok(p) => p,
         Err(e) => {

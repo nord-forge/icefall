@@ -161,10 +161,10 @@ impl DeployManager {
         self.db
             .update_deploy_image_ref(&deploy.id, image_ref)
             .await?;
-        let _ = self
-            .db
-            .update_deploy_env_snapshot(&deploy.id, &snapshot)
-            .await;
+        let _ = crate::deploy::retry_state_write("update_deploy_env_snapshot", || {
+            self.db.update_deploy_env_snapshot(&deploy.id, &snapshot)
+        })
+        .await;
 
         self.emit_status(app, deploy, "starting");
 

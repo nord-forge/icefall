@@ -4,12 +4,17 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::TeamCtx;
 use crate::api::AppState;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/databases/{id}/tables", get(list_tables))
         .route("/databases/{id}/query", post(execute_query))
+        .route(
+            "/databases/{id}/mongo-query",
+            post(execute_mongo_query_route),
+        )
 }
 
 #[derive(Deserialize)]
@@ -18,19 +23,24 @@ struct QueryBody {
     query: String,
 }
 
+/// Connection details for the database browser. `user`/`password` are the least-privileged
+/// credentials available — the read-only account when provisioned, else the primary.
 struct DbInfo {
     container_name: String,
     db_type: String,
     user: String,
     password: String,
     connection_string: String,
+    /// The managed database's own name (used to build connection URIs).
+    db_name: String,
 }
 
-async fn get_db_info(state: &AppState, id: &str) -> Result<DbInfo, ApiError> {
-    let dbs = state.db.list_managed_dbs().await?;
-    let db = dbs
-        .iter()
-        .find(|d| d.id == id)
+async fn get_db_info(state: &AppState, team_id: &str, id: &str) -> Result<DbInfo, ApiError> {
+    // Only resolve the database if it belongs to the caller's team.
+    let db = state
+        .db
+        .get_managed_db_for_team(team_id, id)
+        .await?
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
 
     let creds: serde_json::Value = serde_json::from_str(&db.credentials).unwrap_or_default();
@@ -50,16 +60,24 @@ async fn get_db_info(state: &AppState, id: &str) -> Result<DbInfo, ApiError> {
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let user = creds
+    let admin_user = creds
         .get("user")
         .and_then(|v| v.as_str())
         .unwrap_or("icefall")
         .to_string();
-    let password = creds
+    let admin_password = creds
         .get("password")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
+
+    // Connect as the read-only account, lazily provisioned on first use. Engines
+    // without one fall back to the primary user, guarded by a command allowlist.
+    let (user, password) =
+        match crate::api::routes::databases::readonly::ensure_readonly_user(state, &db).await? {
+            Some(ro) => (ro.user, ro.password),
+            None => (admin_user, admin_password),
+        };
 
     Ok(DbInfo {
         container_name,
@@ -67,18 +85,53 @@ async fn get_db_info(state: &AppState, id: &str) -> Result<DbInfo, ApiError> {
         user,
         password,
         connection_string: conn_str,
+        db_name: db.name.clone(),
     })
+}
+
+/// Rebuild a connection string to target `localhost` (the exec runs inside the
+/// container) with the given credentials — never the stored admin/root account.
+fn local_conn_string(info: &DbInfo) -> String {
+    match info.db_type.as_str() {
+        "postgres" => format!(
+            "postgresql://{}:{}@localhost:5432/{}",
+            info.user, info.password, info.user
+        ),
+        "mysql" | "mariadb" => format!(
+            "mysql://{}:{}@localhost:3306/{}",
+            info.user, info.password, info.db_name
+        ),
+        _ => info
+            .connection_string
+            .replace(&info.container_name, "localhost"),
+    }
+}
+
+/// Build a mongodb:// URI for the browser's account. The read-only user's `authSource`
+/// is the managed database; the primary account authenticates against `admin`.
+fn mongo_conn_string(info: &DbInfo) -> String {
+    let auth_source = if info.user == super::databases::READONLY_USER {
+        info.db_name.as_str()
+    } else {
+        "admin"
+    };
+    format!(
+        "mongodb://{}:{}@localhost:27017/{}?authSource={auth_source}",
+        info.user, info.password, info.db_name
+    )
 }
 
 async fn list_tables(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let info = get_db_info(&state, &id).await?;
+    // Get_db_info scopes the database to the caller's team.
+    let info = get_db_info(&state, &ctx.team_id, &id).await?;
 
     let cmd: Vec<String> = match info.db_type.as_str() {
         "postgres" => vec![
-            "psql".into(), info.connection_string.replace(&info.container_name, "localhost"),
+            "psql".into(), local_conn_string(&info),
             "-t".into(), "-A".into(), "-c".into(),
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name".into(),
         ],
@@ -89,7 +142,7 @@ async fn list_tables(
         ],
         "mongo" => vec![
             "mongosh".into(), "--quiet".into(),
-            format!("mongodb://{}:{}@localhost:27017/{}?authSource=admin", info.user, info.password, info.user),
+            mongo_conn_string(&info),
             "--eval".into(), "db.getCollectionNames().forEach(c => print(c))".into(),
         ],
         "redis" => vec![
@@ -137,17 +190,83 @@ async fn list_tables(
 
 async fn execute_query(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<QueryBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let query = body.query.trim();
-    let info = get_db_info(&state, &id).await?;
+    // Get_db_info scopes the database to the caller's team.
+    let info = get_db_info(&state, &ctx.team_id, &id).await?;
 
     match info.db_type.as_str() {
         "postgres" | "mysql" => execute_sql_query(&state, &info, query).await,
-        "mongo" => execute_mongo_query(&state, &info, query).await,
+        // MongoDB uses the structured /mongo-query endpoint — raw query
+        // strings are no longer accepted (audit C3).
+        "mongo" => Err(ApiError::BadRequest(
+            "Use the /mongo-query endpoint for MongoDB databases".into(),
+        )),
         "redis" => execute_redis_query(&state, &info, query).await,
         _ => Err(ApiError::BadRequest("Unsupported database type".into())),
+    }
+}
+
+/// Tokens that have no place in a read-only browser query — file I/O, program execution,
+/// engine-specific escapes. Rejected at the app layer too, as defense in depth.
+const SQL_FORBIDDEN: &[&str] = &[
+    "into outfile",
+    "into dumpfile",
+    "load_file",
+    "load data",
+    "copy ",
+    "pg_read_file",
+    "pg_ls_dir",
+    "pg_sleep",
+    "dblink",
+    "lo_import",
+    "lo_export",
+];
+
+/// Validate a browser SQL query: a single read-only statement, no file or
+/// program access. Returns the query with a `LIMIT` appended if absent.
+fn validate_sql_query(query: &str) -> Result<String, ApiError> {
+    let trimmed = query.trim().trim_end_matches(';');
+    let lower = trimmed.to_lowercase();
+
+    // Exactly one statement — psql/mysql -e execute stacked statements, so reject
+    // any embedded semicolon (`SELECT 1; DROP TABLE users` must not pass).
+    if trimmed.contains(';') {
+        return Err(ApiError::BadRequest(
+            "Only a single statement is allowed".into(),
+        ));
+    }
+
+    // Read-only: SELECT, or a WITH ... SELECT CTE.
+    if !(lower.starts_with("select") || lower.starts_with("with")) {
+        return Err(ApiError::BadRequest(
+            "Only SELECT (or WITH ... SELECT) queries are allowed".into(),
+        ));
+    }
+
+    // psql meta-commands (\copy, \!, ...) bypass SQL entirely.
+    if trimmed.contains('\\') {
+        return Err(ApiError::BadRequest(
+            "Backslash commands are not allowed".into(),
+        ));
+    }
+
+    for needle in SQL_FORBIDDEN {
+        if lower.contains(needle) {
+            return Err(ApiError::BadRequest(format!(
+                "Query contains a disallowed operation: '{}'",
+                needle.trim()
+            )));
+        }
+    }
+
+    if lower.contains("limit") {
+        Ok(trimmed.to_string())
+    } else {
+        Ok(format!("{trimmed} LIMIT 100"))
     }
 }
 
@@ -156,23 +275,13 @@ async fn execute_sql_query(
     info: &DbInfo,
     query: &str,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let lower = query.to_lowercase();
-    if !lower.starts_with("select") {
-        return Err(ApiError::BadRequest(
-            "Only SELECT queries are allowed".into(),
-        ));
-    }
-    let limited = if lower.contains("limit") {
-        query.to_string()
-    } else {
-        format!("{query} LIMIT 100")
-    };
+    let limited = validate_sql_query(query)?;
 
+    // Connect as the least-privileged account (read-only when provisioned).
     let cmd: Vec<String> = match info.db_type.as_str() {
         "postgres" => vec![
             "psql".into(),
-            info.connection_string
-                .replace(&info.container_name, "localhost"),
+            local_conn_string(info),
             "--csv".into(),
             "-c".into(),
             limited,
@@ -181,6 +290,7 @@ async fn execute_sql_query(
             "mysql".into(),
             format!("-u{}", info.user),
             format!("-p{}", info.password),
+            info.db_name.clone(),
             "-e".into(),
             limited,
             "--batch".into(),
@@ -217,41 +327,100 @@ async fn execute_sql_query(
     ))
 }
 
+/// Structured MongoDB query: validated parts are JSON-serialized into a fixed `find()`
+/// expression so no user-controlled JavaScript is executed (raw `mongosh --eval` was RCE).
+#[derive(Deserialize)]
+struct MongoQueryBody {
+    collection: String,
+    #[serde(default)]
+    filter: serde_json::Value,
+    #[serde(default)]
+    projection: Option<serde_json::Value>,
+    #[serde(default)]
+    sort: Option<serde_json::Value>,
+    #[serde(default)]
+    limit: Option<i64>,
+}
+
+/// Recursively reject a filter that smuggles server-side JavaScript via the
+/// `$where` or `$function` operators — those run JS even inside a `find()`.
+fn filter_has_js_operator(v: &serde_json::Value) -> bool {
+    match v {
+        serde_json::Value::Object(map) => map
+            .iter()
+            .any(|(k, val)| k == "$where" || k == "$function" || filter_has_js_operator(val)),
+        serde_json::Value::Array(items) => items.iter().any(filter_has_js_operator),
+        _ => false,
+    }
+}
+
+async fn execute_mongo_query_route(
+    State(state): State<AppState>,
+    ctx: TeamCtx,
+    Path(id): Path<String>,
+    Json(body): Json<MongoQueryBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // Get_db_info scopes the database to the caller's team.
+    let info = get_db_info(&state, &ctx.team_id, &id).await?;
+    if info.db_type != "mongo" {
+        return Err(ApiError::BadRequest(
+            "This endpoint is for MongoDB databases only".into(),
+        ));
+    }
+    execute_mongo_query(&state, &info, &body).await
+}
+
 async fn execute_mongo_query(
     state: &AppState,
     info: &DbInfo,
-    query: &str,
+    body: &MongoQueryBody,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let blocked = [
-        "insert",
-        "update",
-        "delete",
-        "drop",
-        "remove",
-        "replace",
-        "bulkwrite",
-        "createindex",
-        "createcollection",
-    ];
-    let lower = query.to_lowercase();
-    if blocked.iter().any(|b| lower.contains(b)) {
+    // Collection is the one identifier that cannot be a JSON literal — it is
+    // a bare name in the expression, so it is strictly validated instead.
+    if body.collection.is_empty()
+        || !body
+            .collection
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        return Err(ApiError::BadRequest("Invalid collection name".into()));
+    }
+
+    if filter_has_js_operator(&body.filter) {
         return Err(ApiError::BadRequest(
-            "Only read operations are allowed".into(),
+            "The $where and $function operators are not allowed".into(),
         ));
     }
 
+    // Each part is JSON — a valid, inert JS literal that cannot break out of
+    // the expression. The limit is clamped to a sane range.
+    let filter_json = serde_json::to_string(&body.filter).unwrap_or_else(|_| "{}".into());
+    let projection_json = body
+        .projection
+        .as_ref()
+        .map(|p| serde_json::to_string(p).unwrap_or_else(|_| "{}".into()))
+        .unwrap_or_else(|| "{}".into());
+    let sort_json = body
+        .sort
+        .as_ref()
+        .map(|s| serde_json::to_string(s).unwrap_or_else(|_| "{}".into()))
+        .unwrap_or_else(|| "{}".into());
+    let limit = body.limit.unwrap_or(100).clamp(1, 500);
+
     let eval_expr = format!(
-        "JSON.stringify(({}).toArray ? ({}).toArray() : [{}])",
-        query, query, query
+        "JSON.stringify(db.getCollection({collection}).find({filter}, {projection})\
+         .sort({sort}).limit({limit}).toArray())",
+        collection = serde_json::Value::String(body.collection.clone()),
+        filter = filter_json,
+        projection = projection_json,
+        sort = sort_json,
+        limit = limit,
     );
-    let conn = format!(
-        "mongodb://{}:{}@localhost:27017/{}?authSource=admin",
-        info.user, info.password, info.user
-    );
+
     let cmd = vec![
         "mongosh".to_string(),
         "--quiet".into(),
-        conn,
+        mongo_conn_string(info),
         "--eval".into(),
         eval_expr,
     ];
@@ -412,4 +581,69 @@ async fn execute_redis_query(
     Ok(Json(
         serde_json::json!({ "columns": columns, "rows": rows, "row_count": rows.len() }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- SQL query validation (audit C4) ---
+
+    #[test]
+    fn plain_select_is_accepted_and_gets_a_limit() {
+        let q = validate_sql_query("SELECT * FROM users").unwrap();
+        assert!(q.to_lowercase().contains("limit 100"));
+    }
+
+    #[test]
+    fn with_cte_is_accepted() {
+        assert!(validate_sql_query("WITH x AS (SELECT 1) SELECT * FROM x").is_ok());
+    }
+
+    #[test]
+    fn stacked_statements_are_rejected() {
+        // The classic injection: a benign SELECT then a destructive stmt.
+        assert!(validate_sql_query("SELECT 1; DROP TABLE users").is_err());
+        assert!(validate_sql_query("SELECT 1; DELETE FROM users").is_err());
+    }
+
+    #[test]
+    fn non_select_is_rejected() {
+        assert!(validate_sql_query("DROP TABLE users").is_err());
+        assert!(validate_sql_query("UPDATE users SET admin = 1").is_err());
+    }
+
+    #[test]
+    fn file_access_is_rejected() {
+        assert!(validate_sql_query("SELECT * INTO OUTFILE '/tmp/x' FROM users").is_err());
+        assert!(validate_sql_query("SELECT load_file('/etc/passwd')").is_err());
+        assert!(validate_sql_query("SELECT pg_read_file('/etc/passwd')").is_err());
+    }
+
+    #[test]
+    fn psql_meta_commands_are_rejected() {
+        assert!(validate_sql_query("SELECT 1 \\! sh").is_err());
+    }
+
+    // --- Mongo structured query (audit C3) ---
+
+    #[test]
+    fn where_operator_in_filter_is_detected() {
+        let f = serde_json::json!({ "$where": "sleep(1000)" });
+        assert!(filter_has_js_operator(&f));
+    }
+
+    #[test]
+    fn nested_where_operator_is_detected() {
+        let f = serde_json::json!({ "a": { "b": { "$function": "x" } } });
+        assert!(filter_has_js_operator(&f));
+        let in_array = serde_json::json!({ "$or": [{ "$where": "1" }] });
+        assert!(filter_has_js_operator(&in_array));
+    }
+
+    #[test]
+    fn ordinary_filter_has_no_js_operator() {
+        let f = serde_json::json!({ "active": true, "age": { "$gt": 18 } });
+        assert!(!filter_has_js_operator(&f));
+    }
 }

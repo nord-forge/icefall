@@ -74,7 +74,6 @@ async fn handle_agent_connection(
         drop(old.sender);
     }
 
-    // Mark server online
     let _ = state.db.update_server_status(&server_id, "online").await;
     let _ = state.db.update_server_heartbeat(&server_id).await;
 
@@ -162,7 +161,6 @@ async fn handle_agent_connection(
         _ = recv_task => {},
     }
 
-    // Cleanup
     state.agent_registry.unregister(&server_id).await;
     state.agent_registry.cancel_pending_for(&server_id).await;
     let _ = state.db.update_server_status(&server_id, "offline").await;
@@ -257,7 +255,6 @@ async fn enroll(
         }
     }
 
-    // Generate worker token
     let random_bytes: [u8; 32] = rand::rng().random();
     let worker_token = format!("agt_{}", URL_SAFE_NO_PAD.encode(random_bytes));
 

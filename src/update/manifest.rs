@@ -2,10 +2,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Release manifest describing a single Icefall version.
-///
-/// Published alongside release artifacts on GitHub Releases.
-/// Signed with Ed25519; signature verified against embedded trusted keys.
+/// Release manifest describing a single Icefall version, published alongside
+/// release artifacts and Ed25519-signed for verification against trusted keys.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReleaseManifest {
     pub schema_version: u32,

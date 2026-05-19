@@ -63,12 +63,8 @@ impl DockerClient {
         Ok(())
     }
 
-    /// Export an image to a tar archive, collected into memory.
-    ///
-    /// Both Docker and Podman serve `/images/get` in `docker save` format over
-    /// the Docker-compatible API, so an archive exported from one runtime loads
-    /// cleanly into the other. The archive preserves all of the image's tags.
-    /// Used to transfer a built image to remote servers.
+    /// Export an image to an in-memory tar archive (`docker save` format), used
+    /// to transfer a built image to remote servers. Loads cleanly into Docker or Podman.
     pub async fn export_image(&self, image: &str) -> Result<Bytes, DockerError> {
         let mut stream = self.inner().export_image(image);
         let mut buf = Vec::new();
@@ -83,10 +79,8 @@ impl DockerClient {
         Ok(Bytes::from(buf))
     }
 
-    /// Import an image from a tar archive (equivalent to `docker load`).
-    ///
-    /// Works against both Docker and Podman: `/images/load` accepts the
-    /// `docker save` format on both runtimes, including multi-tag archives.
+    /// Import an image from a tar archive (`docker load`). Works on Docker and
+    /// Podman, including multi-tag archives.
     pub async fn import_image(&self, tar: Bytes) -> Result<(), DockerError> {
         let mut stream = self.inner().import_image(
             bollard::query_parameters::ImportImageOptions::default(),
@@ -99,13 +93,8 @@ impl DockerClient {
         Ok(())
     }
 
-    /// Import an image and verify the expected tag is present afterward.
-    ///
-    /// `docker load` / `import_image` can report success while a Podman edge
-    /// case (e.g. an OCI-format archive) leaves the tag unresolved. Verifying
-    /// the tag exists turns a silent partial load into a clear error — which
-    /// matters for the multi-instance deploy pipeline that transfers images
-    /// between possibly-different runtimes.
+    /// Import an image and verify the expected tag is present afterward, since a
+    /// Podman OCI-archive edge case can report success yet leave the tag unresolved.
     pub async fn import_image_verified(
         &self,
         tar: Bytes,

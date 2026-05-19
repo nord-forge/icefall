@@ -1,9 +1,6 @@
 //! Per-instance health monitoring for multi-instance (load-balanced) apps.
-//!
-//! Walks every `app_instances` row, checks each instance's container
-//! independently, transitions its status, and — once an instance crosses the
-//! failure threshold — marks it failed and attempts to start a replacement so
-//! the app stays at its desired instance count.
+//! Checks each instance's container, transitions status, and replaces failed
+//! instances to keep the app at its desired count.
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import { Save, Key, CheckCircle, Copy } from 'lucide-preact';
+import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -24,7 +25,7 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
   const [copiedCallback, setCopiedCallback] = useState('');
 
   useEffect(() => {
-    fetch('/api/v1/settings/oauth', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    api.getOAuthSettings().then(d => {
       if (d.data) {
         setGithubClientId(d.data.github_client_id || '');
         setGithubEnabled(d.data.github_enabled || false);
@@ -41,7 +42,7 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
   async function handleSave() {
     setSaving(true);
     try {
-      const body: Record<string, any> = {
+      const body: Parameters<typeof api.updateOAuthSettings>[0] = {
         github_client_id: githubClientId || undefined,
         github_enabled: githubEnabled,
         google_client_id: googleClientId || undefined,
@@ -50,13 +51,7 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
       if (githubClientSecret) body.github_client_secret = githubClientSecret;
       if (googleClientSecret) body.google_client_secret = googleClientSecret;
 
-      const res = await fetch('/api/v1/settings/oauth', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-      });
-      const d = await res.json();
+      const d = await api.updateOAuthSettings(body);
       if (d.data) {
         setGithubHasSecret(d.data.github_has_secret);
         setGoogleHasSecret(d.data.google_has_secret);

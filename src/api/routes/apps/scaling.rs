@@ -3,6 +3,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::build::orchestrator::BuildOrchestrator;
 use crate::db::models::{NewDeploy, UpdateApp};
@@ -20,6 +21,7 @@ pub(super) struct ScaleRequest {
 /// deploy to reach it. `desired_instances = 0` stops all instances.
 pub(super) async fn scale_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<ScaleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -29,11 +31,13 @@ pub(super) async fn scale_app(
         )));
     }
 
-    state
+    // App must belong to the caller's team, member role to scale.
+    let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     state
         .db
@@ -82,9 +86,8 @@ pub(super) async fn scale_app(
     let deploy_id = deploy.id.clone();
     let response_deploy_id = deploy_id.clone();
 
-    // Build once on the control plane, then distribute across instances.
-    // Serialized per app via the build lock so concurrent scale/deploy
-    // operations on the same app cannot interleave.
+    // Build once on the control plane, then distribute across instances. Serialized
+    // per app via the build lock so concurrent scale/deploy ops can't interleave.
     tokio::spawn(async move {
         let lock = state.build_locks.acquire(&id).await;
         let _guard = lock.lock().await;
@@ -126,11 +129,13 @@ pub(super) async fn scale_app(
 /// `GET /apps/{id}/instances` — list all instances with server, status, port.
 pub(super) async fn list_instances(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Read-only — get_app_for_team scopes to the caller's team (viewer).
     state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
 
@@ -145,19 +150,21 @@ pub(super) struct LbConfigRequest {
     sticky_sessions: Option<bool>,
 }
 
-/// `PUT /apps/{id}/lb-config` — update load balancing policy, health check
-/// path, and sticky-session setting. Also re-applies the Caddy route so the
-/// change takes effect immediately for a running multi-instance app.
+/// `PUT /apps/{id}/lb-config` — update LB policy, health check path, and sticky-session
+/// setting. Re-applies the Caddy route so the change takes effect immediately.
 pub(super) async fn update_lb_config(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<LbConfigRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state
+    // App must belong to the caller's team, member role to mutate.
+    let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     if let Some(ref policy) = body.policy {
         if !VALID_LB_POLICIES.contains(&policy.as_str()) {
@@ -205,8 +212,17 @@ pub(super) async fn update_lb_config(
 /// `DELETE /apps/{id}/instances/{instance_id}` — remove one instance.
 pub(super) async fn delete_instance(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((id, instance_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Destructive — parent app must belong to the caller's team, admin role.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Admin)?;
+
     let instance = state
         .db
         .get_app_instance(&instance_id)

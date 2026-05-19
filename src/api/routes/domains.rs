@@ -4,6 +4,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::utils::{detect_server_ip, resolve_domain};
 use crate::api::AppState;
 use crate::db::models::NewDomain;
@@ -24,17 +25,34 @@ pub fn routes() -> Router<AppState> {
 
 async fn list_domains(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Read-only — the app must belong to the caller's team (viewer).
+    state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+
     let domains = state.db.list_domains(&id).await?;
     Ok(Json(serde_json::json!({ "data": domains })))
 }
 
 async fn add_domain(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<AddDomainRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     let domain_name = body.domain.trim().to_lowercase();
     if domain_name.is_empty() {
         return Err(ApiError::BadRequest("domain name is required".into()));
@@ -72,8 +90,17 @@ async fn add_domain(
 
 async fn remove_domain(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((app_id, domain_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Parent app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     let domains = state.db.list_domains(&app_id).await?;
     let domain = domains
         .iter()
@@ -88,8 +115,17 @@ async fn remove_domain(
 
 async fn verify_domain(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((app_id, domain_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Parent app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     let domains = state.db.list_domains(&app_id).await?;
     let domain = domains
         .iter()

@@ -4,6 +4,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::NewEnvVar;
 
@@ -54,9 +55,17 @@ struct EnvVarResponse {
 
 async fn list_env_vars(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Read-only — the app must belong to the caller's team (viewer).
+    state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+
     let envs = state.db.list_environments(&id).await?;
     let env = envs
         .first()
@@ -85,9 +94,18 @@ async fn list_env_vars(
 
 async fn set_env_var(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<SetEnvVarRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     validate_key(&body.key)?;
     validate_scope(&body.scope)?;
 
@@ -117,8 +135,37 @@ async fn set_env_var(
 
 async fn delete_env_var(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((id, var_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The parent app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
+    // The env var must actually belong to one of this app's environments —
+    // otherwise a caller could delete another app's var.
+    let envs = state.db.list_environments(&id).await?;
+    let mut belongs = false;
+    for env in &envs {
+        if state
+            .db
+            .get_env_vars(&env.id)
+            .await?
+            .iter()
+            .any(|v| v.id == var_id)
+        {
+            belongs = true;
+            break;
+        }
+    }
+    if !belongs {
+        return Err(ApiError::NotFound(format!("env var '{var_id}' not found")));
+    }
+
     state.db.delete_env_var(&var_id).await?;
     restart_app_containers(&state, &id).await;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
@@ -126,9 +173,18 @@ async fn delete_env_var(
 
 async fn import_dotenv(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<ImportEnvRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     validate_scope(&body.scope)?;
 
     let envs = state.db.list_environments(&id).await?;
@@ -171,8 +227,16 @@ async fn import_dotenv(
 
 async fn resolved_env_vars(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Read-only — the app must belong to the caller's team (viewer).
+    state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+
     let envs = state.db.list_environments(&id).await?;
     let env = envs
         .first()

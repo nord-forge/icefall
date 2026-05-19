@@ -31,16 +31,17 @@ pub(super) async fn get_enabled_providers(
     })))
 }
 
-/// DELETE /api/v1/auth/oauth/{provider}/unlink
-/// Unlinks an OAuth provider from the authenticated user.
+/// DELETE /api/v1/auth/oauth/{provider}/unlink — unlinks an OAuth provider. Unlinking
+/// the last provider requires a `password` in the body to prove the user can still log in.
 pub(super) async fn oauth_unlink(
     State(state): State<AppState>,
     Path(provider): Path<String>,
     headers: HeaderMap,
+    body: Option<Json<UnlinkBody>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let identities = state.db.list_oauth_identities_for_user(&user.id).await?;
 
@@ -51,15 +52,22 @@ pub(super) async fn oauth_unlink(
             ApiError::NotFound(format!("No {provider} identity linked to your account"))
         })?;
 
-    // Ensure the user has another auth method (another OAuth provider linked).
-    // Note: we can't easily tell if the user set their own password (OAuth-created
-    // accounts have a random hash), so we only check for other OAuth providers.
     let other_providers = identities.iter().filter(|i| i.provider != provider).count();
 
     if other_providers == 0 {
-        return Err(ApiError::BadRequest(
-            "Cannot unlink the only authentication method. Link another provider first.".into(),
-        ));
+        // Last OAuth provider: require password confirmation to prove the
+        // user has another way to log in.
+        let password = body.and_then(|b| b.password.clone()).ok_or_else(|| {
+            ApiError::BadRequest(
+                "This is your only linked provider. Supply your password to confirm \
+                     you can still log in: { \"password\": \"...\" }"
+                    .into(),
+            )
+        })?;
+
+        if !verify_password(&password, &user.password_hash) {
+            return Err(ApiError::BadRequest("Incorrect password".into()));
+        }
     }
 
     state.db.delete_oauth_identity(&identity.id).await?;
@@ -67,6 +75,21 @@ pub(super) async fn oauth_unlink(
     Ok(Json(serde_json::json!({
         "message": format!("{provider} has been unlinked from your account")
     })))
+}
+
+fn verify_password(password: &str, hash: &str) -> bool {
+    use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
+    let Ok(parsed) = PasswordHash::new(hash) else {
+        return false;
+    };
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed)
+        .is_ok()
+}
+
+#[derive(Deserialize)]
+pub(super) struct UnlinkBody {
+    password: Option<String>,
 }
 
 /// GET /api/v1/auth/oauth/identities
@@ -77,7 +100,7 @@ pub(super) async fn list_oauth_identities(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let identities = state.db.list_oauth_identities_for_user(&user.id).await?;
 
@@ -104,7 +127,7 @@ pub(super) async fn get_oauth_settings(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));
@@ -164,7 +187,7 @@ pub(super) async fn update_oauth_settings(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if user.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));

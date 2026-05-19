@@ -214,9 +214,8 @@ impl AgentRegistry {
     }
 
     pub async fn cancel_pending_for(&self, _server_id: &str) {
-        // Drop all pending senders — callers will get RecvError
-        // In a more sophisticated version, we'd track which requests belong to which server
-        // For now, this is acceptable since each request has a timeout
+        // Pending senders are left to expire via their per-request timeout;
+        // per-server request tracking is not implemented.
     }
 
     pub async fn stale_servers(&self, threshold: Duration) -> Vec<(String, String)> {

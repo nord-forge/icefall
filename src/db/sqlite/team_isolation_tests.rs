@@ -58,39 +58,34 @@ mod team_isolation {
         let team_x = create_team_for_user(&db, "Team X", &user_a).await;
         let team_y = create_team_for_user(&db, "Team Y", &user_b).await;
 
-        let app_x = db
-            .create_app(&NewApp {
-                name: "app-x".to_string(),
-                git_repo: None,
-                git_branch: "main".to_string(),
-                framework: None,
-                image_ref: None,
-                compose_content: None,
-                deploy_mode: None,
-                server_id: None,
-            })
-            .await
-            .expect("create app for team X");
-        db.set_app_team(&app_x.id, &team_x.id)
-            .await
-            .expect("assign app to team X");
+        // Apps are team-scoped at creation (team_id is required).
+        db.create_app(&NewApp {
+            name: "app-x".to_string(),
+            team_id: team_x.id.clone(),
+            git_repo: None,
+            git_branch: "main".to_string(),
+            framework: None,
+            image_ref: None,
+            compose_content: None,
+            deploy_mode: None,
+            server_id: None,
+        })
+        .await
+        .expect("create app for team X");
 
-        let app_y = db
-            .create_app(&NewApp {
-                name: "app-y".to_string(),
-                git_repo: None,
-                git_branch: "main".to_string(),
-                framework: None,
-                image_ref: None,
-                compose_content: None,
-                deploy_mode: None,
-                server_id: None,
-            })
-            .await
-            .expect("create app for team Y");
-        db.set_app_team(&app_y.id, &team_y.id)
-            .await
-            .expect("assign app to team Y");
+        db.create_app(&NewApp {
+            name: "app-y".to_string(),
+            team_id: team_y.id.clone(),
+            git_repo: None,
+            git_branch: "main".to_string(),
+            framework: None,
+            image_ref: None,
+            compose_content: None,
+            deploy_mode: None,
+            server_id: None,
+        })
+        .await
+        .expect("create app for team Y");
 
         let apps_x = db
             .list_apps_by_team(&team_x.id)
@@ -229,20 +224,19 @@ mod team_isolation {
         let owner = create_user(&db, "owner@example.com").await;
         let team = create_team_for_user(&db, "Team", &owner).await;
 
-        let app = db
-            .create_app(&NewApp {
-                name: "my-app".to_string(),
-                git_repo: None,
-                git_branch: "main".to_string(),
-                framework: None,
-                image_ref: None,
-                compose_content: None,
-                deploy_mode: None,
-                server_id: None,
-            })
-            .await
-            .expect("create app");
-        db.set_app_team(&app.id, &team.id).await.expect("assign");
+        db.create_app(&NewApp {
+            name: "my-app".to_string(),
+            team_id: team.id.clone(),
+            git_repo: None,
+            git_branch: "main".to_string(),
+            framework: None,
+            image_ref: None,
+            compose_content: None,
+            deploy_mode: None,
+            server_id: None,
+        })
+        .await
+        .expect("create app");
 
         let count = db.count_team_resources(&team.id).await.expect("count");
         assert_eq!(count, 1);

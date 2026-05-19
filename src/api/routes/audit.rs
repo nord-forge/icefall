@@ -28,7 +28,7 @@ async fn list_all_audit_logs(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
         return Err(ApiError::Forbidden("Admin access required".into()));
     }
@@ -51,7 +51,7 @@ async fn list_server_audit_logs(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
         return Err(ApiError::Forbidden("Admin access required".into()));
     }

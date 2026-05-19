@@ -85,15 +85,14 @@
   border: 1px solid var(--color-border);
 }
 
+/* a11y [1.4.11]: white quiet-zone keeps the QR scannable in either theme */
 .qrSvg {
   max-width: 220px;
   width: 100%;
   height: auto;
-}
-
-/* a11y [1.4.11]: ensure QR code is visible in both themes */
-.qrSvg :global(rect[fill="#ffffff"]) {
-  fill: var(--color-surface);
+  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 8px;
 }
 
 .secretKey {

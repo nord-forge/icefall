@@ -25,10 +25,8 @@ pub fn container_socket() -> String {
 }
 
 pub fn detect_socket() -> String {
-    // Probe order: rootless Podman first (per-user socket), then rootful
-    // Podman, then Docker. Rootless Podman exposes its API under the user's
-    // runtime directory — missing this makes the daemon fall back to a Docker
-    // socket that does not exist on a rootless host.
+    // Probe rootless Podman (per-user socket) before rootful Podman and Docker;
+    // missing it makes a rootless host fall back to a non-existent Docker socket.
     for path in rootless_podman_socket_paths() {
         if std::path::Path::new(&path).exists() {
             return path;
@@ -48,12 +46,8 @@ pub fn detect_socket() -> String {
     "/var/run/docker.sock".to_string()
 }
 
-/// Candidate rootless Podman socket paths, most specific first.
-///
-/// Rootless Podman places its API socket under the per-user runtime directory.
-/// `XDG_RUNTIME_DIR` is set in every systemd user session (`/run/user/<uid>`),
-/// which is the canonical location; an explicit `ICEFALL_CONTAINER_SOCKET`
-/// override covers any non-standard setup.
+/// Candidate rootless Podman socket paths, derived from `XDG_RUNTIME_DIR`
+/// (set in every systemd user session); non-standard setups use the override.
 fn rootless_podman_socket_paths() -> Vec<String> {
     let mut paths = Vec::new();
     if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {

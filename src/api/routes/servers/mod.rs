@@ -40,7 +40,7 @@ pub fn routes() -> Router<AppState> {
 pub(crate) async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     let user = authenticate_from_headers(state, headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if user.role != "admin" {
         return Err(ApiError::Forbidden("Admin access required".into()));
     }

@@ -1,13 +1,17 @@
 import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
-import node from '@astrojs/node';
 import path from 'path';
 
+// Fully static build: every page (including the [id]/[token]/[...path]
+// dynamic routes) is prerendered to plain HTML. The Rust server serves
+// dist/ directly via ServeDir and SPA-falls-back dynamic paths to the
+// matching prerendered shell. No Node/SSR adapter is needed — the dynamic
+// pages are shells around client:only Preact islands that read their route
+// param from window.location.
 export default defineConfig({
   integrations: [preact()],
   devToolbar: { enabled: false },
   output: 'static',
-  adapter: node({ mode: 'standalone' }),
   server: { port: 4321 },
   prefetch: {
     prefetchAll: false,

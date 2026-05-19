@@ -105,25 +105,28 @@ async fn create_admin(
     State(state): State<AppState>,
     Json(body): Json<CreateAdminRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let users = state.db.list_users().await?;
-    if !users.is_empty() {
-        return Err(ApiError::BadRequest("Admin already exists".into()));
-    }
-    if body.password.len() < 8 {
+    // 12-char minimum — matches auth.rs setup_admin (audit M11; onboarding
+    // previously allowed weaker 8-char admin passwords).
+    if body.password.len() < 12 {
         return Err(ApiError::BadRequest(
-            "Password must be at least 8 characters".into(),
+            "Password must be at least 12 characters".into(),
         ));
     }
 
     let password_hash = hash_password(&body.password)?;
+    // Atomic guard against a setup race (audit H8).
     let user = state
         .db
-        .create_user(&NewUser {
+        .create_first_admin(&NewUser {
             email: body.email.clone(),
             password_hash,
             role: "admin".to_string(),
         })
-        .await?;
+        .await
+        .map_err(|e| match e {
+            crate::db::DbError::Duplicate(_) => ApiError::Conflict("Admin already exists".into()),
+            other => other.into(),
+        })?;
 
     let expires_at = (chrono::Utc::now() + chrono::Duration::days(7))
         .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -248,12 +251,16 @@ struct CreateFirstAppRequest {
 
 async fn create_first_app(
     State(state): State<AppState>,
+    ctx: crate::api::team_auth::TeamCtx,
     Json(body): Json<CreateFirstAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The onboarding step runs as the freshly-created admin (session from
+    // /onboarding/admin); the first app is created in that admin's personal team.
     let app = state
         .db
         .create_app(&crate::db::models::NewApp {
             name: body.name,
+            team_id: ctx.team_id.clone(),
             git_repo: body.git_repo,
             git_branch: body.git_branch.unwrap_or_else(|| "main".into()),
             framework: None,

@@ -47,3 +47,29 @@ pub enum DeployError {
     #[error("envelope encryption failed: {0}")]
     EnvelopeEncrypt(String),
 }
+
+/// Retry a fallible deploy-state write up to three times, logging each failure.
+/// Used for DB updates whose loss would desync the recorded deploy state from
+/// reality (breaking rollbacks and health monitoring) — never swallow them.
+pub async fn retry_state_write<F, Fut, T, E>(what: &str, mut op: F) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+    E: std::fmt::Display,
+{
+    let mut last_err = None;
+    for attempt in 1..=3u32 {
+        match op().await {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                tracing::warn!(operation = what, attempt, error = %e, "deploy-state write failed");
+                last_err = Some(e);
+                if attempt < 3 {
+                    tokio::time::sleep(std::time::Duration::from_millis(200 * attempt as u64))
+                        .await;
+                }
+            }
+        }
+    }
+    Err(last_err.expect("loop runs at least once"))
+}

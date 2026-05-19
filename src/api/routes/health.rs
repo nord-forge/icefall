@@ -89,7 +89,6 @@ async fn update_health(
             .await?;
         Ok(Json(serde_json::json!({ "data": check })))
     } else {
-        // Update existing health check
         let check = &checks[0];
         state
             .db
@@ -119,7 +118,7 @@ async fn delete_health_check(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     state.db.delete_health_check(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))

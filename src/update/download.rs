@@ -28,9 +28,8 @@ impl UpdateDownloader {
         }
     }
 
-    /// Download the update artifact with progress callback.
-    ///
-    /// Returns the path to the downloaded file on success.
+    /// Download the update artifact with progress callback. Returns the path to
+    /// the downloaded file on success.
     pub async fn download(
         &self,
         artifact: &ReleaseArtifact,
@@ -107,9 +106,7 @@ impl UpdateDownloader {
         Ok(final_path)
     }
 
-    /// Extract a downloaded tarball and validate the binary.
-    ///
-    /// Returns the path to the extracted binary.
+    /// Extract a downloaded tarball and validate the binary, returning its path.
     pub async fn extract_and_validate(
         &self,
         tarball_path: &Path,
@@ -189,10 +186,8 @@ impl UpdateDownloader {
     }
 }
 
-/// Check available disk space at the given path.
-///
-/// Uses `sysinfo` / `std::fs::metadata` fallback. On failure, returns u64::MAX
-/// to avoid blocking updates when we can't determine space.
+/// Check available disk space at the given path. Returns u64::MAX on failure
+/// so an undeterminable space figure doesn't block updates.
 fn check_available_disk_space(path: &Path) -> Result<u64, UpdateError> {
     use sysinfo::Disks;
 

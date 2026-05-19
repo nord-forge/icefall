@@ -242,7 +242,8 @@ import '../styles/global.css';
     </div>
 
   <script is:inline>
-    let pendingUserId = null;
+    // Single-use 2FA challenge token from the login step (never a user_id).
+    let pendingChallenge = null;
 
     // Redirect to onboarding if setup is incomplete
     fetch('/api/v1/onboarding/status', { credentials: 'same-origin' })
@@ -252,8 +253,19 @@ import '../styles/global.css';
       })
       .catch(function() {});
 
-    // Check for OAuth error in URL
     const urlParams = new URLSearchParams(window.location.search);
+
+    // OAuth login for a 2FA-enabled account redirects here with a challenge
+    // token — show the TOTP step directly.
+    if (urlParams.get('requires_2fa') === 'true' && urlParams.get('challenge')) {
+      pendingChallenge = urlParams.get('challenge');
+      document.getElementById('credentials-step').style.display = 'none';
+      document.getElementById('totp-step').style.display = 'flex';
+      window.history.replaceState({}, '', '/login');
+      setTimeout(function () { document.getElementById('totp-code').focus(); }, 0);
+    }
+
+    // Check for OAuth error in URL
     const oauthError = urlParams.get('error');
     if (oauthError) {
       const errEl = document.getElementById('error');
@@ -304,14 +316,14 @@ import '../styles/global.css';
         });
         const data = await res.json();
         if (!res.ok) {
-          errEl.textContent = data.error || 'Login failed';
+          errEl.textContent = data.message || data.error || 'Login failed';
           errEl.style.display = 'block';
           return;
         }
 
         // Check if 2FA is required
-        if (data.requires_2fa && data.user_id) {
-          pendingUserId = data.user_id;
+        if (data.requires_2fa && data.challenge) {
+          pendingChallenge = data.challenge;
           document.getElementById('credentials-step').style.display = 'none';
           document.getElementById('totp-step').style.display = 'flex';
           document.getElementById('totp-code').focus();
@@ -341,11 +353,11 @@ import '../styles/global.css';
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: pendingUserId, code }),
+          body: JSON.stringify({ challenge: pendingChallenge, code }),
         });
         const data = await res.json();
         if (!res.ok) {
-          errEl.textContent = data.error || 'Invalid code';
+          errEl.textContent = data.message || data.error || 'Invalid code';
           errEl.style.display = 'block';
           return;
         }
@@ -357,7 +369,7 @@ import '../styles/global.css';
     });
 
     document.getElementById('totp-back').addEventListener('click', () => {
-      pendingUserId = null;
+      pendingChallenge = null;
       document.getElementById('totp-step').style.display = 'none';
       document.getElementById('credentials-step').style.display = 'flex';
       document.getElementById('totp-code').value = '';

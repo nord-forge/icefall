@@ -10,12 +10,13 @@ strip = true
 [workspace.dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 
 # HTTP framework
 axum = { version = "0.8", features = ["macros", "ws"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "util", "fs"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "util", "fs", "set-header"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
@@ -35,6 +36,7 @@ bollard = "0.21"
 
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+url = "2"
 
 # Email
 lettre = { version = "0.11.22", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
@@ -116,6 +118,7 @@ icefall-common = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tokio-stream = { workspace = true }
 
 # HTTP framework
@@ -141,6 +144,7 @@ bollard = { workspace = true }
 
 # HTTP client (for Caddy admin API)
 reqwest = { workspace = true }
+url = { workspace = true }
 
 # Email
 lettre = { workspace = true }

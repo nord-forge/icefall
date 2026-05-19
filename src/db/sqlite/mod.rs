@@ -650,6 +650,17 @@ impl Database for SqliteDatabase {
         users::create_user(&self.pool, user).await
     }
 
+    async fn create_first_admin(&self, user: &NewUser) -> Result<User, DbError> {
+        users::create_first_admin(&self.pool, user).await
+    }
+
+    async fn create_user_with_personal_team(
+        &self,
+        user: &NewUser,
+    ) -> Result<(User, Team), DbError> {
+        users::create_user_with_personal_team(&self.pool, user).await
+    }
+
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError> {
         users::get_user_by_email(&self.pool, email).await
     }
@@ -1471,6 +1482,18 @@ impl Database for SqliteDatabase {
 
     async fn list_api_tokens_by_team(&self, team_id: &str) -> Result<Vec<ApiToken>, DbError> {
         team_scoping::list_api_tokens_by_team(&self.pool, team_id).await
+    }
+
+    async fn get_app_for_team(&self, team_id: &str, app_id: &str) -> Result<Option<App>, DbError> {
+        team_scoping::get_app_for_team(&self.pool, team_id, app_id).await
+    }
+
+    async fn get_managed_db_for_team(
+        &self,
+        team_id: &str,
+        db_id: &str,
+    ) -> Result<Option<ManagedDatabase>, DbError> {
+        team_scoping::get_managed_db_for_team(&self.pool, &self.encryptor, team_id, db_id).await
     }
 
     async fn set_app_team(&self, app_id: &str, team_id: &str) -> Result<(), DbError> {

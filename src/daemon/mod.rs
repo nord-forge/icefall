@@ -58,6 +58,12 @@ impl DaemonRunner {
 
         info!("Starting Icefall daemon v{}", env!("CARGO_PKG_VERSION"));
 
+        // Cancellation token + tracker for daemon-owned background loops, so
+        // SIGTERM lets them finish their current iteration instead of being
+        // killed mid-write.
+        let shutdown = tokio_util::sync::CancellationToken::new();
+        let tracker = tokio_util::task::TaskTracker::new();
+
         // Validate config
         config.validate()?;
 
@@ -184,11 +190,15 @@ impl DaemonRunner {
         // Daily database cleanup (runs all pruning jobs)
         {
             let db_clone = db.clone();
-            tokio::spawn(async move {
+            let cleanup_shutdown = shutdown.clone();
+            tracker.spawn(async move {
                 let mut interval =
                     tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
                 loop {
-                    interval.tick().await;
+                    tokio::select! {
+                        () = cleanup_shutdown.cancelled() => break,
+                        _ = interval.tick() => {}
+                    }
                     let now = chrono::Utc::now();
                     let cutoff_90d = (now - chrono::Duration::days(90))
                         .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -232,11 +242,15 @@ impl DaemonRunner {
         // Daily cleanup of old rollback binaries (7-day retention)
         {
             let data_dir = config.data_dir.clone();
-            tokio::spawn(async move {
+            let rollback_shutdown = shutdown.clone();
+            tracker.spawn(async move {
                 let mut interval =
                     tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
                 loop {
-                    interval.tick().await;
+                    tokio::select! {
+                        () = rollback_shutdown.cancelled() => break,
+                        _ = interval.tick() => {}
+                    }
                     let rb = crate::update::rollback::UpdateRollback::new(&data_dir);
                     if let Err(e) = rb.cleanup_old_rollbacks(7) {
                         warn!(error = %e, "rollback cleanup failed");
@@ -319,6 +333,15 @@ impl DaemonRunner {
 
         if systemd::is_systemd_managed() {
             systemd::notify_stopping();
+        }
+
+        // Cancel daemon-owned background loops and wait for them to finish
+        // their current iteration before exiting.
+        shutdown.cancel();
+        tracker.close();
+        match tokio::time::timeout(std::time::Duration::from_secs(10), tracker.wait()).await {
+            Ok(()) => info!("Background tasks stopped cleanly"),
+            Err(_) => warn!("Background tasks did not stop within 10s"),
         }
 
         info!("Daemon stopped");

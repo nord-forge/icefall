@@ -127,14 +127,9 @@ impl RemoteExecutor {
 
     // --- Image transfer ---
 
-    /// Transfer a built image to the remote server and load it into the remote
-    /// Docker daemon.
-    ///
-    /// The raw `docker save` tar (`image_tar`) is gzip-compressed, split into
-    /// `chunk_size`-byte chunks, and streamed as binary WebSocket frames. Each
-    /// chunk carries a SHA-256 the agent verifies; a failed chunk is retried
-    /// individually. The whole transfer is retried up to `MAX_TRANSFER_ATTEMPTS`
-    /// times on a fatal error.
+    /// Transfer a built image to the remote server and load it. The tar is
+    /// gzip-compressed, split into chunks, and streamed as binary WS frames; each
+    /// chunk carries a verified SHA-256 and is retried individually on failure.
     pub async fn load_image(
         &self,
         image_tar: &[u8],

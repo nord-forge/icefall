@@ -12,16 +12,9 @@ use crate::events::EventType;
 use super::{DeployManager, ResourceLimits};
 
 impl DeployManager {
-    /// Deploy an app across multiple servers to satisfy `app.desired_instances`.
-    ///
-    /// This reconciles current state to desired state: every pre-existing
-    /// instance is torn down and replaced with `desired_instances` fresh
-    /// containers running the newly built image. Instances are distributed
-    /// round-robin across online servers (more instances than servers is
-    /// allowed — each gets its own host port). New instances are started one
-    /// at a time (rolling); old instances are only torn down after the new
-    /// ones are healthy, so traffic keeps flowing. Caddy's upstream list is
-    /// rebuilt from the final running set.
+    /// Deploy an app across multiple servers to satisfy `app.desired_instances`,
+    /// reconciling current to desired state. New instances are started one at a
+    /// time (rolling) and old ones torn down only once the new ones are healthy.
     pub async fn deploy_instances(
         &self,
         deploy: &Deploy,
@@ -183,10 +176,9 @@ impl DeployManager {
         Ok(())
     }
 
-    /// Choose which servers to place `desired` instances on. The app's primary
-    /// server is preferred first; remaining slots are filled round-robin across
-    /// all online servers (ordered by free capacity), so `desired` may exceed
-    /// the server count — a server can host multiple instances.
+    /// Choose servers for `desired` instances: the app's primary server first,
+    /// then round-robin across online servers by free capacity. `desired` may
+    /// exceed the server count — a server can host multiple instances.
     async fn select_instance_targets(
         &self,
         app: &App,
@@ -486,14 +478,9 @@ impl DeployManager {
         Ok(())
     }
 
-    /// Reconcile a multi-instance app back up to `desired_instances` after one
-    /// or more instances have failed.
-    ///
-    /// Failed instance rows (and any leftover containers) are removed, then the
-    /// shortfall is filled with new instances running the image from the app's
-    /// most recent successful deploy — no rebuild needed, the image already
-    /// exists. Caddy is rebuilt from the resulting running set. Used by the
-    /// instance health runner.
+    /// Reconcile a multi-instance app back up to `desired_instances` after
+    /// failures: remove failed instances, then fill the shortfall with the image
+    /// from the latest successful deploy (no rebuild) and rebuild Caddy.
     pub async fn replace_failed_instances(
         &self,
         app: &App,

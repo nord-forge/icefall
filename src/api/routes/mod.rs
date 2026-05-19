@@ -38,6 +38,7 @@ pub mod shared_variables;
 pub mod teams;
 pub mod terminal;
 pub mod two_factor;
+pub mod two_factor_challenge;
 pub mod update;
 pub mod users;
 pub mod volumes;

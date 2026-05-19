@@ -1,10 +1,6 @@
-//! Runtime quirk detection.
-//!
-//! Icefall talks to either Docker or Podman through the same `bollard` Unix
-//! socket API. They are *mostly* compatible, but a handful of behaviors differ
-//! — especially under rootless Podman. `RuntimeQuirks` captures those
-//! differences as data, resolved once when the client connects, so the rest of
-//! the code branches on a value instead of hardcoding Docker assumptions.
+//! Runtime quirk detection. Docker and Podman share the `bollard` socket API
+//! but differ in behavior (especially rootless Podman); `RuntimeQuirks` captures
+//! those differences as data resolved once at connect time.
 
 use crate::config::ContainerRuntime;
 
@@ -53,12 +49,8 @@ impl RuntimeQuirks {
         }
     }
 
-    /// Resolve quirks from the socket path and the runtime's `info` response.
-    ///
-    /// `socket_path` is a strong signal for rootless (the socket then lives
-    /// under a per-user runtime directory). `security_options` from `docker
-    /// info` / `podman info` carries an explicit `name=rootless` entry on
-    /// rootless Podman, which confirms it.
+    /// Resolve quirks from the socket path (a per-user runtime dir signals
+    /// rootless) and `security_options` (a `name=rootless` entry confirms it).
     pub fn detect(
         runtime: ContainerRuntime,
         socket_path: &str,

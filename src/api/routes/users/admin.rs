@@ -15,10 +15,10 @@ pub(super) async fn list_users(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if caller.role != "admin" {
-        return Err(ApiError::BadRequest("Admin access required".into()));
+        return Err(ApiError::Forbidden("Admin access required".into()));
     }
 
     let users = state.db.list_users().await?;
@@ -53,9 +53,9 @@ pub(super) async fn change_role(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
-        return Err(ApiError::BadRequest("Admin access required".into()));
+        return Err(ApiError::Forbidden("Admin access required".into()));
     }
     if !["admin", "deployer", "viewer"].contains(&body.role.as_str()) {
         return Err(ApiError::BadRequest("Invalid role".into()));
@@ -73,9 +73,9 @@ pub(super) async fn deactivate_user(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
-        return Err(ApiError::BadRequest("Admin access required".into()));
+        return Err(ApiError::Forbidden("Admin access required".into()));
     }
     if caller.id == id {
         return Err(ApiError::BadRequest(
@@ -116,9 +116,9 @@ pub(super) async fn reset_password(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
-        return Err(ApiError::BadRequest("Admin access required".into()));
+        return Err(ApiError::Forbidden("Admin access required".into()));
     }
 
     let target = state
@@ -150,9 +150,9 @@ pub(super) async fn admin_reset_2fa(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
-        return Err(ApiError::BadRequest("Admin access required".into()));
+        return Err(ApiError::Forbidden("Admin access required".into()));
     }
 
     let target = state

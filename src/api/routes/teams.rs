@@ -53,7 +53,7 @@ async fn list_teams(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let teams = state.db.list_teams_for_user(&user.id).await?;
     Ok(Json(serde_json::json!({ "data": teams })))
@@ -71,7 +71,7 @@ async fn create_team(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let name = body.name.trim().to_string();
     if name.is_empty() {
@@ -110,7 +110,7 @@ async fn get_team(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let team = state
         .db
@@ -149,7 +149,7 @@ async fn update_team(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state
         .db
@@ -158,7 +158,7 @@ async fn update_team(
         .ok_or_else(|| ApiError::NotFound("Team not found".into()))?;
 
     if membership.role != "owner" && membership.role != "admin" {
-        return Err(ApiError::BadRequest(
+        return Err(ApiError::Forbidden(
             "Only team owners and admins can update the team".into(),
         ));
     }
@@ -187,7 +187,7 @@ async fn delete_team(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let team = state
         .db
@@ -196,7 +196,7 @@ async fn delete_team(
         .ok_or_else(|| ApiError::NotFound("Team not found".into()))?;
 
     if team.owner_id != user.id {
-        return Err(ApiError::BadRequest(
+        return Err(ApiError::Forbidden(
             "Only the team owner can delete the team".into(),
         ));
     }
@@ -219,7 +219,7 @@ async fn switch_team(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state
         .db
@@ -250,7 +250,7 @@ async fn list_members(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state.db.get_team_membership(&id, &user.id).await?;
     if membership.is_none() {
@@ -274,7 +274,7 @@ async fn update_member_role(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state
         .db
@@ -323,7 +323,7 @@ async fn remove_member(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state
         .db
@@ -370,7 +370,7 @@ async fn invite_member(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state
         .db
@@ -420,7 +420,7 @@ async fn list_invitations(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let membership = state
         .db
@@ -445,7 +445,7 @@ async fn accept_invitation(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let invitation = state
         .db
@@ -505,7 +505,7 @@ async fn decline_invitation(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let invitation = state
         .db
@@ -522,14 +522,27 @@ async fn decline_invitation(
 
 // --- Server sharing endpoints ---
 
+/// Servers are global infrastructure (no per-server owner column), so granting or
+/// revoking a team's access to a server is an administrator-only action.
+fn require_global_admin(user: &crate::db::models::User) -> Result<(), ApiError> {
+    if user.role == "admin" {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden(
+            "Only an administrator can manage server sharing".into(),
+        ))
+    }
+}
+
 async fn list_server_shares(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(server_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+    require_global_admin(&user)?;
 
     let shares = state.db.list_server_shares(&server_id).await?;
     Ok(Json(serde_json::json!({ "data": shares })))
@@ -549,7 +562,8 @@ async fn share_server(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+    require_global_admin(&user)?;
 
     let valid_levels = ["deploy", "read-only"];
     if !valid_levels.contains(&body.access_level.as_str()) {
@@ -571,9 +585,10 @@ async fn revoke_share(
     headers: HeaderMap,
     Path((server_id, team_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    authenticate_from_headers(&state, &headers)
+    let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+    require_global_admin(&user)?;
 
     state.db.revoke_server_share(&server_id, &team_id).await?;
     Ok(Json(serde_json::json!({ "message": "Share revoked" })))

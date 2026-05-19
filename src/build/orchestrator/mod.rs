@@ -48,7 +48,6 @@ impl BuildOrchestrator {
             .update_deploy_status(deploy_id, "building", None)
             .await?;
 
-        // Collect secrets for redaction
         let secrets = self.collect_secrets(deploy_id).await;
 
         // Step 1: Clone
@@ -60,7 +59,7 @@ impl BuildOrchestrator {
             .as_deref()
             .ok_or_else(|| BuildError::GitClone("app has no git_repo configured".to_string()))?;
 
-        // Try to obtain a GitHub installation access token for cloning private repos
+        // Obtain a GitHub installation access token for cloning private repos
         let github_token = self.resolve_github_token(git_repo).await;
 
         let clone_opts = GitCloneOptions {
@@ -382,13 +381,9 @@ impl BuildOrchestrator {
             .await;
     }
 
-    /// Attempt to resolve a GitHub installation access token for the given repo URL.
-    ///
-    /// Searches all GitHub installations, finds one whose app matches,
-    /// generates a JWT, and exchanges it for an installation token.
-    /// Returns None if no matching installation is found or if token generation fails.
+    /// Resolve a GitHub installation access token for the given repo URL.
+    /// Returns None if no matching installation is found or token generation fails.
     async fn resolve_github_token(&self, repo_url: &str) -> Option<String> {
-        // Only attempt for GitHub-hosted repos
         if !repo_url.contains("github.com") {
             return None;
         }
@@ -396,7 +391,6 @@ impl BuildOrchestrator {
         let installations = self.db.list_github_installations().await.ok()?;
 
         for installation in &installations {
-            // Try to find a GitHub App linked to this installation
             let app = match self
                 .db
                 .get_github_app_for_installation(installation.installation_id)
@@ -406,7 +400,6 @@ impl BuildOrchestrator {
                 _ => continue,
             };
 
-            // Generate JWT and get installation token
             let jwt = match crate::github::auth::generate_jwt(app.app_id, &app.private_key) {
                 Ok(jwt) => jwt,
                 Err(e) => {

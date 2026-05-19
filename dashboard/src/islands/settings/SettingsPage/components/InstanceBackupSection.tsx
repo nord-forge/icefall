@@ -3,6 +3,7 @@ import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Save, HardDrive, Play, CheckCircle, XCircle, Clock } from 'lucide-preact';
+import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -53,7 +54,7 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
   const [ibTriggering, setIbTriggering] = useState(false);
 
   useEffect(() => {
-    fetch('/api/v1/settings/instance-backup', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    api.getInstanceBackupConfig().then(d => {
       if (d.data) {
         setIbEnabled(d.data.enabled);
         setIbSchedule(d.data.cron_schedule || 'daily');
@@ -61,7 +62,7 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
       }
     }).catch(() => {});
 
-    fetch('/api/v1/settings/instance-backup/history', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    api.listInstanceBackupHistory().then(d => {
       setIbHistory(d.data || []);
     }).catch(() => {});
   }, []);
@@ -69,13 +70,11 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
   async function saveConfig() {
     setIbSaving(true);
     try {
-      const res = await fetch('/api/v1/settings/instance-backup', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ enabled: ibEnabled, cron_schedule: ibSchedule, retention_count: ibRetention }),
+      const d = await api.updateInstanceBackupConfig({
+        enabled: ibEnabled,
+        cron_schedule: ibSchedule,
+        retention_count: ibRetention,
       });
-      const d = await res.json();
       if (d.data) {
         setIbEnabled(d.data.enabled);
         setIbSchedule(d.data.cron_schedule);
@@ -89,15 +88,11 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
   async function triggerBackup() {
     setIbTriggering(true);
     try {
-      await fetch('/api/v1/settings/instance-backup/trigger', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
+      await api.triggerInstanceBackup();
       onSaveMessage('Instance backup triggered');
       setTimeout(async () => {
         try {
-          const res = await fetch('/api/v1/settings/instance-backup/history', { credentials: 'same-origin' });
-          const d = await res.json();
+          const d = await api.listInstanceBackupHistory();
           setIbHistory(d.data || []);
         } catch {}
       }, 2000);

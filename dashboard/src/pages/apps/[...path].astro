@@ -2,7 +2,12 @@
 import DashboardLayout from '../../layouts/DashboardLayout.astro';
 import AppDetailRouter from '@islands/app-detail/AppDetailRouter/AppDetailRouter';
 
-export const prerender = false;
+// Static shell. The AppDetailRouter island reads the app path from
+// window.location at runtime, so no server-side params are needed. The
+// Rust server SPA-falls-back any /apps/* URL to this prerendered page.
+export function getStaticPaths() {
+  return [{ params: { path: '_' } }];
+}
 ---
 
 <DashboardLayout title="App">

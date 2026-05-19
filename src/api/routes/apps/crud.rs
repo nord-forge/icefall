@@ -3,6 +3,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::{NewApp, NewEnvironment, UpdateApp, CONTROL_PLANE_SERVER_ID};
 
@@ -65,13 +66,16 @@ pub(super) struct UpdateAppRequest {
 
 pub(super) async fn list_apps(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Query(query): Query<ListAppsQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let mut apps = if let Some(pid) = &query.project_id {
-        state.db.list_apps_by_project(pid).await?
-    } else {
-        state.db.list_apps().await?
-    };
+    // Scope the listing to the caller's team, then apply the
+    // existing project/tag filters in memory.
+    let mut apps = state.db.list_apps_by_team(&ctx.team_id).await?;
+
+    if let Some(pid) = &query.project_id {
+        apps.retain(|app| app.project_id.as_deref() == Some(pid.as_str()));
+    }
 
     if let Some(tag) = &query.tag {
         let tag = tag.trim().to_lowercase();
@@ -91,8 +95,12 @@ pub(super) async fn list_apps(
 
 pub(super) async fn create_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Json(body): Json<CreateAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Creating an app requires at least member role in the team.
+    ctx.verify_team_access(&ctx.team_id, TeamRole::Member)?;
+
     if body.name.trim().is_empty() {
         return Err(ApiError::BadRequest(
             "App name must not be empty".to_string(),
@@ -136,6 +144,7 @@ pub(super) async fn create_app(
         .db
         .create_app(&NewApp {
             name: body.name.clone(),
+            team_id: ctx.team_id.clone(),
             git_repo: body.git_repo,
             git_branch: body.git_branch.unwrap_or_else(|| "main".into()),
             framework: body.framework,
@@ -175,11 +184,13 @@ pub(super) async fn create_app(
 
 pub(super) async fn get_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Only return the app if it belongs to the caller's team.
     let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     Ok(Json(serde_json::json!({ "data": app })))
@@ -187,9 +198,18 @@ pub(super) async fn get_app(
 
 pub(super) async fn update_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     Json(body): Json<UpdateAppRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team, member role to mutate.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     let app = state
         .db
         .update_app(
@@ -251,8 +271,17 @@ pub(super) async fn update_app(
 
 pub(super) async fn delete_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Destructive delete — app must belong to the caller's team, admin role.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Admin)?;
+
     state.db.delete_app(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }

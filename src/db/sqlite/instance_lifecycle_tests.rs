@@ -1,12 +1,5 @@
-//! QA-264: integration tests for the multi-instance / load-balancing data
-//! lifecycle.
-//!
-//! These exercise the parts of Phase 31 that do not require a live Docker or
-//! Caddy: the `app_instances` data model, scale-up / scale-down state
-//! transitions, per-server instance queries, and the Caddy multi-upstream
-//! config generation. Docker- and Caddy-network-dependent scenarios (real
-//! zero-downtime rolling deploys, live traffic distribution) are out of scope
-//! for unit-level tests and are covered by manual / staging verification.
+//! QA-264: integration tests for the multi-instance / load-balancing data lifecycle.
+//! Covers Docker/Caddy-independent parts only; live scenarios are out of scope.
 
 #[cfg(test)]
 mod instance_lifecycle {
@@ -41,9 +34,25 @@ mod instance_lifecycle {
         SqliteDatabase::new_with_pool(pool, encryptor)
     }
 
+    /// Create a user with a personal team and return that team's id.
+    /// Apps are team-scoped (team_id is NOT NULL), so tests need a real team.
+    async fn create_test_team(db: &SqliteDatabase, email: &str) -> String {
+        let (_user, team) = db
+            .create_user_with_personal_team(&NewUser {
+                email: email.to_string(),
+                password_hash: "$argon2id$test".to_string(),
+                role: "admin".to_string(),
+            })
+            .await
+            .expect("create user with personal team");
+        team.id
+    }
+
     async fn create_test_app(db: &SqliteDatabase, name: &str) -> App {
+        let team_id = create_test_team(db, &format!("{name}@example.com")).await;
         db.create_app(&NewApp {
             name: name.to_string(),
+            team_id,
             git_repo: Some("https://github.com/test/repo".to_string()),
             git_branch: "main".to_string(),
             framework: None,

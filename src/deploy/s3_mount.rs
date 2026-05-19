@@ -136,9 +136,8 @@ fn sidecar_container_name(app_name: &str, index: usize) -> String {
 }
 
 /// Create an rclone sidecar container that FUSE-mounts an S3 bucket into a
-/// shared Docker volume. Returns the container ID of the started sidecar.
-///
-/// The app container should mount the same named volume at `config.target`.
+/// shared Docker volume (the app container mounts the same volume at
+/// `config.target`). Returns the started sidecar's container ID.
 pub async fn create_s3_sidecar(
     docker: &DockerClient,
     app_id: &str,

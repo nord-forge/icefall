@@ -44,10 +44,9 @@ impl DockerClient {
         Ok(response.id)
     }
 
-    /// Verify container-to-container DNS works by creating a throwaway network,
-    /// inspecting its driver, and removing it. Logs a clear remediation hint if
-    /// the runtime cannot resolve container names (e.g. Podman without
-    /// `aardvark-dns`). Best-effort: never fails the caller.
+    /// Verify container-to-container DNS via a throwaway network, logging a
+    /// remediation hint if names don't resolve (e.g. Podman without `aardvark-dns`).
+    /// Best-effort: never fails the caller.
     pub async fn check_network_dns(&self) {
         use crate::config::ContainerRuntime;
 
