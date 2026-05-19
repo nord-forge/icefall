@@ -28,7 +28,12 @@ impl CaddyClient {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                // Client::default() has no timeout — log so the degraded state
+                // is observable rather than a silent regression.
+                tracing::warn!(error = %e, "Caddy HTTP client build failed; using default client without timeout");
+                reqwest::Client::new()
+            });
         Self {
             client,
             base_url: admin_url.trim_end_matches('/').to_string(),
