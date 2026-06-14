@@ -3,6 +3,7 @@ import styles from '@styles/sidebar.module.css';
 import ThemeToggle from '../theme/ThemeToggle';
 import LogoutButton from '@islands/shared/LogoutButton/LogoutButton';
 import SystemStatus from '@islands/shared/SystemStatus/SystemStatus';
+import InactiveAppsBadge from '@islands/shared/InactiveAppsBadge/InactiveAppsBadge';
 import UpdatePill from '@islands/update/UpdatePill/UpdatePill';
 import UpdateDialog from '@islands/update/UpdateDialog/UpdateDialog';
 import TeamSwitcher from '@islands/teams/TeamSwitcher/TeamSwitcher';
@@ -82,6 +83,7 @@ function isActive(href: string): boolean {
           {item.icon === 'book' && <><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14" /><path d="M4 19h16" /><path d="M12 3v16" /></>}
         </svg>
         {item.label}
+        {item.href === '/' && <InactiveAppsBadge client:idle />}
       </a>
     ))}
   </nav>

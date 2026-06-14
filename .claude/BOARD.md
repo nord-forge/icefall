@@ -344,7 +344,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | 🟡 | `github_apps`/`github_installations` tables + build use; webhook automation, PR status checks/comments not wired |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 
-### Phase 26 — Icefall+ Differentiators — 11 ✅ · 6 🟡 · 3 ⬜
+### Phase 26 — Icefall+ Differentiators — 12 ✅ · 5 🟡 · 3 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-175](tickets/phase-26-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | ✅ | `analytics.rs` route + AnalyticsPage |
@@ -361,7 +361,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-186](tickets/phase-26-icefall-plus/IF-186-canary-probe.md) | Canary Probe | ✅ | `canary_results` table (p50/p95/p99), baseline compare |
 | [IF-187](tickets/phase-26-icefall-plus/IF-187-config-time-machine.md) | Config Time Machine | ✅ | `config_history` table + route, full audit trail |
 | [IF-188](tickets/phase-26-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | ✅ | `deploy_events` table, `list_deploy_events()` |
-| [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | 🟡 | `GET /apps/inactive` computes inactivity (no deploy 90d / no request 30d, honors exempt) (2026-06-14); sidebar badge + weekly digest pending |
+| [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | ✅ | `GET /apps/inactive` + sidebar inactive-apps count badge (2026-06-14). Weekly digest email is a follow-up (depends on notification dispatch) |
 | [IF-190](tickets/phase-26-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | 🟡 | `tunnel_enabled` flag; no tunnel route/CLI |
 | [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | ⬜ | No recommendation engine / UI |
 | [IF-192](tickets/phase-26-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | ✅ | `bundles.rs` route, `bundle_imports`, export/import |
@@ -394,8 +394,8 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | Metric | Count |
 |--------|-------|
 | Total tickets | 220 |
-| Done (✅) | ~205 |
-| Partial (🟡) | 8 |
+| Done (✅) | ~206 |
+| Partial (🟡) | 7 |
 | Missing (⬜) | 6 |
 | Phases fully complete | 23 / 28 |
 | Superseded | 1 |
@@ -431,7 +431,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | 23 — Rust Quality | **Done** | 7/7 |
 | 24 — Feature Parity | **Done** | 18/18 |
 | 25 — Parity Gaps | Near done | 14✅ 1🟡 2⬜ / 17 |
-| 26 — Icefall+ | Near done | 11✅ 6🟡 3⬜ / 20 |
+| 26 — Icefall+ | Near done | 12✅ 5🟡 3⬜ / 20 |
 | 27 — MCP Expansion | **Done** | 3/3 |
 | 28 — Comprehensive Docs | **Done** | 8/8 |
 
