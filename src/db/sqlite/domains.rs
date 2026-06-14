@@ -58,6 +58,27 @@ pub(super) async fn update_domain_status(
     Ok(())
 }
 
+/// Mark one domain as the app's primary, clearing the flag on the others.
+/// Runs in a transaction so the app never has two primaries.
+pub(super) async fn set_primary_domain(
+    pool: &SqlitePool,
+    app_id: &str,
+    domain_id: &str,
+) -> Result<(), DbError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE domains SET is_primary = FALSE WHERE app_id = ?")
+        .bind(app_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE domains SET is_primary = TRUE WHERE id = ? AND app_id = ?")
+        .bind(domain_id)
+        .bind(app_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 pub(super) async fn delete_domain(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
     sqlx::query("DELETE FROM domains WHERE id = ?")
         .bind(id)

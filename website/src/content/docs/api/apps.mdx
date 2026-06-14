@@ -1,0 +1,465 @@
+---
+title: Apps API
+description: Create, configure, deploy, and control apps over the Icefall REST API.
+---
+
+Apps are the core resource. These endpoints create and configure apps, control
+their containers, and manage scaling, instances, and load balancing. All paths
+are relative to `/api/v1`. See the [API overview](/api/overview/) for
+authentication, the required `X-Icefall-Request` header on writes, and the
+shared error format.
+
+## Endpoints
+
+| Method | Path | Min role | Description |
+|--------|------|----------|-------------|
+| GET | `/apps` | viewer | List apps in the team |
+| POST | `/apps` | member | Create an app |
+| GET | `/apps/{id}` | viewer | Get one app |
+| PUT | `/apps/{id}` | member | Update app configuration |
+| DELETE | `/apps/{id}` | admin | Delete an app |
+| POST | `/apps/{id}/start` | member | Start the app's containers |
+| POST | `/apps/{id}/stop` | member | Stop the app's containers |
+| POST | `/apps/{id}/restart` | member | Restart the app's containers |
+| POST | `/apps/{id}/wake` | member | Wake a hibernating app |
+| PUT | `/apps/{id}/scale` | member | Set desired instance count |
+| GET | `/apps/{id}/instances` | viewer | List running instances |
+| DELETE | `/apps/{id}/instances/{instance_id}` | admin | Remove one instance |
+| PUT | `/apps/{id}/lb-config` | member | Update load balancer policy |
+| GET | `/apps/{id}/drift` | viewer | Check config drift |
+| PUT | `/apps/{id}/migrate` | member | Migrate to another server |
+| POST | `/apps/{id}/clone` | member | Clone the app |
+| POST | `/apps/{id}/move` | member | Move the app to another project |
+| GET | `/apps/{id}/export` | — | Export as a bundle |
+| POST | `/bundles/import` | member | Import a bundle |
+| GET | `/apps/{id}/config-history` | — | List configuration changes |
+
+Deploy endpoints live on the [Deploys API](/api/deploys/) page. Env vars,
+domains, and volumes have their own pages.
+
+## List apps
+
+```
+GET /apps
+```
+
+Returns every app in the caller's team. Optional query parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `project_id` | string | Filter to one project |
+| `tag` | string | Filter by tag (case-insensitive) |
+
+```bash
+curl "https://icefall.example.com/api/v1/apps?tag=production" \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+```js
+const res = await fetch("https://icefall.example.com/api/v1/apps", {
+  headers: { Authorization: "Bearer icefall_xxxxxxxx" },
+});
+const { data } = await res.json();
+```
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": "app_a1b2c3",
+      "name": "billing-api",
+      "git_repo": "https://github.com/acme/billing-api",
+      "git_branch": "main",
+      "framework": "nodejs",
+      "team_id": "team_acme",
+      "deploy_mode": "auto",
+      "server_id": "srv_eu1",
+      "desired_instances": 2,
+      "lb_policy": "round_robin",
+      "lb_health_check_path": "/health",
+      "lb_sticky_sessions": false,
+      "ghost_mode_enabled": false,
+      "require_deploy_approval": false,
+      "created_at": "2026-05-01T09:12:00Z",
+      "updated_at": "2026-06-10T14:30:00Z"
+    }
+  ]
+}
+```
+
+The app object carries many more optional configuration fields (build config,
+volumes, basic auth, canary, ghost mode, and so on). The full set is whatever
+you can set through `PUT /apps/{id}`.
+
+## Create an app
+
+```
+POST /apps
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | App name; must be non-empty |
+| `git_repo` | string | no | Git repository URL |
+| `git_branch` | string | no | Branch to deploy; defaults to `main` |
+| `framework` | string | no | Framework hint, e.g. `nodejs`, `nextjs` |
+| `image_ref` | string | no | Prebuilt image reference (image-only deploy) |
+| `compose_content` | string | no | Docker Compose YAML |
+| `port` | number | no | Container port |
+| `deploy_mode` | string | no | e.g. `auto`, `native` |
+| `server_id` | string | no | Target server; must be online and not draining |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "billing-api",
+    "git_repo": "https://github.com/acme/billing-api",
+    "git_branch": "main",
+    "framework": "nodejs",
+    "server_id": "srv_eu1"
+  }'
+```
+
+Returns the created app under `data`.
+
+Error cases:
+
+- `400 bad_request` — empty name, invalid Compose YAML, or a server that is
+  offline, draining, or not found.
+- `403 forbidden` — caller is below `member`.
+
+## Get an app
+
+```
+GET /apps/{id}
+```
+
+Returns the app under `data`, or `404 not_found` if it does not exist in the
+caller's team.
+
+## Update an app
+
+```
+PUT /apps/{id}
+```
+
+Every field is optional; send only what you want to change. Notable fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Rename the app |
+| `git_repo` / `git_branch` | string | Source repository and branch |
+| `framework` | string | Framework hint |
+| `build_config` | string | JSON-encoded build configuration |
+| `resource_limits` | string | JSON-encoded CPU/memory limits |
+| `volumes` | string | JSON-encoded volume mounts |
+| `tags` | string | Comma-separated tags (normalized to lowercase) |
+| `image_ref` | string \| null | Prebuilt image reference |
+| `compose_content` | string \| null | Compose YAML |
+| `project_id` | string \| null | Move to a project |
+| `deploy_mode` | string | Deploy strategy |
+| `base_directory` | string \| null | Monorepo subdirectory |
+| `disable_build_cache` | boolean | Force clean builds |
+| `git_submodules_enabled` | boolean | Clone submodules |
+| `git_lfs_enabled` | boolean | Fetch Git LFS objects |
+| `git_shallow_clone` | boolean | Shallow clone |
+| `basic_auth_enabled` | boolean | Gate the app behind HTTP basic auth |
+| `basic_auth_username` | string \| null | Basic auth user |
+| `basic_auth_password` | string | Basic auth password (stored hashed) |
+| `pre_deploy_commands` | string \| null | Commands run before deploy |
+| `post_deploy_commands` | string \| null | Commands run after deploy |
+| `ssh_key_id` | string \| null | Deploy key for private repos |
+| `preview_enabled` | boolean | Enable preview environments |
+| `preview_branch_pattern` | string \| null | Branch glob for previews |
+| `ghost_mode_enabled` | boolean | Hibernate when idle |
+| `ghost_mode_idle_minutes` | number | Idle minutes before hibernating |
+| `canary_enabled` | boolean | Enable canary deploys |
+| `canary_config` | string \| null | JSON-encoded canary config |
+| `tunnel_enabled` | boolean | Expose via tunnel |
+| `require_deploy_approval` | boolean | Require approval before deploy runs |
+| `project_environment_id` | string \| null | Bind to a project environment |
+
+```bash
+curl -X PUT https://icefall.example.com/api/v1/apps/app_a1b2c3 \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "require_deploy_approval": true, "tags": "production,billing" }'
+```
+
+Returns the updated app under `data`.
+
+## Delete an app
+
+```
+DELETE /apps/{id}
+```
+
+Permanently deletes the app and its related resources. Requires `admin`.
+
+```json
+{ "message": "deleted" }
+```
+
+## Start, stop, restart
+
+```
+POST /apps/{id}/start
+POST /apps/{id}/stop
+POST /apps/{id}/restart
+```
+
+Each acts on every container of the app and reports the affected count.
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps/app_a1b2c3/restart \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1"
+```
+
+```json
+{ "message": "restarted", "containers": 2 }
+```
+
+## Wake a hibernating app
+
+```
+POST /apps/{id}/wake
+```
+
+Wakes an app that ghost mode has put to sleep.
+
+```json
+{ "message": "waking", "containers": 1 }
+```
+
+If the app is not hibernating it returns its current status instead:
+
+```json
+{ "message": "App is not hibernating", "status": "running" }
+```
+
+## Scale
+
+```
+PUT /apps/{id}/scale
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `desired_instances` | number | yes | Target count, 0–20. `0` stops all instances |
+
+```bash
+curl -X PUT https://icefall.example.com/api/v1/apps/app_a1b2c3/scale \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "desired_instances": 3 }'
+```
+
+```json
+{ "message": "scaling", "deploy_id": "dpl_77aa", "desired_instances": 3 }
+```
+
+Scaling to zero returns:
+
+```json
+{ "message": "scaled to zero", "desired_instances": 0 }
+```
+
+`400 bad_request` is returned for a count outside 0–20 or when the app has no
+production environment.
+
+## Instances
+
+```
+GET /apps/{id}/instances
+DELETE /apps/{id}/instances/{instance_id}
+```
+
+List returns one entry per running instance:
+
+```json
+{
+  "data": [
+    {
+      "id": "inst_01",
+      "app_id": "app_a1b2c3",
+      "server_id": "srv_eu1",
+      "status": "running",
+      "container_id": "c0ffee",
+      "host_port": 49160,
+      "created_at": "2026-06-10T14:30:05Z",
+      "updated_at": "2026-06-10T14:30:09Z"
+    }
+  ]
+}
+```
+
+Removing an instance requires `admin`:
+
+```json
+{ "message": "instance removed" }
+```
+
+## Load balancer config
+
+```
+PUT /apps/{id}/lb-config
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `policy` | string | `round_robin`, `least_conn`, `ip_hash`, or `random` |
+| `health_check_path` | string | Must start with `/` |
+| `sticky_sessions` | boolean | Pin clients to one instance |
+
+```json
+{ "message": "lb config updated" }
+```
+
+Invalid policies or a health check path that does not start with `/` return
+`400 bad_request`.
+
+## Drift
+
+```
+GET /apps/{id}/drift
+```
+
+Reports whether the running configuration has drifted from the desired one.
+
+```json
+{
+  "data": {
+    "drifted": true,
+    "current_hash": "9f2c...",
+    "deployed_hash": "1ab4..."
+  }
+}
+```
+
+## Migrate to another server
+
+```
+PUT /apps/{id}/migrate
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `target_server_id` | string | yes | Destination server |
+| `acknowledge_volume_loss` | boolean | no | Required `true` if the app has volumes |
+
+The migration runs asynchronously and returns the new deploy:
+
+```json
+{
+  "data": { "id": "dpl_88bb", "app_id": "app_a1b2c3", "status": "pending" },
+  "warnings": [],
+  "message": "Migration started"
+}
+```
+
+`400 bad_request` is returned for the same server, unacknowledged volume loss,
+an offline target, or an app with no environments.
+
+## Clone and move
+
+```
+POST /apps/{id}/clone
+POST /apps/{id}/move
+```
+
+Clone duplicates the app under a new name:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `new_name` | string | yes | Name for the clone |
+| `target_project_id` | string \| null | no | Project for the clone |
+| `target_server_id` | string \| null | no | Server for the clone |
+
+Move reassigns the app to another project:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `target_project_id` | string \| null | no | Destination project |
+
+Both return the resulting app under `data`.
+
+## Export and import bundles
+
+```
+GET /apps/{id}/export
+POST /bundles/import
+```
+
+Export produces a portable, self-describing bundle (config plus an env
+template, without secret values):
+
+```json
+{
+  "data": {
+    "icefall_bundle": "1.0",
+    "exported_at": "2026-06-14T10:00:00Z",
+    "app": {
+      "name": "billing-api",
+      "type": "git",
+      "repo_url": "https://github.com/acme/billing-api",
+      "branch": "main",
+      "framework": "nodejs",
+      "deploy_mode": "auto"
+    },
+    "env_template": [
+      { "key": "STRIPE_KEY", "required": true, "scope": "production" }
+    ],
+    "domain_patterns": ["billing.acme.com"]
+  }
+}
+```
+
+Import recreates an app from a bundle in the caller's team:
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/bundles/import \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  --data-binary @bundle.json
+```
+
+```json
+{ "data": { "id": "app_new1" }, "message": "App 'billing-api' imported from bundle" }
+```
+
+Import requires at least `member`; the body must include an `app` object with
+a `name`.
+
+## Configuration history
+
+```
+GET /apps/{id}/config-history
+```
+
+Lists recent configuration changes. Optional `limit` (default 50).
+
+```json
+{
+  "data": [
+    {
+      "id": "cfg_01",
+      "resource_type": "app",
+      "resource_id": "app_a1b2c3",
+      "field": "require_deploy_approval",
+      "old_value": "false",
+      "new_value": "true",
+      "changed_by": "usr_nick",
+      "changed_at": "2026-06-12T08:00:00Z"
+    }
+  ]
+}
+```

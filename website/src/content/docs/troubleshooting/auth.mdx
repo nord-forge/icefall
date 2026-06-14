@@ -1,0 +1,113 @@
+---
+title: Authentication issues
+description: Fix login, 2FA, OAuth, and API token problems.
+---
+
+## Can't log in
+
+**Symptom**: `Invalid email or password` on the login form.
+
+**Cause**: Wrong credentials, or the error is deliberately generic — Icefall
+returns the same message whether the email is unknown or the password is wrong,
+to avoid leaking which accounts exist.
+
+**Fix**:
+1. Re-check the email and password. Passwords are a minimum of 12 characters.
+2. If you've forgotten the password, an admin must reset it — there is no
+   self-service password reset or email-verification flow.
+3. If the first-run setup never completed, log in is impossible until the initial
+   admin account is created at `/api/v1/auth/setup`.
+
+### Too many login attempts
+
+**Symptom**: `Too many login attempts. Try again later.` (HTTP 429).
+
+**Cause**: Login is rate-limited to **5 attempts per 15 minutes per IP**. There is
+no per-account lockout — only this per-IP limit.
+
+**Fix**: Wait for the window to pass, then try again. If you sit behind a shared
+NAT or proxy, the limit is shared across everyone on that IP. Icefall reads the
+client IP from `cf-connecting-ip` then `x-real-ip`, so make sure your proxy sets
+one of those.
+
+## 2FA problems
+
+### Code rejected
+
+**Symptom**: A correct-looking TOTP code is rejected at the 2FA step.
+
+**Cause**: TOTP is time-based (SHA1, 6 digits, 30-second step, ±1 step of skew).
+A wrong code is usually clock drift on the device, or the 5-minute login
+challenge expiring before you finish.
+
+**Fix**:
+1. Sync the time on your authenticator device.
+2. Complete the second step within 5 minutes of entering your password — after
+   that the challenge expires and you start over.
+3. The 2FA validation step is itself rate-limited to 5 attempts per 5 minutes per
+   IP.
+
+### Lost 2FA device
+
+**Symptom**: No access to the authenticator app.
+
+**Fix**:
+1. Use a **backup code** instead of a TOTP code at the 2FA prompt. You were given
+   10 single-use codes when you enabled 2FA.
+2. If you've also lost the backup codes, there is no self-service recovery — an
+   **admin must disable 2FA** for your account. After that, log in with your
+   password and set 2FA up again.
+
+## OAuth callback error
+
+**Symptom**: Sign-in with GitHub or Google bounces back to
+`/login?error=oauth_denied` or a similar error.
+
+**Causes and fixes**:
+
+- **Redirect URI mismatch** — the provider's configured callback must match
+  exactly. Icefall's callbacks are
+  `https://{your-domain}/api/v1/auth/oauth/github/callback` and
+  `.../google/callback`. Register those precisely in the provider's app settings.
+- **Provider not configured** — `OAuth provider '...' is not enabled or
+  configured` (HTTP 400) means the client ID/secret are missing in Icefall's
+  admin settings.
+- **`oauth_link_required`** — your provider email matches an existing account but
+  isn't linked yet. Log in with your password first, then link the provider from
+  your profile. Icefall does not auto-link accounts by email.
+- **Expired state** — `Invalid or expired OAuth state` means the flow took longer
+  than 5 minutes. Start the sign-in again.
+- **`domain_not_allowed` / `registration_disabled`** — your email domain isn't
+  allowed, or new-account creation is turned off. An admin controls both.
+
+## API token not working
+
+**Symptom**: API calls return `401 Unauthorized`.
+
+**Causes and fixes**:
+
+- **Expired** — a token with an expiry past its date returns 401, the same as a
+  missing token. Create a new one.
+- **Revoked** — deleting a token invalidates it immediately. Issue a fresh token.
+- **Malformed header** — send `Authorization: Bearer icefall_<token>`. Tokens
+  start with the `icefall_` prefix and are shown **only once** at creation; if you
+  lost it, delete and recreate.
+- **CSRF header on mutations** — browser-style mutating requests must also send
+  the `X-Icefall-Request` header. Server-to-server token calls should include it
+  too for POST/PUT/PATCH/DELETE.
+
+### Token can't do something
+
+**Symptom**: The token authenticates (200 on reads) but a write is rejected.
+
+**Cause**: Tokens have no scopes of their own — they inherit the **role** of the
+user who created them. A `viewer` is read-only; a `deployer` can manage apps,
+databases, and domains; only `admin` can manage users.
+
+**Fix**: Have the token created by a user with the role the call requires.
+
+## See also
+
+- [Users & roles](/auth/users/) — what each role can do
+- [API tokens](/auth/tokens/) — creating and revoking tokens
+- [OAuth](/auth/oauth/) — provider setup

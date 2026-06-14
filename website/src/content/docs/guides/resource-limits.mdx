@@ -1,0 +1,57 @@
+---
+title: Configure resource limits
+description: Record CPU and memory limits for an app.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Each app carries a resource-limits configuration that records the CPU and memory
+budget you intend for it. You set it on the app, and the host's container runtime
+applies cgroup limits where it supports them.
+
+## Prerequisites
+
+- A deployed app.
+- A target CPU and memory budget for the app.
+
+## Set limits
+
+<Steps>
+
+1. Open the app and go to the **Settings** tab.
+
+2. Set the CPU and memory budget for the app in the resource-limits
+   configuration.
+
+3. Save, then redeploy or restart so the container is recreated with the new
+   configuration.
+
+</Steps>
+
+## Watch actual usage
+
+The app's metrics show real consumption — CPU percentage, memory used against the
+limit, and disk used — so you can right-size the budget against observed load.
+
+## Runtime behavior
+
+How strictly CPU and memory limits are enforced depends on the container runtime
+on the host:
+
+- **Docker** and **rootful Podman** enforce cgroup CPU and memory limits.
+- **Rootless Podman** enforces them only with cgroups v2 and delegation
+  configured. See [Docker vs Podman differences](/reference/podman-differences).
+
+## Troubleshooting
+
+- **App killed under load**: the memory limit may be too low. Raise it and
+  redeploy, using the metrics to find a safe headroom.
+- **Limits seem ignored**: confirm the runtime supports cgroup enforcement in
+  your mode (notably rootless Podman).
+
+## Related
+
+- [Set up container hibernation](/guides/ghost-mode)
+- [Docker vs Podman differences](/reference/podman-differences)

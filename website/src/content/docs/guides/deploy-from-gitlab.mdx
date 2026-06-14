@@ -1,0 +1,84 @@
+---
+title: Deploy from GitLab
+description: Connect a GitLab repository and trigger automatic deploys on push.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 10 minutes.
+
+Icefall deploys any Git repository it can clone, including GitLab.com and
+self-hosted GitLab. Push deploys are driven by a GitLab push webhook that calls
+back into your Icefall instance with a shared secret.
+
+## Prerequisites
+
+- A running Icefall instance reachable over HTTPS.
+- A GitLab repository you can administer (to add a webhook).
+- A clone URL for the repository (HTTPS or SSH).
+
+## Create the app
+
+<Steps>
+
+1. In the dashboard, open **Apps > Create app**.
+
+2. Paste the repository clone URL, for example `https://gitlab.com/acme/web.git`,
+   and choose the branch to deploy.
+
+3. Pick the target server and finish the wizard. Icefall stores a per-app
+   webhook secret you will use in the next section.
+
+</Steps>
+
+## Add the GitLab webhook
+
+<Steps>
+
+1. Open the app, go to the **Settings** tab, and copy the **webhook secret**.
+
+2. In GitLab, open **Settings > Webhooks** for the repository.
+
+3. Set the URL to:
+
+   ```
+   https://your-icefall-instance.com/api/v1/webhooks/<app-id>/gitlab
+   ```
+
+4. Paste the webhook secret into the **Secret token** field. Icefall validates
+   it against the `X-Gitlab-Token` header on every request, so a missing or
+   wrong token is rejected.
+
+5. Under **Trigger**, enable **Push events** and limit them to your deploy
+   branch. Save the webhook.
+
+</Steps>
+
+## Verify
+
+<Steps>
+
+1. In GitLab, use **Test > Push events** on the webhook, or push a commit.
+
+2. In Icefall, open the app's **Deploys** tab. A new deploy should appear within
+   a few seconds.
+
+3. Watch the build in the **Logs** tab and confirm the deploy reaches
+   `succeeded`.
+
+</Steps>
+
+## Troubleshooting
+
+- **No deploy triggered**: confirm the webhook fired in GitLab's recent
+  deliveries and that the response was `200`. A `401` means the secret token
+  does not match the app's webhook secret.
+- **Wrong branch deploys**: GitLab sends every push by default. Restrict the
+  webhook to your deploy branch using the branch filter.
+- **Clone fails for a private repo**: add credentials for the repository so
+  Icefall can authenticate the clone.
+
+## Related
+
+- [Deploy from GitHub](/guides/deploy-from-github)
+- [Custom domain](/guides/custom-domain)

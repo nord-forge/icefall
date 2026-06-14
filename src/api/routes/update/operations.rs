@@ -13,7 +13,7 @@ use crate::update::download::UpdateDownloader;
 use crate::update::rollback::UpdateRollback;
 use crate::update::CURRENT_VERSION;
 
-use super::{require_admin, DEFAULT_GITHUB_REPO};
+use super::require_admin;
 
 pub(super) async fn start_download(
     State(state): State<AppState>,
@@ -53,7 +53,7 @@ pub(super) async fn start_download(
         let updates_dir = data_dir.join("updates");
         let downloader = UpdateDownloader::new(updates_dir);
 
-        let checker = UpdateChecker::new(DEFAULT_GITHUB_REPO);
+        let checker = UpdateChecker::new(&crate::update::github_repo());
         let check_state = match db.get_update_state().await {
             Ok(s) => s,
             Err(e) => {

@@ -1,0 +1,102 @@
+---
+title: Switch from Docker to Podman
+description: Move an existing Icefall instance from the Docker runtime to Podman.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 20 minutes.
+
+If you already run Icefall on Docker, you can switch the runtime to Podman.
+Because Podman speaks the same socket interface, the change is mostly a matter of
+installing Podman, repointing Icefall, and recreating containers on the new
+runtime.
+
+## Prerequisites
+
+- A working Icefall instance running on Docker.
+- Podman 4.0 or newer available for the host.
+- A current export of your instance as a safety net (see
+  [server migration](/guides/server-migration)).
+
+## Prepare
+
+<Steps>
+
+1. Take a full export so you can recover if anything goes wrong:
+
+   ```bash
+   icefall migrate export --output icefall-pre-podman.tar.gz
+   ```
+
+2. Install Podman 4.0+ and enable its socket:
+
+   ```bash
+   systemctl enable --now podman.socket
+   podman info
+   ```
+
+</Steps>
+
+## Switch the runtime
+
+<Steps>
+
+1. Stop the daemon:
+
+   ```bash
+   systemctl stop icefall
+   ```
+
+2. Set the runtime to Podman in `/etc/icefall/config.toml` (the `runtime` key),
+   or set `ICEFALL_RUNTIME=podman` for the service.
+
+3. Start the daemon again:
+
+   ```bash
+   systemctl start icefall
+   ```
+
+</Steps>
+
+## Recreate workloads on Podman
+
+<Steps>
+
+1. Containers created under Docker are not adopted by Podman automatically.
+   Redeploy each app so its containers are recreated on the Podman runtime.
+
+2. Restart managed databases so their containers come up under Podman.
+
+3. Confirm published ports are reachable. In rootless Podman, ports bind to
+   `127.0.0.1` rather than `0.0.0.0` — see
+   [Docker vs Podman differences](/reference/podman-differences).
+
+</Steps>
+
+## Verify
+
+<Steps>
+
+1. In the dashboard, confirm all apps and databases are running.
+
+2. Deploy a change to confirm the build pipeline works on Podman.
+
+3. Check health checks pass for each app.
+
+</Steps>
+
+## Troubleshooting
+
+- **Apps still on Docker containers**: redeploy them; switching the runtime does
+  not migrate running containers in place.
+- **Inter-container DNS fails**: install `aardvark-dns` for name resolution on
+  Podman networks.
+- For socket, exec, and stats issues, see
+  [Podman troubleshooting](/guides/podman-troubleshooting).
+
+## Related
+
+- [Install and configure Podman](/guides/podman-setup)
+- [Podman troubleshooting](/guides/podman-troubleshooting)
+- [Migrate your instance to a new server](/guides/server-migration)

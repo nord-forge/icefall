@@ -1,0 +1,65 @@
+---
+title: Stream logs to a drain
+description: Forward an app's logs to Grafana Loki, Axiom, or a custom HTTP endpoint.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 10 minutes.
+
+A log drain forwards an app's logs to an external destination so you can retain,
+search, and alert on them long term. Icefall ships drains for Grafana Loki,
+Axiom, and any custom HTTP endpoint.
+
+## Prerequisites
+
+- A deployed app.
+- Credentials for the destination: a Loki push URL, an Axiom dataset and token,
+  or a custom HTTP endpoint.
+
+## Add a drain
+
+<Steps>
+
+1. Open the app, go to **Settings**, and find the **Log drains** section.
+
+2. Choose **Add drain** and pick a type:
+
+   - **Loki** — the push URL (for example
+     `https://logs.example.com`). Optionally add a tenant ID and basic-auth
+     username and password. Icefall pushes to `/loki/api/v1/push`.
+   - **Axiom** — the dataset name and an API token. Icefall ingests to the
+     dataset over HTTPS.
+   - **HTTP** — a URL, the method (`POST` or `PUT`), optional headers as JSON,
+     and a format (`json` or `text`).
+
+3. Name the drain, enable it, and save.
+
+</Steps>
+
+## Verify
+
+<Steps>
+
+1. Use **Test** on the drain to send a sample log line.
+
+2. Confirm the line arrives in Loki, Axiom, or your endpoint.
+
+3. The drain row shows the last-sent time, and an error count and last error if
+   delivery is failing.
+
+</Steps>
+
+## Troubleshooting
+
+- **Errors increasing**: open the drain and check the last error. A `401`
+  usually means a wrong token or missing auth.
+- **Loki rejects pushes**: confirm the base URL is correct and, for
+  multi-tenant Loki, that the tenant ID is set.
+- **Nothing arrives**: confirm the drain is enabled and that the destination
+  accepts the chosen method and format.
+
+## Related
+
+- [Search application logs](/guides/log-search)
+- [Configure notifications](/guides/setup-notifications)

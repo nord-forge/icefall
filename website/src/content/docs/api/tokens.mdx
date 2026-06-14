@@ -1,0 +1,117 @@
+---
+title: API tokens API
+description: Create, list, and revoke API tokens for scripted and MCP access to Icefall.
+---
+
+API tokens authenticate scripts, CI, the [CLI](/cli/commands/), and the
+[MCP server](/api/mcp/). A token carries the role and team of the user who
+created it. All paths are relative to `/api/v1`. See the
+[API overview](/api/overview/) for the shared error format and the required
+`X-Icefall-Request` header on writes.
+
+## Token format
+
+Tokens are prefixed `icefall_` followed by random hex. Send them as a bearer
+token:
+
+```
+Authorization: Bearer icefall_xxxxxxxx
+```
+
+Only the SHA-256 hash is stored. The plaintext value is returned **once**, at
+creation, and cannot be retrieved again.
+
+## Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/tokens` | auth | List your tokens (no plaintext) |
+| POST | `/tokens` | auth | Create a token |
+| DELETE | `/tokens/{id}` | auth | Revoke a token |
+
+## List tokens
+
+```
+GET /tokens
+```
+
+```bash
+curl https://icefall.example.com/api/v1/tokens \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "tok_01",
+      "name": "ci-deploy",
+      "last_used_at": "2026-06-14T07:00:00Z",
+      "expires_at": "2026-12-31T00:00:00Z",
+      "created_at": "2026-05-01T09:00:00Z"
+    }
+  ]
+}
+```
+
+The plaintext token is never included in list responses.
+
+## Create a token
+
+```
+POST /tokens
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Label to identify the token |
+| `expires_at` | string | no | ISO 8601 expiry; omit for no expiry |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/tokens \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "ci-deploy", "expires_at": "2026-12-31T00:00:00Z" }'
+```
+
+```js
+const res = await fetch("https://icefall.example.com/api/v1/tokens", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer icefall_xxxxxxxx",
+    "X-Icefall-Request": "1",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ name: "ci-deploy" }),
+});
+const { data } = await res.json();
+console.log(data.token); // store this now — it will not be shown again
+```
+
+The response includes the plaintext token:
+
+```json
+{
+  "data": { "id": "tok_01", "name": "ci-deploy", "token": "icefall_3f9a8c2b1d7e..." },
+  "warning": "This token will only be shown once. Store it securely."
+}
+```
+
+## Revoke a token
+
+```
+DELETE /tokens/{id}
+```
+
+```bash
+curl -X DELETE https://icefall.example.com/api/v1/tokens/tok_01 \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1"
+```
+
+```json
+{ "message": "token revoked" }
+```
+
+Revoking a token that is not yours returns `404 not_found`.

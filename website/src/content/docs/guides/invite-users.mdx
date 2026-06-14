@@ -1,0 +1,73 @@
+---
+title: Invite team members
+description: Invite users to your instance or team and assign a role.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Icefall supports two kinds of invitations: instance invitations (an
+administrator adds someone to the whole instance) and team invitations (a team
+owner or admin adds someone to a specific team). Both are sent by email and
+expire after 7 days.
+
+## Prerequisites
+
+- For instance invitations: administrator access.
+- For team invitations: the owner or admin role on the team.
+- SMTP configured so invitation emails can be sent.
+
+## Invite a user to the instance
+
+<Steps>
+
+1. As an administrator, open **Users** and choose **Invite user**.
+
+2. Enter the email address and pick a role:
+
+   - **admin** — full access, including settings and user management.
+   - **deployer** — can manage and deploy apps.
+   - **viewer** — read-only access.
+
+3. Send the invitation. The user receives an email with a link to set a password
+   and join.
+
+</Steps>
+
+## Invite a user to a team
+
+<Steps>
+
+1. Open **Teams**, select the team, and choose **Invite**.
+
+2. Enter the email address and pick a team role:
+
+   - **admin** — invite and manage members.
+   - **member** — standard access for deployments.
+   - **viewer** — read-only access.
+
+3. Send the invitation. The recipient accepts from the link in their email; the
+   email address must match the invitation.
+
+</Steps>
+
+The person who creates a team is its **owner**. The owner role cannot be changed
+and is the only role that can delete the team.
+
+## Verify
+
+The team or user list shows pending invitations until they are accepted. Once
+accepted, the member appears with their assigned role.
+
+## Troubleshooting
+
+- **No email received**: confirm SMTP is configured and check spam. You can
+  reissue the invitation if it expired (invitations last 7 days).
+- **"Email does not match"**: team invitations must be accepted by the exact
+  address they were sent to.
+
+## Related
+
+- [Enable two-factor authentication](/guides/setup-2fa)
+- [Create API tokens](/guides/api-tokens)

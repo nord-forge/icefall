@@ -1,0 +1,192 @@
+---
+title: API overview
+description: Base URL, authentication, request conventions, error format, and rate limits for the Icefall REST API.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The Icefall REST API is served by the control plane under the `/api/v1`
+prefix. Every per-resource page in this section documents the real route
+paths, request bodies, and response shapes exposed by that prefix.
+
+## Base URL
+
+All endpoints live under:
+
+```
+https://your-icefall-server/api/v1
+```
+
+The examples in this section use `https://icefall.example.com` as the host.
+Replace it with your own.
+
+## Authentication
+
+Most endpoints require authentication. There are two accepted credentials:
+
+- **API token** — `Authorization: Bearer icefall_xxxxxxxx`. Create one under
+  **Settings → API Tokens** (see [API tokens](/api/tokens/)). This is the
+  right choice for scripts, CI, and the [MCP server](/api/mcp/).
+- **Session cookie** — `Cookie: icefall_session=...`, issued by
+  [`POST /auth/login`](/api/auth/). This is what the dashboard uses.
+
+An API token carries the role and team of the user who created it. A request
+that fails authentication returns `401`:
+
+```json
+{ "error": "unauthorized", "message": "Authentication required" }
+```
+
+### Required header for writes
+
+Every state-changing request (`POST`, `PUT`, `PATCH`, `DELETE`) on `/api/`
+must carry the `X-Icefall-Request` header. This is a CSRF guard: cross-site
+forms cannot set custom headers, so its presence proves the call came from a
+real client. The header has no value requirement — it only needs to be
+present:
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "billing-api" }'
+```
+
+A mutating request without it returns `403`:
+
+```json
+{ "error": "forbidden", "message": "Missing X-Icefall-Request header" }
+```
+
+Inbound webhooks and agent callbacks are exempt — they authenticate with
+signatures or enrollment tokens instead.
+
+## Response format
+
+Successful responses wrap the payload in a `data` field:
+
+```json
+{ "data": { "id": "app_a1b2c3", "name": "billing-api" } }
+```
+
+List endpoints return an array under `data`:
+
+```json
+{ "data": [ { "id": "app_a1b2c3" }, { "id": "app_d4e5f6" } ] }
+```
+
+Lifecycle actions (start, stop, delete, and similar) return a short `message`
+instead, sometimes with extra context:
+
+```json
+{ "message": "started", "containers": 2 }
+```
+
+## Errors
+
+Errors share a single shape across every endpoint:
+
+```json
+{ "error": "not_found", "message": "app app_a1b2c3" }
+```
+
+The HTTP status and `error` code map as follows:
+
+| Status | `error` code | Meaning |
+|--------|-------------|---------|
+| 400 | `bad_request` | Invalid input, missing field, or invalid state transition |
+| 401 | `unauthorized` | No valid session or token |
+| 403 | `forbidden` | Insufficient role, or missing `X-Icefall-Request` header |
+| 404 | `not_found` | Resource missing — also returned for resources in another team |
+| 409 | `conflict` | Uniqueness or dependency conflict |
+| 429 | `too_many_requests` | Rate limit exceeded |
+| 500 | `internal_error` | Unexpected server error (details are never leaked) |
+| 503 | `service_unavailable` | A dependency such as the container runtime is unreachable |
+
+Cross-team access always returns `404` rather than `403`, so the API never
+reveals whether a resource exists in a team you cannot see.
+
+## Roles and teams
+
+Authorization is team-scoped. A caller acts within one team and holds one of
+four team roles, in increasing order of privilege:
+
+| Role | Can do |
+|------|--------|
+| `viewer` | Read-only (`GET`) |
+| `member` | Create, update, deploy, manage env vars and domains |
+| `admin` | Delete apps and databases, remove instances, manage users |
+| `owner` | Full team ownership |
+
+Some account-level endpoints (users, servers, global settings) check the
+user's account role instead — one of `admin`, `deployer`, or `viewer`. Each
+page notes which check applies.
+
+## Pagination
+
+List endpoints that can grow large use offset pagination with `limit` and
+`offset` query parameters. `limit` is clamped per endpoint to protect the
+server.
+
+```bash
+curl "https://icefall.example.com/api/v1/audit?limit=50&offset=100" \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+Most resource lists (apps, deploys, databases) return a bounded recent set
+without paging — the per-resource pages note the cap where one applies.
+
+## Rate limits
+
+Rate limits are enforced per IP for unauthenticated endpoints and per user
+for authenticated writes. Exceeding a limit returns `429` with the
+`too_many_requests` code.
+
+| Scope | Limit |
+|-------|-------|
+| Login | 5 attempts / 15 min per IP |
+| Registration | 3 / hour per IP |
+| Two-factor validation | 5 / 5 min per IP |
+| Authenticated writes | 100 / 15 min per user |
+| Global safety net | 1000 / 15 min per IP |
+
+Client IPs are resolved from `cf-connecting-ip` or `x-real-ip`.
+`x-forwarded-for` is never trusted.
+
+## Container runtime
+
+Icefall supports both Docker and Podman. The configured runtime is reported
+by [`GET /settings`](/api/settings/) as a `runtime` field
+(`"docker"` or `"podman"`), and [`GET /settings/runtime`](/api/settings/)
+returns the resolved socket and version. Server and settings responses that
+carry runtime information are noted on their pages.
+
+<Aside type="note">
+Endpoint behavior is identical across runtimes — the same routes, bodies, and
+responses apply. The runtime only affects how containers are created on the
+host. See the [Podman runtime reference](/reference/podman/) for the
+operational differences.
+</Aside>
+
+## OpenAPI
+
+A machine-readable OpenAPI 3.1 document is served, unauthenticated, at:
+
+```
+https://icefall.example.com/api/v1/openapi.json
+```
+
+## Search
+
+A single cross-resource search endpoint spans apps, databases, servers, and
+domains.
+
+```bash
+curl "https://icefall.example.com/api/v1/search?q=billing" \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/search` | Search across apps, databases, servers, and domains. Requires `q`. |

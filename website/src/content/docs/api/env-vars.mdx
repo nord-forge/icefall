@@ -1,0 +1,211 @@
+---
+title: Environment variables API
+description: Manage scoped environment variables for apps and shared variables over the Icefall REST API.
+---
+
+These endpoints manage an app's environment variables, including bulk import
+and the resolved merge across scopes. Shared variables and project-environment
+variables are covered at the end. All paths are relative to `/api/v1`. See the
+[API overview](/api/overview/) for authentication, the required
+`X-Icefall-Request` header on writes, and the shared error format.
+
+## Scopes
+
+App env vars carry a scope: `shared`, `production`, or `preview`. `shared`
+applies everywhere; `production` and `preview` override it for their
+respective environments. `PORT` and `HOST` are reserved and cannot be set.
+
+## Endpoints
+
+| Method | Path | Min role | Description |
+|--------|------|----------|-------------|
+| GET | `/apps/{id}/env` | viewer | List an app's variables |
+| POST | `/apps/{id}/env` | member | Set a variable |
+| DELETE | `/apps/{id}/env/{var_id}` | member | Delete a variable |
+| POST | `/apps/{id}/env/import` | member | Bulk import from `.env` text |
+| GET | `/apps/{id}/env/resolved` | viewer | Resolved merge across scopes |
+
+## List variables
+
+```
+GET /apps/{id}/env
+```
+
+Values are masked by default. Pass `reveal=true` to return them in clear, and
+`scope` to filter.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `reveal` | boolean | Return real values instead of `••••••••` |
+| `scope` | string | Filter by `shared`, `production`, or `preview` |
+
+```bash
+curl "https://icefall.example.com/api/v1/apps/app_a1b2c3/env?reveal=true" \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "env_01",
+      "key": "STRIPE_KEY",
+      "value": "sk_live_abc123",
+      "scope": "production",
+      "created_at": "2026-05-01T09:30:00Z"
+    }
+  ]
+}
+```
+
+## Set a variable
+
+```
+POST /apps/{id}/env
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | string | yes | `UPPER_SNAKE_CASE`; not `PORT` or `HOST` |
+| `value` | string | yes | The value |
+| `scope` | string | no | `shared` (default), `production`, or `preview` |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps/app_a1b2c3/env \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "key": "STRIPE_KEY", "value": "sk_live_abc123", "scope": "production" }'
+```
+
+```json
+{ "data": { "id": "env_01", "key": "STRIPE_KEY", "scope": "production" } }
+```
+
+A reserved or malformed key returns `400 bad_request`.
+
+## Delete a variable
+
+```
+DELETE /apps/{id}/env/{var_id}
+```
+
+```json
+{ "message": "deleted" }
+```
+
+## Bulk import
+
+```
+POST /apps/{id}/env/import
+```
+
+Parses `.env`-formatted text. Blank lines and lines starting with `#` are
+ignored.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | string | yes | `.env` text |
+| `scope` | string | no | Target scope, default `shared` |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps/app_a1b2c3/env/import \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "content": "STRIPE_KEY=sk_live_abc123\nLOG_LEVEL=info", "scope": "production" }'
+```
+
+```json
+{ "imported": 2, "skipped": [] }
+```
+
+`skipped` lists keys that were reserved or invalid.
+
+## Resolved variables
+
+```
+GET /apps/{id}/env/resolved
+```
+
+Returns the effective set after merging `shared` with the environment-specific
+scope and adding defaults. `PORT=3000` and `HOST=0.0.0.0` are always present
+unless overridden.
+
+```json
+{
+  "data": [
+    { "key": "PORT", "value": "3000" },
+    { "key": "HOST", "value": "0.0.0.0" },
+    { "key": "STRIPE_KEY", "value": "sk_live_abc123" }
+  ]
+}
+```
+
+## Shared variables
+
+Shared variables apply to a whole project or server, not a single app.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/shared-variables/{scope}/{scope_id}` | List variables for a scope |
+| POST | `/shared-variables/{scope}/{scope_id}` | Create a shared variable |
+| DELETE | `/shared-variables/{id}` | Delete a shared variable |
+
+`{scope}` is `project` or `server`; `{scope_id}` is the project or server ID.
+
+```
+POST /shared-variables/{scope}/{scope_id}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | string | yes | `UPPER_SNAKE_CASE` |
+| `value` | string | yes | The value |
+| `is_sensitive` | boolean | no | Mask the value in list responses (default `false`) |
+
+```json
+{
+  "data": {
+    "id": "shv_01",
+    "key": "SENTRY_DSN",
+    "scope": "project",
+    "scope_id": "prj_01",
+    "is_sensitive": true
+  }
+}
+```
+
+## Project-environment variables
+
+Project environments (such as staging or production) carry their own
+variables.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/environments/{id}/variables` | List variables for an environment |
+| POST | `/environments/{id}/variables` | Create a variable |
+| DELETE | `/environments/{env_id}/variables/{var_id}` | Delete a variable |
+
+```
+POST /environments/{id}/variables
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | string | yes | Variable name |
+| `value` | string | yes | The value |
+| `is_secret` | boolean | no | Reserved |
+
+```json
+{
+  "data": {
+    "id": "pev_01",
+    "environment_id": "penv_staging",
+    "key": "API_BASE_URL",
+    "value": "https://staging.acme.com",
+    "scope": "project_environment",
+    "created_at": "2026-06-14T10:00:00Z"
+  }
+}
+```

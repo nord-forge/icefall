@@ -1,0 +1,71 @@
+---
+title: Create and use API tokens
+description: Generate a personal access token to authenticate the API, CLI, and MCP.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+API tokens authenticate non-interactive access to Icefall — the REST API, the
+CLI, CI pipelines, and the MCP integration. A token carries your account's
+permissions and is shown only once at creation, so store it securely.
+
+## Prerequisites
+
+- An Icefall account.
+
+## Create a token
+
+<Steps>
+
+1. Open **Profile > API tokens**.
+
+2. Choose **Create token**, give it a descriptive name (for example
+   `ci-deploy` or `laptop-cli`), and optionally set an expiry date.
+
+3. Create the token and copy it immediately. Tokens begin with the prefix
+   `icefall_` and are displayed only once:
+
+   ```
+   icefall_3f9c2a... (copy now — you cannot view it again)
+   ```
+
+</Steps>
+
+## Use a token
+
+Send the token as a bearer credential in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer icefall_your_token_here" \
+  https://your-icefall-instance.com/api/v1/apps
+```
+
+For the CLI, run `icefall login` and paste the token when prompted. For the MCP
+integration, place the token in your client's MCP configuration.
+
+## Manage and revoke tokens
+
+The **Profile > API tokens** table lists each token's name, last-used time, and
+expiry. To revoke a token, delete it from the list — any client using it stops
+working immediately.
+
+## Good practice
+
+- Use a separate token per machine or pipeline so you can revoke one without
+  affecting the others.
+- Set an expiry on tokens used in CI and rotate them periodically.
+- Never commit a token to a repository or paste it into logs.
+
+## Troubleshooting
+
+- **401 Unauthorized**: the token may be revoked, expired, or mistyped. Create a
+  fresh token and try again.
+- **Lost token**: tokens cannot be retrieved after creation. Delete the old one
+  and create a new token.
+
+## Related
+
+- [Deploy from the command line](/guides/cli-deploy)
+- [Manage Icefall from Claude Code](/guides/mcp-claude-code)

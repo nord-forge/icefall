@@ -1,0 +1,43 @@
+---
+title: MCP Integration — Windsurf
+description: Connect Windsurf (Codeium) to your Icefall instance for AI-assisted deployment
+---
+
+## Setup
+
+1. Create an API token in Icefall: **Settings > API Tokens > Create Token** with deployer or admin role.
+
+2. Open Windsurf and go to **Settings > Cascade > MCP Servers** (or edit `~/.codeium/windsurf/mcp_config.json` directly).
+
+3. Add Icefall as a server:
+
+```json
+{
+  "mcpServers": {
+    "icefall": {
+      "serverUrl": "https://your-icefall-instance.com/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer icefall_your_token_here"
+      }
+    }
+  }
+}
+```
+
+4. Refresh the MCP server list (or restart Windsurf). Icefall's tools are now available in Cascade.
+
+## Usage
+
+In the Cascade chat panel, you can ask:
+
+- "Deploy this project to production"
+- "What's the status of my-api?"
+- "Show me the recent deploy logs"
+- "Rollback my-api to the previous version"
+- "Create a new app from this repo"
+
+Cascade will call Icefall's MCP tools to carry out these operations directly from your editor.
+
+## Available Tools
+
+See the [Claude Code guide](/guides/mcp-claude-code/) for the full list of 27 tools, resources, and prompts, or the complete [MCP tool reference](/api/mcp-tools/) for every input. They're identical across all MCP clients.

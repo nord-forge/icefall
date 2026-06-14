@@ -1,0 +1,81 @@
+---
+title: Configure GitHub OAuth login
+description: Let users sign in to Icefall with their GitHub account.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 10 minutes.
+
+GitHub OAuth lets users sign in to Icefall with their GitHub account instead of a
+password. You configure it once as an administrator by creating a GitHub OAuth
+app and entering its client ID and secret in Icefall.
+
+## Prerequisites
+
+- Administrator access to Icefall.
+- A GitHub account that can create OAuth apps (personal or organization).
+- Your Icefall base URL, served over HTTPS.
+
+## Create a GitHub OAuth app
+
+<Steps>
+
+1. In GitHub, open **Settings > Developer settings > OAuth Apps > New OAuth App**.
+
+2. Set the **Authorization callback URL** to:
+
+   ```
+   https://your-icefall-instance.com/api/v1/auth/oauth/github/callback
+   ```
+
+3. Register the app and copy the **Client ID**. Generate a new **Client secret**
+   and copy it as well.
+
+</Steps>
+
+## Configure Icefall
+
+<Steps>
+
+1. In Icefall, open **Settings > OAuth providers**.
+
+2. In the GitHub section, paste the **Client ID** and **Client secret**. The
+   callback URL is shown there with a copy button if you need it again.
+
+3. Turn on the **Enable** toggle and save. The secret field clears after saving
+   and shows a configured indicator.
+
+</Steps>
+
+## Verify
+
+<Steps>
+
+1. Sign out, then return to the login page. A **Sign in with GitHub** option
+   should appear.
+
+2. Complete the GitHub authorization. You should land back in Icefall, signed in.
+
+3. To attach GitHub to an existing account, open your **Profile** and link the
+   GitHub identity from there.
+
+</Steps>
+
+If your account has two-factor authentication enabled, Icefall still prompts for
+your 2FA code after the GitHub step.
+
+## Troubleshooting
+
+- **Redirect URI mismatch**: the callback URL in GitHub must match the Icefall
+  callback URL exactly, including `https` and the path.
+- **Button does not appear**: confirm the GitHub provider is enabled and saved in
+  Icefall settings.
+- **Email already in use**: if the GitHub email matches an existing account,
+  link GitHub from your profile instead of signing in fresh, to avoid duplicate
+  accounts.
+
+## Related
+
+- [Configure Google OAuth login](/guides/oauth-google)
+- [Enable two-factor authentication](/guides/setup-2fa)

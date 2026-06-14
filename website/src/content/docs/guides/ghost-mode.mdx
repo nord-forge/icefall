@@ -1,0 +1,60 @@
+---
+title: Set up container hibernation
+description: Use Ghost Mode to hibernate idle apps and save resources.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Ghost Mode hibernates an app after a period of inactivity, freeing the resources
+its containers hold. The app wakes again when you bring it back, which suits
+staging environments, demos, and rarely used internal tools.
+
+## Prerequisites
+
+- A deployed app.
+
+## Enable Ghost Mode
+
+<Steps>
+
+1. Open the app and go to the **Settings** tab.
+
+2. Turn on **Ghost Mode**.
+
+3. Set the **idle timeout** in minutes — how long the app sits idle before it
+   hibernates (default 30). Save.
+
+</Steps>
+
+When the app hibernates, its status changes to `hibernating` and its containers
+are stopped.
+
+## Wake a hibernated app
+
+Bring a hibernated app back from the dashboard's wake control. Icefall starts the
+app's stopped containers and returns the status to `active`.
+
+## Verify
+
+<Steps>
+
+1. Leave the app idle past the timeout and confirm its status shows
+   `hibernating`.
+
+2. Wake it and confirm the status returns to `active` and the app serves traffic.
+
+</Steps>
+
+## Troubleshooting
+
+- **App never hibernates**: confirm Ghost Mode is enabled and that the idle
+  timeout has actually elapsed without activity.
+- **Wake does not work**: wake only applies to an app in the `hibernating` state;
+  an already-active app has nothing to start.
+
+## Related
+
+- [Configure resource limits](/guides/resource-limits)
+- [Configure health checks](/guides/health-checks)

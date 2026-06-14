@@ -38,6 +38,17 @@ update, so a tampered or corrupt download is rejected rather than installed.
 - **beta** — earlier access to new features, less settled. Use it on a
   non-critical server if you want to try things ahead of stable.
 
+## Installing from a fork or mirror
+
+By default Icefall checks the `nord-forge/icefall` GitHub repository for
+releases. Set the `ICEFALL_GITHUB_ORG` environment variable to point the updater
+(and the installer) at a different organization — useful for forks or an internal
+mirror. The repository name is always `icefall`.
+
+```bash
+ICEFALL_GITHUB_ORG=my-org icefall update check
+```
+
 ## Rolling back
 
 If an update causes a problem, return to the previous version:

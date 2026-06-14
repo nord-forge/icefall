@@ -90,11 +90,12 @@ pub(super) async fn create_api_token(
     token_hash: &str,
     expires_at: Option<&str>,
     team_id: Option<&str>,
+    abilities: Option<&str>,
 ) -> Result<ApiToken, DbError> {
     let id = new_id();
     let now = now_iso8601();
-    sqlx::query("INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, team_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(&id).bind(user_id).bind(name).bind(token_hash).bind(expires_at).bind(team_id).bind(&now)
+    sqlx::query("INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, team_id, abilities, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(&id).bind(user_id).bind(name).bind(token_hash).bind(expires_at).bind(team_id).bind(abilities).bind(&now)
         .execute(pool).await?;
     Ok(ApiToken {
         id,
@@ -102,6 +103,7 @@ pub(super) async fn create_api_token(
         name: name.to_string(),
         token_hash: token_hash.to_string(),
         team_id: team_id.map(String::from),
+        abilities: abilities.map(String::from),
         last_used_at: None,
         expires_at: expires_at.map(String::from),
         created_at: now,

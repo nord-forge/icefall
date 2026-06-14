@@ -1,0 +1,83 @@
+---
+title: Manage apps from the CLI
+description: Manage apps, environment variables, domains, and databases with the icefall CLI.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 10 minutes.
+
+Beyond deploying, the `icefall` CLI manages everyday resources: apps, environment
+variables, custom domains, and databases. Every command authenticates with the
+token you set up with `icefall login`.
+
+## Prerequisites
+
+- The `icefall` CLI installed and authenticated (`icefall login`).
+
+## Apps
+
+```bash
+icefall apps list           # list all applications
+icefall apps info <app>     # show details for one app
+icefall status              # server status overview
+```
+
+## Environment variables
+
+```bash
+icefall env list <app>              # list variables for an app
+icefall env set <app> KEY=value     # set or update a variable
+```
+
+For example:
+
+```bash
+icefall env set web DATABASE_URL=postgres://user:pass@db:5432/app
+```
+
+## Domains
+
+```bash
+icefall domains list <app>                 # list domains
+icefall domains add <app> app.example.com  # add a custom domain
+```
+
+## Databases
+
+```bash
+icefall db list                 # list managed databases
+icefall db create postgres      # create a managed database (postgres, mysql, redis, mongo)
+icefall db backup <db>          # trigger a manual backup
+```
+
+## Logs
+
+```bash
+icefall logs <app>                 # stream logs
+icefall logs <app> --search error  # filter the stream
+```
+
+## Verify
+
+After any change, confirm it took effect:
+
+<Steps>
+
+1. Run the matching `list` command (for example `icefall env list <app>`).
+
+2. For variable or config changes, redeploy or restart the app so they apply.
+
+</Steps>
+
+## Troubleshooting
+
+- **Command not authorized**: your token may lack the required role. Use a token
+  for an account with sufficient permissions.
+- **Resource not found**: confirm the app or database name with `icefall apps
+  list` or `icefall db list`.
+
+## Related
+
+- [Deploy from the command line](/guides/cli-deploy)
+- [Manage environment variables](/guides/environment-variables)

@@ -305,6 +305,10 @@ impl Database for SqliteDatabase {
         domains::delete_domain(&self.pool, id).await
     }
 
+    async fn set_primary_domain(&self, app_id: &str, domain_id: &str) -> Result<(), DbError> {
+        domains::set_primary_domain(&self.pool, app_id, domain_id).await
+    }
+
     async fn list_all_domains(&self) -> Result<Vec<Domain>, DbError> {
         domains::list_all_domains(&self.pool).await
     }
@@ -1064,8 +1068,18 @@ impl Database for SqliteDatabase {
         token_hash: &str,
         expires_at: Option<&str>,
         team_id: Option<&str>,
+        abilities: Option<&str>,
     ) -> Result<ApiToken, DbError> {
-        sessions::create_api_token(&self.pool, user_id, name, token_hash, expires_at, team_id).await
+        sessions::create_api_token(
+            &self.pool,
+            user_id,
+            name,
+            token_hash,
+            expires_at,
+            team_id,
+            abilities,
+        )
+        .await
     }
 
     async fn get_api_token_by_hash(&self, token_hash: &str) -> Result<Option<ApiToken>, DbError> {

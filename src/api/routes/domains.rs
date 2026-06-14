@@ -20,6 +20,7 @@ pub fn routes() -> Router<AppState> {
         .route("/apps/{id}/domains", get(list_domains).post(add_domain))
         .route("/apps/{id}/domains/{domain_id}", delete(remove_domain))
         .route("/apps/{id}/domains/{domain_id}/verify", post(verify_domain))
+        .route("/apps/{id}/domains/{domain_id}/primary", post(set_primary))
         .route("/server/ip", get(get_server_ip))
 }
 
@@ -111,6 +112,29 @@ async fn remove_domain(
     state.db.delete_domain(&domain_id).await?;
 
     Ok(Json(serde_json::json!({ "message": "deleted" })))
+}
+
+/// Mark a domain as the app's primary (IF-161). The primary is the canonical
+/// hostname shown in the UI and used for generated links.
+async fn set_primary(
+    State(state): State<AppState>,
+    ctx: TeamCtx,
+    Path((app_id, domain_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
+    let domains = state.db.list_domains(&app_id).await?;
+    if !domains.iter().any(|d| d.id == domain_id) {
+        return Err(ApiError::NotFound(format!("domain {domain_id}")));
+    }
+
+    state.db.set_primary_domain(&app_id, &domain_id).await?;
+    Ok(Json(serde_json::json!({ "message": "primary domain updated" })))
 }
 
 async fn verify_domain(

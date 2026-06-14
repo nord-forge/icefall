@@ -1,0 +1,220 @@
+---
+title: Auth API
+description: Log in, manage sessions, and configure two-factor authentication over the Icefall REST API.
+---
+
+These endpoints handle login, sessions, first-run setup, and two-factor
+authentication. For scripted access prefer an [API token](/api/tokens/) over a
+session. User management lives on the [Users API](/api/users/) page; OAuth is
+covered there too. All paths are relative to `/api/v1`. See the
+[API overview](/api/overview/) for the shared error format and the required
+`X-Icefall-Request` header on writes.
+
+## Sessions and tokens
+
+A session is created by `POST /auth/login` and returned both as a `session_id`
+and as the `icefall_session` cookie (HttpOnly, SameSite=Lax, 7-day lifetime).
+Pass it back as the cookie or as a bearer token. API tokens use the same
+`Authorization: Bearer` header but begin with `icefall_`.
+
+## Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/auth/setup` | — | Whether first-run setup is needed |
+| POST | `/auth/setup` | — | Create the first admin |
+| POST | `/auth/login` | — | Log in |
+| POST | `/auth/logout` | session | Invalidate the current session |
+| PUT | `/auth/password` | session | Change password |
+| POST | `/auth/2fa/setup` | session | Begin 2FA enrollment |
+| POST | `/auth/2fa/verify` | session | Confirm and enable 2FA |
+| POST | `/auth/2fa/validate` | — | Complete login with a 2FA code |
+| POST | `/auth/2fa/backup-codes` | session | Regenerate backup codes |
+| DELETE | `/auth/2fa` | session | Disable 2FA |
+
+## First-run setup
+
+```
+GET /auth/setup
+POST /auth/setup
+```
+
+`GET` reports whether any users exist:
+
+```json
+{ "needs_setup": true, "user_count": 0 }
+```
+
+`POST` creates the first admin and sets a session cookie. It succeeds only
+while no users exist (otherwise `409 conflict`). The password must be at least
+12 characters.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | yes | Admin email |
+| `password` | string | yes | At least 12 characters |
+
+## Log in
+
+```
+POST /auth/login
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | yes | Account email |
+| `password` | string | yes | Account password |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/auth/login \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "nick@acme.com", "password": "correct horse battery staple" }'
+```
+
+On success:
+
+```json
+{
+  "data": {
+    "user": { "id": "usr_nick", "email": "nick@acme.com", "role": "admin", "totp_enabled": false },
+    "session_id": "sess_abc123"
+  }
+}
+```
+
+If the account has 2FA enabled, login returns a challenge instead of a
+session; complete it with `POST /auth/2fa/validate`:
+
+```json
+{ "requires_2fa": true, "challenge": "chl_xyz789" }
+```
+
+Login is rate-limited to 5 attempts per 15 minutes per IP. Exceeding it
+returns `429 too_many_requests`.
+
+## Log out
+
+```
+POST /auth/logout
+```
+
+```json
+{ "message": "logged out" }
+```
+
+## Change password
+
+```
+PUT /auth/password
+```
+
+Verifies the current password and invalidates all other sessions. The new
+password must be at least 12 characters.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `current_password` | string | yes | Existing password |
+| `new_password` | string | yes | At least 12 characters |
+
+```json
+{ "message": "password changed" }
+```
+
+## Two-factor authentication
+
+### Enroll
+
+```
+POST /auth/2fa/setup
+```
+
+Generates a TOTP secret and QR code but does not enable 2FA yet:
+
+```json
+{
+  "data": {
+    "secret": "JBSWY3DPEHPK3PXP",
+    "qr_svg": "<svg ...>",
+    "otpauth_url": "otpauth://totp/Icefall:nick@acme.com?secret=..."
+  }
+}
+```
+
+### Confirm
+
+```
+POST /auth/2fa/verify
+```
+
+Confirms enrollment with a code from the authenticator app, enables 2FA, and
+returns one-time backup codes.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | yes | 6-digit TOTP code |
+
+```json
+{
+  "data": { "totp_enabled": true, "backup_codes": ["A1B2C3D4", "E5F6G7H8"] },
+  "warning": "Save these backup codes securely. They will not be shown again."
+}
+```
+
+### Complete login
+
+```
+POST /auth/2fa/validate
+```
+
+Exchanges a login challenge plus a code for a session. Accepts a TOTP code or
+a backup code. Rate-limited to 5 attempts per 5 minutes per IP.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `challenge` | string | yes | Challenge from `/auth/login` |
+| `code` | string | yes | TOTP or backup code |
+
+```json
+{
+  "data": {
+    "user": { "id": "usr_nick", "email": "nick@acme.com", "role": "admin", "totp_enabled": true },
+    "session_id": "sess_def456"
+  }
+}
+```
+
+### Regenerate backup codes
+
+```
+POST /auth/2fa/backup-codes
+```
+
+Requires a current TOTP code and replaces all previous backup codes.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | yes | 6-digit TOTP code |
+
+```json
+{
+  "data": { "backup_codes": ["X9Y8Z7W6", "V5U4T3S2"] },
+  "warning": "Save these backup codes securely. They replace all previous codes."
+}
+```
+
+### Disable
+
+```
+DELETE /auth/2fa
+```
+
+Requires a TOTP or backup code.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | yes | TOTP or backup code |
+
+```json
+{ "message": "Two-factor authentication has been disabled" }
+```

@@ -1,0 +1,83 @@
+---
+title: Connect an external database
+description: Point an app at a database that Icefall does not manage.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Icefall can create and manage databases for you, but you can also connect an app
+to a database that lives elsewhere — a cloud provider, an existing server, or a
+database your team already runs. Icefall does not provision or back up an
+external database; you connect to it through environment variables, exactly as
+you would in any other host.
+
+## Prerequisites
+
+- A running, reachable external database.
+- A connection string or the individual host, port, user, password, and
+  database name.
+- Network access from the app's server to the database (firewall and security
+  group rules allowing the database port).
+
+## Add the connection details
+
+<Steps>
+
+1. Open the app and go to the **Environment variables** editor.
+
+2. Add the connection string your framework expects, for example:
+
+   ```
+   DATABASE_URL=postgres://app_user:secret@db.example.com:5432/app_production
+   ```
+
+   Or add the parts individually if your app reads them separately:
+
+   ```
+   DB_HOST=db.example.com
+   DB_PORT=5432
+   DB_USER=app_user
+   DB_PASSWORD=secret
+   DB_NAME=app_production
+   ```
+
+3. Save. Connection values are stored masked and shown as dots until you reveal
+   them.
+
+</Steps>
+
+## Apply and verify
+
+<Steps>
+
+1. Redeploy or restart the app so the new environment variables take effect.
+
+2. Watch the **Logs** tab for a successful connection on boot.
+
+3. Confirm the app can read and write by exercising a feature that touches the
+   database.
+
+</Steps>
+
+## Notes and limits
+
+- Backups, the database browser, and lifecycle controls in Icefall apply to
+  **managed** databases only. An external database is operated entirely by you.
+- Restrict the database to the app server's IP where possible, and require TLS
+  on the connection.
+- If you later want backups and the dashboard browser, create a
+  [managed database](/guides/connect-database) instead.
+
+## Troubleshooting
+
+- **Connection refused or timeout**: verify the database port is open from the
+  app server and that the host resolves.
+- **Authentication failed**: re-check the user, password, and database name in
+  the environment variables.
+
+## Related
+
+- [Connect a managed database](/guides/connect-database)
+- [Manage environment variables](/guides/environment-variables)

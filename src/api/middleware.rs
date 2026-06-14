@@ -118,9 +118,7 @@ pub async fn require_auth(
 
     // Authenticated path: identify the caller, then apply a per-user rate
     // limit before running the handler (audit H1).
-    let user_id = resolve_user_id(&state, headers).await;
-
-    let Some(user_id) = user_id else {
+    let Some(caller) = resolve_caller(&state, headers).await else {
         return (
             StatusCode::UNAUTHORIZED,
             axum::Json(serde_json::json!({
@@ -131,16 +129,44 @@ pub async fn require_auth(
             .into_response();
     };
 
-    if is_mutating(&method) && !rate_limit::API_PER_USER.check(&user_id).await {
+    // IF-168: enforce API token ability scoping. A token with non-null
+    // abilities may only reach routes whose required ability it was granted.
+    if let Some(abilities) = &caller.token_abilities {
+        if let Some(required) = crate::api::abilities::required_ability(&method, &path) {
+            if !crate::api::abilities::granted(abilities, &required) {
+                return (
+                    StatusCode::FORBIDDEN,
+                    axum::Json(serde_json::json!({
+                        "error": {
+                            "code": "insufficient_scope",
+                            "message": format!("Token lacks '{required}' ability")
+                        }
+                    })),
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    if is_mutating(&method) && !rate_limit::API_PER_USER.check(&caller.user_id).await {
         return too_many_requests();
     }
 
     next.run(req).await
 }
 
-/// Resolve the authenticated user's ID from a Bearer token (API token or
-/// session) or the session cookie. Returns `None` if not authenticated.
-async fn resolve_user_id(state: &AppState, headers: &axum::http::HeaderMap) -> Option<String> {
+/// An authenticated caller plus, for ability-scoped API tokens, the granted
+/// scopes. `token_abilities` is `None` for session/cookie auth or a token with
+/// null abilities (both = full access).
+struct Caller {
+    user_id: String,
+    token_abilities: Option<Vec<String>>,
+}
+
+/// Resolve the authenticated caller from a Bearer token (API token or session)
+/// or the session cookie. Returns `None` if not authenticated. For ability-
+/// scoped API tokens the granted scopes are returned for enforcement.
+async fn resolve_caller(state: &AppState, headers: &axum::http::HeaderMap) -> Option<Caller> {
     if let Some(auth) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
         if let Some(token) = auth.strip_prefix("Bearer ") {
             if token.starts_with("icefall_") {
@@ -152,12 +178,23 @@ async fn resolve_user_id(state: &AppState, headers: &axum::http::HeaderMap) -> O
                         .is_some_and(|exp| exp < &crate::db::models::now_iso8601());
                     if !expired {
                         let _ = state.db.update_token_last_used(&api_token.id).await;
-                        return Some(api_token.user_id);
+                        // null abilities = full access; otherwise parse the
+                        // granted scopes (a malformed value denies everything).
+                        let token_abilities = api_token.abilities.as_deref().map(|json| {
+                            serde_json::from_str::<Vec<String>>(json).unwrap_or_default()
+                        });
+                        return Some(Caller {
+                            user_id: api_token.user_id,
+                            token_abilities,
+                        });
                     }
                 }
             } else if let Ok(Some(session)) = state.db.get_session(token).await {
                 if session.expires_at >= crate::db::models::now_iso8601() {
-                    return Some(session.user_id);
+                    return Some(Caller {
+                        user_id: session.user_id,
+                        token_abilities: None,
+                    });
                 }
             }
         }
@@ -168,7 +205,10 @@ async fn resolve_user_id(state: &AppState, headers: &axum::http::HeaderMap) -> O
             if let Some(session_id) = part.trim().strip_prefix("icefall_session=") {
                 if let Ok(Some(session)) = state.db.get_session(session_id).await {
                     if session.expires_at >= crate::db::models::now_iso8601() {
-                        return Some(session.user_id);
+                        return Some(Caller {
+                            user_id: session.user_id,
+                            token_abilities: None,
+                        });
                     }
                 }
             }

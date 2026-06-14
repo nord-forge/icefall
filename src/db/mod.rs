@@ -104,6 +104,8 @@ pub trait Database: Send + Sync + 'static {
         ssl_status: &str,
     ) -> Result<(), DbError>;
     async fn delete_domain(&self, id: &str) -> Result<(), DbError>;
+    /// Set one domain as the app's primary, clearing the flag on the rest.
+    async fn set_primary_domain(&self, app_id: &str, domain_id: &str) -> Result<(), DbError>;
     async fn list_all_domains(&self) -> Result<Vec<Domain>, DbError>;
     async fn update_domain_ssl_info(
         &self,
@@ -522,6 +524,7 @@ pub trait Database: Send + Sync + 'static {
         token_hash: &str,
         expires_at: Option<&str>,
         team_id: Option<&str>,
+        abilities: Option<&str>,
     ) -> Result<ApiToken, DbError>;
     async fn get_api_token_by_hash(&self, token_hash: &str) -> Result<Option<ApiToken>, DbError>;
     async fn list_api_tokens(&self, user_id: &str) -> Result<Vec<ApiToken>, DbError>;

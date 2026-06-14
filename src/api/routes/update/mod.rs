@@ -10,8 +10,6 @@ use crate::api::error::ApiError;
 use crate::api::routes::auth::authenticate_from_headers;
 use crate::api::AppState;
 
-const DEFAULT_GITHUB_REPO: &str = "nordforge/icefall";
-
 async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     let user = authenticate_from_headers(state, headers)
         .await?

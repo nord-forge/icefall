@@ -9,7 +9,7 @@ use crate::update::discovery::UpdateChecker;
 use crate::update::rollback::UpdateRollback;
 use crate::update::CURRENT_VERSION;
 
-use super::{require_admin, DEFAULT_GITHUB_REPO};
+use super::require_admin;
 
 pub(super) async fn check_for_update(
     State(state): State<AppState>,
@@ -22,7 +22,7 @@ pub(super) async fn check_for_update(
     let now = now_iso8601();
     state.db.set_last_check_at(&now).await?;
 
-    let checker = UpdateChecker::new(DEFAULT_GITHUB_REPO);
+    let checker = UpdateChecker::new(&crate::update::github_repo());
     let result = checker
         .check_for_update(
             CURRENT_VERSION,

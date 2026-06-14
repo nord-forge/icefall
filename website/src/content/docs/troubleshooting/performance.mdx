@@ -1,0 +1,96 @@
+---
+title: Performance issues
+description: Diagnose high memory, CPU, disk, and dashboard slowness.
+---
+
+## App using too much memory
+
+**Symptom**: A container is killed and restarted repeatedly, or the host runs out
+of memory. Logs may show `OOMKilled` or the process exiting with code 137.
+
+**Cause**: By default Icefall sets no memory limit on a container, so a leak or a
+spike can consume all available host RAM.
+
+**Fix**:
+1. Set a memory limit in the app's resource settings so a single app can't starve
+   the host.
+2. Watch the app's memory graph after deploy — a steadily climbing line that
+   never drops back is a leak in the app, not an Icefall problem.
+3. Right-size the limit: too low and the container is OOM-killed, too high and it
+   defeats the purpose.
+
+:::caution[Rootless Podman]
+On rootless Podman, memory and CPU limits are only enforced when cgroups v2
+delegation is enabled. Without it the limit is silently ignored — Icefall logs a
+warning when you set a limit it expects the runtime to drop. See
+[Podman troubleshooting](/troubleshooting/podman/).
+:::
+
+## High CPU usage
+
+**Symptom**: An app's CPU graph sits near 100% (per core), the host feels
+sluggish, or other apps slow down.
+
+**Cause**: Almost always the app itself — a blocking event loop, heavy
+computation in a request handler, or a tight retry loop — not the platform.
+
+**Fix**:
+1. Open the app's metrics and confirm which container is responsible.
+2. Profile the app under load; move CPU-heavy work out of the request path.
+3. Set a CPU limit (CPU shares) on the app so one container can't monopolize the
+   host.
+
+## Disk full
+
+**Symptom**: Deploys fail mid-build, backups fail, or the dashboard reports the
+server low on disk.
+
+**Cause**: The usual culprits are old container images from past deploys, rotated
+log files, and database dumps.
+
+**Diagnose**:
+
+```bash
+# Docker
+docker system df
+docker images
+
+# Podman
+podman system df
+podman images
+```
+
+**Fix**:
+1. Icefall keeps a bounded number of images per app (the most recent few) and can
+   prune the rest — run a cleanup from the dashboard. Image pruning is **not**
+   automatic by default; you have to trigger it or schedule it.
+2. App logs are capped: each app log rotates at 50 MB and keeps a handful of
+   rotated files, and files older than 7 days are cleaned up. If logs are still
+   large, an app is logging excessively — fix it at the source.
+3. Database backups keep the most recent 7 per database by default; lower the
+   retention if dumps are large, or move instance backups to S3 with
+   `ICEFALL_BACKUP_S3_BUCKET`.
+
+**Prevention**: Schedule image cleanup, and alert on disk usage before it fills.
+
+## Slow or laggy dashboard
+
+**Symptom**: The dashboard feels slow to update, or live metrics and logs stutter.
+
+**Cause**: The dashboard streams live updates over Server-Sent Events (SSE) and
+the daemon collects container metrics and runs health checks on 10-second cycles.
+A very large number of apps, or many browser tabs each holding open SSE
+connections, multiplies that work.
+
+**Fix**:
+1. Close extra dashboard tabs — each one holds its own event stream.
+2. If you run a large fleet, prefer one server's view at a time over keeping
+   every app's live stream open.
+3. Check the host isn't already CPU- or memory-starved (see above) — a loaded
+   host makes the daemon's collectors lag too.
+
+## See also
+
+- [Architecture](/concepts/architecture/) — what the background workers do
+- [Metrics](/monitoring/metrics/) — reading the graphs
+- [Podman troubleshooting](/troubleshooting/podman/) — rootless limit and stats caveats

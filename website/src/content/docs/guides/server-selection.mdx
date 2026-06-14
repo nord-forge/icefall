@@ -1,0 +1,60 @@
+---
+title: How server recommendation works
+description: Understand the scoring Icefall uses to recommend a server for a new app.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+When you create an app on a multi-server instance, Icefall recommends the server
+with the most available capacity. The recommendation comes from a score computed
+from each online server's current load.
+
+## Prerequisites
+
+- An Icefall instance with more than one connected server.
+
+## See the recommendation
+
+<Steps>
+
+1. Start **Apps > Create app** and reach the server selection step.
+
+2. Each online server shows CPU, RAM, and disk usage and its app count. The
+   highest-scoring server is marked **Recommended**.
+
+3. Accept the recommendation, or pick another server to override it.
+
+</Steps>
+
+## How the score is computed
+
+The score averages four signals, each expressed as available headroom between 0
+and 1:
+
+- **CPU availability** — `(100 − cpu%) / 100`
+- **RAM availability** — `1 − (ram used / ram total)`
+- **Disk availability** — `1 − (disk used / disk total)`
+- **App load** — `1 / (app count + 1)`, so each additional app lowers the score
+
+The four are averaged into a single score. The online server with the highest
+score is recommended. Offline servers are never recommended.
+
+## When to override
+
+The recommendation optimizes for free capacity. Override it when you have other
+requirements, such as keeping an app near its database, pinning to a specific
+region, or isolating a workload on its own server.
+
+## Troubleshooting
+
+- **No server recommended**: at least one server must be online. Reconnect any
+  offline servers.
+- **Recommendation seems off**: scores reflect current usage, which shifts as
+  load changes; recheck after metrics refresh.
+
+## Related
+
+- [Add a worker server](/guides/add-server)
+- [Move an app to another server](/guides/migrate-app)
