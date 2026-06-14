@@ -3,7 +3,8 @@ title: Installation
 description: Install Icefall on your server in under 2 minutes.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Code } from '@astrojs/starlight/components';
+import installScript from '../../../../../install.sh?raw';
 
 ## One-liner install
 
@@ -15,10 +16,21 @@ This will:
 1. Detect your OS and architecture
 2. Detect or install a container runtime — Docker or Podman
 3. Install Caddy (for automatic HTTPS)
-4. Download the Icefall binary
+4. Download the Icefall binary and dashboard
 5. Generate a config file with a random encryption key
 6. Create and start a systemd service
 7. Print your dashboard URL
+
+Piping a script straight into `bash` is convenient, but you should read what you
+run. The full installer is reproduced below — it is the exact script served at
+`icefall.dev/install.sh`.
+
+<details>
+<summary>Read the full <code>install.sh</code></summary>
+
+<Code code={installScript} lang="bash" title="install.sh" />
+
+</details>
 
 ## Install flags
 
@@ -30,6 +42,7 @@ order after `bash -s --`.
 | `--runtime=NAME` | `ICEFALL_RUNTIME` | `docker`, `podman`, `auto` | `auto` | Which container runtime to use |
 | `--yes` | — | — | off | Non-interactive: accept all defaults, ask nothing |
 | — | `ICEFALL_VERSION` | version tag, or `latest` | `latest` | Which Icefall release to install |
+| — | `ICEFALL_GITHUB_ORG` | GitHub org | `nord-forge` | Org to download releases from (forks/mirrors) |
 | — | `NO_COLOR` | any non-empty value | off | Disable colored output |
 
 ## Choosing a container runtime
@@ -91,6 +104,11 @@ you intend to switch.
 
 ## Manual install
 
+Releases are published as a tarball containing the `icefall` binary **and** the
+dashboard. The daemon serves the dashboard from `dashboard/dist` relative to its
+working directory, so extract the tarball into the data directory and point the
+service's `WorkingDirectory` there.
+
 <Tabs>
 <TabItem label="Ubuntu/Debian">
 ```bash
@@ -100,14 +118,16 @@ curl -fsSL https://get.docker.com | sh
 # Install Caddy
 sudo apt install -y caddy
 
-# Download Icefall (use the URL matching your architecture)
-# x86_64:
-sudo curl -fsSL -o /usr/local/bin/icefall \
-  https://github.com/nordforge/icefall/releases/latest/download/icefall-x86_64-unknown-linux-gnu
-# aarch64 (ARM):
-# sudo curl -fsSL -o /usr/local/bin/icefall \
-#   https://github.com/nordforge/icefall/releases/latest/download/icefall-aarch64-unknown-linux-gnu
-sudo chmod +x /usr/local/bin/icefall
+# Pick the tarball matching your architecture: x86_64-linux or aarch64-linux
+ARCH=x86_64-linux
+TAG=$(curl -fsSL https://api.github.com/repos/nord-forge/icefall/releases/latest \
+  | grep -m1 '"tag_name"' | cut -d'"' -f4)
+
+# Download and extract the binary + dashboard into the data directory
+sudo mkdir -p /var/lib/icefall
+curl -fsSL "https://github.com/nord-forge/icefall/releases/download/${TAG}/icefall-${TAG}-${ARCH}.tar.gz" \
+  | sudo tar -xz -C /var/lib/icefall
+sudo install -m 755 /var/lib/icefall/icefall /usr/local/bin/icefall
 
 # Initialize
 sudo icefall init
@@ -127,19 +147,28 @@ sudo systemctl enable --now docker
 sudo dnf copr enable @caddy/caddy
 sudo dnf install -y caddy
 
-# Download Icefall (use the URL matching your architecture)
-# x86_64:
-sudo curl -fsSL -o /usr/local/bin/icefall \
-  https://github.com/nordforge/icefall/releases/latest/download/icefall-x86_64-unknown-linux-gnu
-# aarch64 (ARM):
-# sudo curl -fsSL -o /usr/local/bin/icefall \
-#   https://github.com/nordforge/icefall/releases/latest/download/icefall-aarch64-unknown-linux-gnu
-sudo chmod +x /usr/local/bin/icefall
+# Pick the tarball matching your architecture: x86_64-linux or aarch64-linux
+ARCH=x86_64-linux
+TAG=$(curl -fsSL https://api.github.com/repos/nord-forge/icefall/releases/latest \
+  | grep -m1 '"tag_name"' | cut -d'"' -f4)
+
+# Download and extract the binary + dashboard into the data directory
+sudo mkdir -p /var/lib/icefall
+curl -fsSL "https://github.com/nord-forge/icefall/releases/download/${TAG}/icefall-${TAG}-${ARCH}.tar.gz" \
+  | sudo tar -xz -C /var/lib/icefall
+sudo install -m 755 /var/lib/icefall/icefall /usr/local/bin/icefall
+
 sudo icefall init
 sudo systemctl enable --now icefall
 ```
 </TabItem>
 </Tabs>
+
+:::caution[Manual installs need `WorkingDirectory`]
+When you write the systemd unit yourself, set `WorkingDirectory=/var/lib/icefall`
+so the daemon can find `dashboard/dist`. The one-liner installer does this for
+you.
+:::
 
 ## Non-interactive install
 

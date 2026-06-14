@@ -11,7 +11,7 @@
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/nordforge/icefall.git
+git clone https://github.com/nord-forge/icefall.git
 cd icefall
 
 # 2. Build the Rust daemon
@@ -184,7 +184,7 @@ For the full experience (HTTPS, domains, webhooks), use a cheap VPS:
 
 ```bash
 # On a fresh Ubuntu 24.04 server:
-curl -fsSL https://raw.githubusercontent.com/nordforge/icefall/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nord-forge/icefall/main/install.sh | bash
 
 # Then open http://YOUR_IP:3000 to complete setup
 ```

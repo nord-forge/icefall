@@ -17,8 +17,6 @@ const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 6
 const WINDOW_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 const DEPLOY_WAIT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
-const DEFAULT_GITHUB_REPO: &str = "nordforge/icefall";
-
 pub fn spawn_update_checker(
     db: Arc<dyn Database>,
     config: Arc<IcefallConfig>,
@@ -27,7 +25,7 @@ pub fn spawn_update_checker(
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 
-        let checker = UpdateChecker::new(DEFAULT_GITHUB_REPO);
+        let checker = UpdateChecker::new(&crate::update::github_repo());
 
         loop {
             debug!("running periodic update check");

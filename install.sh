@@ -3,9 +3,11 @@
 # Usage: curl -fsSL https://icefall.dev/install.sh | bash
 #
 # Environment variables:
-#   ICEFALL_VERSION   - Version to install (default: latest)
-#   ICEFALL_RUNTIME   - Container runtime: docker | podman | auto (default: auto)
-#   NO_COLOR          - Disable colored output
+#   ICEFALL_VERSION    - Version to install (default: latest)
+#   ICEFALL_RUNTIME    - Container runtime: docker | podman | auto (default: auto)
+#   ICEFALL_GITHUB_ORG - GitHub org to install from (default: nord-forge)
+#   ICEFALL_REPO       - Full "org/repo" override (default: $ICEFALL_GITHUB_ORG/icefall)
+#   NO_COLOR           - Disable colored output
 #
 # Flags (positional, any order):
 #   --yes             - Non-interactive; accept defaults
@@ -14,8 +16,11 @@
 set -euo pipefail
 
 ICEFALL_VERSION="${ICEFALL_VERSION:-latest}"
+ICEFALL_REPO="${ICEFALL_REPO:-${ICEFALL_GITHUB_ORG:-nord-forge}/icefall}"
 ICEFALL_BIN="/usr/local/bin/icefall"
 ICEFALL_DATA="/var/lib/icefall"
+# The daemon serves "dashboard/dist" relative to its working directory (src/api/mod.rs).
+ICEFALL_DASHBOARD="$ICEFALL_DATA/dashboard/dist"
 ICEFALL_CONFIG="/etc/icefall/config.toml"
 ICEFALL_SERVICE="/etc/systemd/system/icefall.service"
 ICEFALL_LOG="/var/log/icefall-install.log"
@@ -471,35 +476,107 @@ install_caddy() {
     ok "Caddy installed"
 }
 
+# Fetch a URL to stdout, preferring curl, falling back to wget.
+fetch() {
+    if command -v curl &>/dev/null; then
+        curl -fsSL "$1"
+    else
+        wget -qO- "$1"
+    fi
+}
+
+# Download a URL to a file, preferring curl, falling back to wget.
+fetch_to() {
+    if command -v curl &>/dev/null; then
+        curl -fsSL "$1" -o "$2"
+    else
+        wget -qO "$2" "$1"
+    fi
+}
+
+# Resolve "latest" to a concrete release tag (e.g. v1.2.0) via the GitHub API.
+resolve_release_tag() {
+    if [ "$ICEFALL_VERSION" != "latest" ]; then
+        # Normalize to a leading "v" (accept both "1.2.0" and "v1.2.0").
+        case "$ICEFALL_VERSION" in
+            v*) echo "$ICEFALL_VERSION" ;;
+            *)  echo "v$ICEFALL_VERSION" ;;
+        esac
+        return
+    fi
+
+    local tag
+    tag=$(fetch "https://api.github.com/repos/${ICEFALL_REPO}/releases/latest" 2>/dev/null \
+        | grep -m1 '"tag_name"' \
+        | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+    if [ -z "$tag" ]; then
+        error "Could not resolve the latest Icefall release from github.com/${ICEFALL_REPO}. Set ICEFALL_VERSION=vX.Y.Z to pin a version."
+    fi
+    echo "$tag"
+}
+
 install_icefall() {
+    local tag
+    tag="$(resolve_release_tag)"
+    local version="${tag#v}"
+
     if [ -f "$ICEFALL_BIN" ]; then
         local current_version
         current_version=$("$ICEFALL_BIN" --version 2>/dev/null | awk '{print $2}' || echo "unknown")
-        if [ "$ICEFALL_VERSION" != "latest" ] && [ "$current_version" = "${ICEFALL_VERSION#v}" ]; then
-            ok "Icefall $current_version already installed (matches requested version)"
+        if [ "$current_version" = "$version" ]; then
+            ok "Icefall $current_version already installed (matches $tag)"
             return
         fi
-        info "Upgrading Icefall from $current_version..."
-    fi
-
-    info "Installing Icefall ($ARCH)..."
-
-    local download_url
-    if [ "$ICEFALL_VERSION" = "latest" ]; then
-        download_url="https://github.com/nord-forge/icefall/releases/latest/download/icefall-${ARCH}-unknown-linux-gnu"
+        info "Upgrading Icefall from $current_version to $version..."
     else
-        download_url="https://github.com/nord-forge/icefall/releases/download/${ICEFALL_VERSION}/icefall-${ARCH}-unknown-linux-gnu"
+        info "Installing Icefall $version ($ARCH)..."
     fi
 
-    if command -v curl &>/dev/null; then
-        curl -fsSL "$download_url" -o "${ICEFALL_BIN}.tmp"
+    # Release artifacts are tarballs containing the binary + dashboard/dist.
+    # Naming/layout is the source of truth in scripts/sign-release.py + release.yml.
+    local arch_label="${ARCH}-linux"
+    local tarball="icefall-${tag}-${arch_label}.tar.gz"
+    local base_url="https://github.com/${ICEFALL_REPO}/releases/download/${tag}"
+
+    local workdir
+    workdir="$(mktemp -d)"
+    trap 'rm -rf "$workdir"' RETURN
+
+    info "Downloading $tarball..."
+    fetch_to "${base_url}/${tarball}" "${workdir}/${tarball}" \
+        || error "Failed to download $tarball from $base_url"
+
+    # Verify SHA-256 against the published .sha256 sidecar.
+    if fetch_to "${base_url}/${tarball}.sha256" "${workdir}/${tarball}.sha256" 2>/dev/null; then
+        ( cd "$workdir" && sha256sum -c "${tarball}.sha256" >/dev/null 2>&1 ) \
+            || error "SHA-256 checksum verification failed for $tarball"
+        ok "Checksum verified"
     else
-        wget -qO "${ICEFALL_BIN}.tmp" "$download_url"
+        warn "No checksum file published for $tarball — skipping verification"
     fi
 
-    chmod 755 "${ICEFALL_BIN}.tmp"
-    mv "${ICEFALL_BIN}.tmp" "$ICEFALL_BIN"
+    info "Extracting..."
+    tar -xzf "${workdir}/${tarball}" -C "$workdir"
+
+    # Locate the binary (top level, or one directory deep).
+    local extracted_bin
+    extracted_bin="$(find "$workdir" -maxdepth 2 -type f -name icefall ! -name '*.tar.gz' | head -1)"
+    [ -n "$extracted_bin" ] || error "No 'icefall' binary found inside $tarball"
+
+    install -m 755 "$extracted_bin" "$ICEFALL_BIN"
     ok "Binary installed to $ICEFALL_BIN"
+
+    # Install the dashboard so the daemon can serve it from WorkingDirectory.
+    local extracted_dash
+    extracted_dash="$(find "$workdir" -maxdepth 3 -type d -path '*/dashboard/dist' | head -1)"
+    if [ -n "$extracted_dash" ]; then
+        rm -rf "$ICEFALL_DASHBOARD"
+        mkdir -p "$(dirname "$ICEFALL_DASHBOARD")"
+        cp -r "$extracted_dash" "$ICEFALL_DASHBOARD"
+        ok "Dashboard installed to $ICEFALL_DASHBOARD"
+    else
+        warn "No dashboard/dist found in $tarball — the web UI will not be served"
+    fi
 }
 
 setup_config() {
@@ -562,6 +639,7 @@ $runtime_dep
 
 [Service]
 Type=notify
+WorkingDirectory=$ICEFALL_DATA
 ExecStart=/usr/local/bin/icefall daemon start
 ExecStopPost=-/var/lib/icefall/updates/icefall.rollback rollback --check
 Restart=on-failure
@@ -598,6 +676,7 @@ description="Icefall Deployment Platform"
 command="/usr/local/bin/icefall"
 command_args="daemon start"
 command_background="yes"
+directory="$ICEFALL_DATA"
 pidfile="/var/run/icefall.pid"
 depend() {
     need net $rc_dep
