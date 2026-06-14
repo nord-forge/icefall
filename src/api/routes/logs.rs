@@ -20,10 +20,30 @@ struct LogQuery {
     stream: Option<String>,
     #[serde(default = "default_limit")]
     limit: usize,
+    /// Suppress lines matching the app's noise patterns (IF-193). Default true.
+    #[serde(default = "default_true")]
+    suppress_noise: bool,
 }
 
 fn default_limit() -> usize {
     200
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Split a stored pattern blob (one pattern per line) into lowercased,
+/// non-empty substrings used for case-insensitive matching.
+fn parse_patterns(blob: &Option<String>) -> Vec<String> {
+    blob.as_deref()
+        .map(|s| {
+            s.lines()
+                .map(|l| l.trim().to_lowercase())
+                .filter(|l| !l.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 async fn search_logs(
@@ -40,11 +60,42 @@ async fn search_logs(
             params.limit,
         )
         .await;
-    let count = results.len();
+
+    // Noise suppression + anomaly highlighting from the app's stored patterns.
+    let app = state.db.get_app(&id).await?;
+    let noise = app
+        .as_ref()
+        .map(|a| parse_patterns(&a.log_noise_patterns))
+        .unwrap_or_default();
+    let highlight = app
+        .as_ref()
+        .map(|a| parse_patterns(&a.log_highlight_patterns))
+        .unwrap_or_default();
+
+    let mut suppressed = 0usize;
+    let data: Vec<serde_json::Value> = results
+        .into_iter()
+        .filter_map(|line| {
+            let lower = line.message.to_lowercase();
+            if params.suppress_noise && noise.iter().any(|p| lower.contains(p)) {
+                suppressed += 1;
+                return None;
+            }
+            let highlighted = highlight.iter().any(|p| lower.contains(p));
+            Some(serde_json::json!({
+                "timestamp": line.timestamp,
+                "stream": line.stream,
+                "message": line.message,
+                "highlighted": highlighted,
+            }))
+        })
+        .collect();
+    let count = data.len();
 
     Ok(Json(serde_json::json!({
-        "data": results,
+        "data": data,
         "count": count,
+        "suppressed_count": suppressed,
     })))
 }
 

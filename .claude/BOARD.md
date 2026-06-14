@@ -344,7 +344,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | 🟡 | `github_apps`/`github_installations` tables + build use; webhook automation, PR status checks/comments not wired |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 
-### Phase 26 — Icefall+ Differentiators — 10 ✅ · 7 🟡 · 3 ⬜
+### Phase 26 — Icefall+ Differentiators — 11 ✅ · 6 🟡 · 3 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-175](tickets/phase-26-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | ✅ | `analytics.rs` route + AnalyticsPage |
@@ -365,7 +365,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-190](tickets/phase-26-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | 🟡 | `tunnel_enabled` flag; no tunnel route/CLI |
 | [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | ⬜ | No recommendation engine / UI |
 | [IF-192](tickets/phase-26-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | ✅ | `bundles.rs` route, `bundle_imports`, export/import |
-| [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | 🟡 | `log_noise_patterns`/`log_highlight_patterns` cols; no filtering in viewer |
+| [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | ✅ | Log API applies stored noise patterns (suppress + `suppressed_count`) and highlight flags; `suppress_noise` toggle (2026-06-14) |
 | [IF-194](tickets/phase-26-icefall-plus/IF-194-power-nap-scheduler.md) | Power Nap Scheduler | 🟡 | `power_nap_*` cols; no quiet-hours scheduler |
 
 ### Phase 27 — MCP Expansion — 3 ✅ — complete
@@ -394,8 +394,8 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | Metric | Count |
 |--------|-------|
 | Total tickets | 220 |
-| Done (✅) | ~201 |
-| Partial (🟡) | 12 |
+| Done (✅) | ~202 |
+| Partial (🟡) | 11 |
 | Missing (⬜) | 6 |
 | Phases fully complete | 23 / 28 |
 | Superseded | 1 |
@@ -431,7 +431,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | 23 — Rust Quality | **Done** | 7/7 |
 | 24 — Feature Parity | **Done** | 18/18 |
 | 25 — Parity Gaps | Near done | 11✅ 4🟡 2⬜ / 17 |
-| 26 — Icefall+ | Near done | 10✅ 7🟡 3⬜ / 20 |
+| 26 — Icefall+ | Near done | 11✅ 6🟡 3⬜ / 20 |
 | 27 — MCP Expansion | **Done** | 3/3 |
 | 28 — Comprehensive Docs | **Done** | 8/8 |
 
