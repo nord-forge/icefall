@@ -84,6 +84,17 @@ async fn handle_agent_connection(
         serde_json::json!({ "server_id": &server_id, "name": &server_name }),
     );
 
+    // IF-167: server reachability notification.
+    crate::api::routes::notifications::emit_event(
+        &state.db,
+        &state.config.caddy_admin_url,
+        "server.online",
+        None,
+        &format!("Server '{server_name}' is online"),
+        serde_json::json!({ "server_id": &server_id, "name": &server_name }),
+    )
+    .await;
+
     let sid_send = server_id.clone();
     let send_task = tokio::spawn(async move {
         loop {
@@ -171,6 +182,17 @@ async fn handle_agent_connection(
         None,
         serde_json::json!({ "server_id": &server_id, "name": &server_name, "reason": "disconnected" }),
     );
+
+    // IF-167: server reachability notification.
+    crate::api::routes::notifications::emit_event(
+        &state.db,
+        &state.config.caddy_admin_url,
+        "server.offline",
+        None,
+        &format!("Server '{server_name}' went offline"),
+        serde_json::json!({ "server_id": &server_id, "name": &server_name, "reason": "disconnected" }),
+    )
+    .await;
 }
 
 async fn resolve_chunk_ack(
@@ -305,6 +327,17 @@ pub fn spawn_heartbeat_checker(state: AppState) {
                     None,
                     serde_json::json!({ "server_id": &server_id, "name": &server_name, "reason": "heartbeat_timeout" }),
                 );
+
+                // IF-167: server reachability notification.
+                crate::api::routes::notifications::emit_event(
+                    &state.db,
+                    &state.config.caddy_admin_url,
+                    "server.offline",
+                    None,
+                    &format!("Server '{server_name}' went offline (heartbeat timeout)"),
+                    serde_json::json!({ "server_id": &server_id, "name": &server_name, "reason": "heartbeat_timeout" }),
+                )
+                .await;
             }
         }
     });

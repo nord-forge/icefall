@@ -95,3 +95,18 @@ pub(super) async fn get_notification_rules(
     .await?;
     Ok(rules)
 }
+
+/// All rules subscribed to a given event type, across every scope (IF-167).
+/// Used by the event dispatch pipeline to fan an event out to channels.
+pub(super) async fn get_notification_rules_by_event(
+    pool: &SqlitePool,
+    event_type: &str,
+) -> Result<Vec<NotificationRule>, DbError> {
+    let rules = sqlx::query_as::<_, NotificationRule>(
+        "SELECT * FROM notification_rules WHERE event_type = ?",
+    )
+    .bind(event_type)
+    .fetch_all(pool)
+    .await?;
+    Ok(rules)
+}
