@@ -15,3 +15,7 @@ target/
 *.db
 *.db-wal
 *.db-shm
+
+# Signing keys — private keys must never be committed (keep .pub tracked)
+*.pem
+keys/*.pem
