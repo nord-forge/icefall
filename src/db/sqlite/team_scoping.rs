@@ -36,7 +36,9 @@ pub(super) async fn list_managed_dbs_by_team(
     team_id: &str,
 ) -> Result<Vec<ManagedDatabase>, DbError> {
     let rows = sqlx::query(
-        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, team_id, backup_retention_count, created_at
+        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id,
+                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at,
+                team_id, backup_retention_count, created_at
          FROM databases WHERE team_id = ? ORDER BY created_at DESC",
     )
     .bind(team_id)
@@ -58,6 +60,12 @@ pub(super) async fn list_managed_dbs_by_team(
             backup_schedule: row.get("backup_schedule"),
             app_id: row.get("app_id"),
             project_id: row.get("project_id"),
+            ssl_enabled: row.get("ssl_enabled"),
+            ssl_mode: row.get("ssl_mode"),
+            ssl_ca_cert: row.get("ssl_ca_cert"),
+            ssl_cert: row.get("ssl_cert"),
+            ssl_key: row.get("ssl_key"),
+            ssl_expires_at: row.get("ssl_expires_at"),
             team_id: row.get("team_id"),
             backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
@@ -90,7 +98,9 @@ pub(super) async fn get_managed_db_for_team(
     db_id: &str,
 ) -> Result<Option<ManagedDatabase>, DbError> {
     let row = sqlx::query(
-        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, team_id, backup_retention_count, created_at
+        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id,
+                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at,
+                team_id, backup_retention_count, created_at
          FROM databases WHERE id = ? AND team_id = ?",
     )
     .bind(db_id)
@@ -114,6 +124,12 @@ pub(super) async fn get_managed_db_for_team(
         backup_schedule: row.get("backup_schedule"),
         app_id: row.get("app_id"),
         project_id: row.get("project_id"),
+        ssl_enabled: row.get("ssl_enabled"),
+        ssl_mode: row.get("ssl_mode"),
+        ssl_ca_cert: row.get("ssl_ca_cert"),
+        ssl_cert: row.get("ssl_cert"),
+        ssl_key: row.get("ssl_key"),
+        ssl_expires_at: row.get("ssl_expires_at"),
         team_id: row.get("team_id"),
         backup_retention_count: row.get("backup_retention_count"),
         created_at: row.get("created_at"),

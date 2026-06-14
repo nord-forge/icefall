@@ -10,6 +10,12 @@ pub struct ManagedDatabase {
     pub backup_schedule: Option<String>,
     pub app_id: Option<String>,
     pub project_id: Option<String>,
+    pub ssl_enabled: bool,
+    pub ssl_mode: Option<String>,
+    pub ssl_ca_cert: Option<String>,
+    pub ssl_cert: Option<String>,
+    pub ssl_key: Option<String>,
+    pub ssl_expires_at: Option<String>,
     /// Owning team. NOT NULL in the schema — every database belongs to a team.
     pub team_id: String,
     pub backup_retention_count: i32,

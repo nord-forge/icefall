@@ -36,6 +36,12 @@ pub(super) async fn create_managed_db(
         backup_schedule: None,
         app_id: db.app_id.clone(),
         project_id: None,
+        ssl_enabled: false,
+        ssl_mode: None,
+        ssl_ca_cert: None,
+        ssl_cert: None,
+        ssl_key: None,
+        ssl_expires_at: None,
         team_id: db.team_id.clone(),
         backup_retention_count: 7,
         created_at: now,
@@ -64,7 +70,9 @@ pub(super) async fn list_managed_dbs(
     encryptor: &Encryptor,
 ) -> Result<Vec<ManagedDatabase>, DbError> {
     let rows = sqlx::query(
-        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, backup_retention_count, created_at
+        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id,
+                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at,
+                team_id, backup_retention_count, created_at
          FROM databases ORDER BY created_at DESC",
     )
     .fetch_all(pool)
@@ -85,6 +93,12 @@ pub(super) async fn list_managed_dbs(
             backup_schedule: row.get("backup_schedule"),
             app_id: row.get("app_id"),
             project_id: row.get("project_id"),
+            ssl_enabled: row.get("ssl_enabled"),
+            ssl_mode: row.get("ssl_mode"),
+            ssl_ca_cert: row.get("ssl_ca_cert"),
+            ssl_cert: row.get("ssl_cert"),
+            ssl_key: row.get("ssl_key"),
+            ssl_expires_at: row.get("ssl_expires_at"),
             team_id: row.get("team_id"),
             backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
@@ -99,7 +113,9 @@ pub(super) async fn list_managed_dbs_by_project(
     project_id: &str,
 ) -> Result<Vec<ManagedDatabase>, DbError> {
     let rows = sqlx::query(
-        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id, backup_retention_count, created_at
+        "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id,
+                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at,
+                team_id, backup_retention_count, created_at
          FROM databases WHERE project_id = ? ORDER BY created_at DESC",
     )
     .bind(project_id)
@@ -121,6 +137,12 @@ pub(super) async fn list_managed_dbs_by_project(
             backup_schedule: row.get("backup_schedule"),
             app_id: row.get("app_id"),
             project_id: row.get("project_id"),
+            ssl_enabled: row.get("ssl_enabled"),
+            ssl_mode: row.get("ssl_mode"),
+            ssl_ca_cert: row.get("ssl_ca_cert"),
+            ssl_cert: row.get("ssl_cert"),
+            ssl_key: row.get("ssl_key"),
+            ssl_expires_at: row.get("ssl_expires_at"),
             team_id: row.get("team_id"),
             backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
@@ -134,5 +156,41 @@ pub(super) async fn delete_managed_db(pool: &SqlitePool, id: &str) -> Result<(),
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub(super) async fn update_database_ssl(
+    pool: &SqlitePool,
+    id: &str,
+    ssl_enabled: bool,
+    ssl_mode: Option<&str>,
+) -> Result<(), DbError> {
+    sqlx::query("UPDATE databases SET ssl_enabled = ?, ssl_mode = ? WHERE id = ?")
+        .bind(ssl_enabled)
+        .bind(ssl_mode)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub(super) async fn store_database_certs(
+    pool: &SqlitePool,
+    id: &str,
+    ca_cert: &str,
+    cert: &str,
+    key: &str,
+    expires_at: &str,
+) -> Result<(), DbError> {
+    sqlx::query(
+        "UPDATE databases SET ssl_ca_cert = ?, ssl_cert = ?, ssl_key = ?, ssl_expires_at = ? WHERE id = ?",
+    )
+    .bind(ca_cert)
+    .bind(cert)
+    .bind(key)
+    .bind(expires_at)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }

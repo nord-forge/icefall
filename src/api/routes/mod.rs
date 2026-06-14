@@ -6,9 +6,12 @@ pub mod auth;
 pub mod backups;
 pub mod bundles;
 pub mod cleanup;
+pub mod clone;
 pub mod config_history;
 pub mod databases;
 pub mod db_browser;
+pub mod db_restore;
+pub mod db_ssl;
 pub mod deploys;
 pub mod domains;
 pub mod env_vars;
@@ -30,6 +33,7 @@ pub mod onboarding;
 pub mod openapi;
 pub mod profile;
 pub mod projects;
+pub mod scheduled_tasks;
 pub mod search;
 pub mod server;
 pub mod servers;
@@ -90,7 +94,30 @@ pub fn api_routes() -> Router<AppState> {
         .merge(teams::routes())
         .merge(shared_variables::routes())
         .merge(openapi::routes())
+        .merge(scheduled_tasks::routes())
         .route("/search", axum::routing::get(search::search))
+        .route("/apps/{id}/clone", axum::routing::post(clone::clone_app))
+        .route("/apps/{id}/move", axum::routing::post(clone::move_app))
+        .route(
+            "/databases/{id}/restore",
+            axum::routing::post(db_restore::restore_database),
+        )
+        .route(
+            "/databases/{id}/restore/history",
+            axum::routing::get(db_restore::list_restore_history),
+        )
+        .route(
+            "/databases/{id}/ssl",
+            axum::routing::put(db_ssl::update_database_ssl),
+        )
+        .route(
+            "/databases/{id}/certificate",
+            axum::routing::get(db_ssl::get_database_certificate),
+        )
+        .route(
+            "/databases/{id}/certificate/regenerate",
+            axum::routing::post(db_ssl::regenerate_certificate),
+        )
         .route(
             "/analytics/deploys",
             axum::routing::get(analytics::deploy_analytics),

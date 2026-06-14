@@ -19,7 +19,9 @@ use crate::api::AppState;
 const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/apps/{id}/terminal", get(terminal_ws))
+    Router::new()
+        .route("/apps/{id}/terminal", get(terminal_ws))
+        .route("/servers/{id}/terminal", get(server_terminal_ws))
 }
 
 #[derive(Deserialize)]
@@ -251,6 +253,154 @@ async fn handle_terminal_inner(
 
     // Abort the docker-to-ws task when the ws-to-docker loop exits
     docker_to_ws.abort();
+
+    Ok(())
+}
+
+async fn server_terminal_ws(
+    State(state): State<AppState>,
+    Path(server_id): Path<String>,
+    Query(query): Query<TerminalQuery>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ApiError> {
+    let token_ref = query.token.as_deref().map(String::from);
+    let header_session = extract_session_id(&headers);
+    let session_id = token_ref
+        .or(header_session)
+        .ok_or_else(|| ApiError::Forbidden("not authenticated".into()))?;
+    let session_id = session_id.as_str();
+
+    let session = state
+        .db
+        .get_session(session_id)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("invalid session".into()))?;
+
+    let user = state
+        .db
+        .get_user_by_id(&session.user_id)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("user not found".into()))?;
+
+    if user.role != "admin" {
+        return Err(ApiError::Forbidden(
+            "Admin role required for server terminal".into(),
+        ));
+    }
+
+    let server = state
+        .db
+        .get_server(&server_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("server {server_id}")))?;
+
+    if !server.terminal_enabled {
+        return Err(ApiError::Forbidden(
+            "Server terminal is not enabled. Enable it in server settings.".into(),
+        ));
+    }
+
+    let is_control_plane = server.role == "control-plane";
+    let agent_registry = state.agent_registry.clone();
+
+    Ok(ws.on_upgrade(move |socket| async move {
+        if is_control_plane {
+            if let Err(e) = handle_local_server_terminal(socket).await {
+                tracing::warn!("Server terminal session ended with error: {e}");
+            }
+        } else {
+            if let Err(e) = handle_remote_server_terminal(socket, agent_registry, server_id).await {
+                tracing::warn!("Remote server terminal session ended with error: {e}");
+            }
+        }
+    }))
+}
+
+async fn handle_local_server_terminal(
+    mut socket: WebSocket,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let _ = socket
+        .send(Message::Text(
+            "Server shell ready. Send commands as text messages.\r\n".into(),
+        ))
+        .await;
+
+    while let Some(Ok(msg)) = socket.next().await {
+        match msg {
+            Message::Text(text) => {
+                let cmd = text.trim();
+                if cmd.is_empty() {
+                    continue;
+                }
+
+                let output = tokio::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(cmd)
+                    .output()
+                    .await;
+
+                match output {
+                    Ok(out) => {
+                        let stdout = String::from_utf8_lossy(&out.stdout);
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        let mut response = stdout.to_string();
+                        if !stderr.is_empty() {
+                            response.push_str(&stderr);
+                        }
+                        let _ = socket.send(Message::Text(response.into())).await;
+                    }
+                    Err(e) => {
+                        let _ = socket
+                            .send(Message::Text(format!("Error: {e}\r\n").into()))
+                            .await;
+                    }
+                }
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_remote_server_terminal(
+    mut socket: WebSocket,
+    agent_registry: std::sync::Arc<crate::agent::registry::AgentRegistry>,
+    server_id: String,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let _ = socket
+        .send(Message::Text(
+            "Remote server terminal proxying via agent...\r\n".into(),
+        ))
+        .await;
+
+    while let Some(Ok(msg)) = socket.next().await {
+        match msg {
+            Message::Text(text) => {
+                let result = agent_registry
+                    .send_request(
+                        &server_id,
+                        "terminal.server.input".into(),
+                        serde_json::json!({ "data": text.to_string() }),
+                    )
+                    .await;
+
+                if let Ok(icefall_common::protocol::AgentMessage::Response {
+                    result: Some(val),
+                    ..
+                }) = result
+                {
+                    if let Some(output) = val.get("output").and_then(|v| v.as_str()) {
+                        let _ = socket.send(Message::Text(output.into())).await;
+                    }
+                }
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
 
     Ok(())
 }
