@@ -79,8 +79,8 @@ export default function ProfilePage() {
 
   // --- Tokens ---
 
-  async function handleCreateToken(name: string): Promise<string> {
-    const { data } = await api.createToken(name);
+  async function handleCreateToken(name: string, abilities?: string[]): Promise<string> {
+    const { data } = await api.createToken(name, undefined, abilities);
     const { data: refreshed } = await api.listTokens();
     setTokens(refreshed);
     return data.token;

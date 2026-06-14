@@ -323,7 +323,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-224](tickets/phase-24-feature-parity/IF-224-git-submodule-lfs-support.md) | Git submodule & LFS support | 2026-05-14 | submodules/lfs/shallow toggles on GitCloneOptions, post-clone steps |
 | [IF-225](tickets/phase-24-feature-parity/IF-225-database-ssl-certificates.md) | Database SSL certificates | 2026-05-14 | rcgen self-signed certs, per-DB SSL toggle + mode, regenerate endpoint |
 
-### Phase 25 — Parity Gaps — 11 ✅ · 4 🟡 · 2 ⬜
+### Phase 25 — Parity Gaps — 12 ✅ · 3 🟡 · 2 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-159](tickets/phase-25-parity-gaps/IF-159-registration-toggle.md) | Registration enable/disable | ✅ | `registration_settings` table, settings PUT, RegistrationSettings UI |
@@ -333,9 +333,9 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-163](tickets/phase-25-parity-gaps/IF-163-post-deploy-commands.md) | Post-deployment commands | ✅ | `post_deploy_commands` exec after container start |
 | [IF-164](tickets/phase-25-parity-gaps/IF-164-backup-retention-config.md) | Configurable backup retention | ✅ | `backup_retention_count` field (default 7) |
 | [IF-165](tickets/phase-25-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | ⬜ | Terminal exists for apps/servers only; no DB terminal route/UI |
-| [IF-166](tickets/phase-25-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | 🟡 | `git_branch` + webhook branch detect; no deploy-branch UI/autocomplete |
+| [IF-166](tickets/phase-25-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | 🟡 | `GET /apps/{id}/branches` added (git ls-remote) for autocomplete (2026-06-14); deploy-branch picker UI still pending |
 | [IF-167](tickets/phase-25-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | 🟡 | Disk + backup events wired; server offline/online dispatch missing |
-| [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | ✅ | `abilities` now enforced in `require_auth` via `api/abilities.rs`; token create accepts scopes, 403 `insufficient_scope` — backend done 2026-06-14 (UI checkboxes/badges pending) |
+| [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | ✅ | Enforced in `require_auth` (`api/abilities.rs`), 403 `insufficient_scope`; token UI has presets + ability checkboxes + badges (2026-06-14) |
 | [IF-169](tickets/phase-25-parity-gaps/IF-169-ssh-key-management.md) | SSH key management | ✅ | `ssh_keys` table, model (ed25519/rsa), encrypted private key |
 | [IF-170](tickets/phase-25-parity-gaps/IF-170-docker-registry-credentials.md) | Container registry credentials | ✅ | `registries` table, encrypted creds, dockerhub/ghcr/gitlab/custom |
 | [IF-171](tickets/phase-25-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | ✅ | `{app}.icefall.internal` generated in deploy + DB hostnames |
@@ -344,7 +344,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | 🟡 | `github_apps`/`github_installations` tables + build use; webhook automation, PR status checks/comments not wired |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 
-### Phase 26 — Icefall+ Differentiators — 10 ✅ · 7 🟡 · 3 ⬜
+### Phase 26 — Icefall+ Differentiators — 11 ✅ · 6 🟡 · 3 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-175](tickets/phase-26-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | ✅ | `analytics.rs` route + AnalyticsPage |
@@ -361,11 +361,11 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-186](tickets/phase-26-icefall-plus/IF-186-canary-probe.md) | Canary Probe | ✅ | `canary_results` table (p50/p95/p99), baseline compare |
 | [IF-187](tickets/phase-26-icefall-plus/IF-187-config-time-machine.md) | Config Time Machine | ✅ | `config_history` table + route, full audit trail |
 | [IF-188](tickets/phase-26-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | ✅ | `deploy_events` table, `list_deploy_events()` |
-| [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | 🟡 | `last_request_at`/`exempt_from_inactivity` cols; no detection job |
+| [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | 🟡 | `GET /apps/inactive` computes inactivity (no deploy 90d / no request 30d, honors exempt) (2026-06-14); sidebar badge + weekly digest pending |
 | [IF-190](tickets/phase-26-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | 🟡 | `tunnel_enabled` flag; no tunnel route/CLI |
 | [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | ⬜ | No recommendation engine / UI |
 | [IF-192](tickets/phase-26-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | ✅ | `bundles.rs` route, `bundle_imports`, export/import |
-| [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | 🟡 | `log_noise_patterns`/`log_highlight_patterns` cols; no filtering in viewer |
+| [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | ✅ | Log API applies stored noise patterns (suppress + `suppressed_count`) and highlight flags; `suppress_noise` toggle (2026-06-14) |
 | [IF-194](tickets/phase-26-icefall-plus/IF-194-power-nap-scheduler.md) | Power Nap Scheduler | 🟡 | `power_nap_*` cols; no quiet-hours scheduler |
 
 ### Phase 27 — MCP Expansion — 3 ✅ — complete
@@ -394,8 +394,8 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | Metric | Count |
 |--------|-------|
 | Total tickets | 220 |
-| Done (✅) | ~201 |
-| Partial (🟡) | 12 |
+| Done (✅) | ~203 |
+| Partial (🟡) | 10 |
 | Missing (⬜) | 6 |
 | Phases fully complete | 23 / 28 |
 | Superseded | 1 |
@@ -430,8 +430,8 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | 22 — Expansion (v1.2) | Near done | 4✅ 1🟡 1⬜ / 6 |
 | 23 — Rust Quality | **Done** | 7/7 |
 | 24 — Feature Parity | **Done** | 18/18 |
-| 25 — Parity Gaps | Near done | 11✅ 4🟡 2⬜ / 17 |
-| 26 — Icefall+ | Near done | 10✅ 7🟡 3⬜ / 20 |
+| 25 — Parity Gaps | Near done | 12✅ 3🟡 2⬜ / 17 |
+| 26 — Icefall+ | Near done | 11✅ 6🟡 3⬜ / 20 |
 | 27 — MCP Expansion | **Done** | 3/3 |
 | 28 — Comprehensive Docs | **Done** | 8/8 |
 
