@@ -6,6 +6,10 @@ use axum::Router;
 
 use crate::api::AppState;
 
+/// Shared trigger used by both the deploy route and the scheduled-deploy
+/// scheduler (IF-179).
+pub(crate) use operations::trigger_deploy;
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route(
@@ -19,6 +23,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/deploys/{deploy_id}/cancel",
             post(operations::cancel_deploy),
+        )
+        .route(
+            "/deploys/{deploy_id}/reschedule",
+            post(operations::reschedule_deploy),
         )
         .route("/deploys/latest", get(query::get_latest_deploys))
 }

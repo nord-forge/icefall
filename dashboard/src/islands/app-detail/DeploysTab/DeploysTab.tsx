@@ -2,13 +2,15 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import type { App, Deploy } from '@lib/types';
-import { formatRelativeTime, formatDuration, shortSha } from '@lib/format';
+import { formatRelativeTime, formatDuration, formatCountdown, shortSha } from '@lib/format';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import Button from '@islands/shared/Button/Button';
 import { createSSEClient } from '@lib/sse';
-import { RotateCcw, X } from 'lucide-preact';
+import { RotateCcw, X, CalendarClock } from 'lucide-preact';
 import ApprovalBadge from './components/ApprovalBadge';
 import CanaryResultsSection from './components/CanaryResultsSection';
+import ScheduleDeployDialog from '@islands/app-detail/AppHeader/components/ScheduleDeployDialog';
+import { currentTimeZone, loadTimeZone, formatInTimeZone } from '@lib/timezone';
 import styles from './deploys-tab.module.css';
 
 type Props = {
@@ -22,6 +24,11 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
   const [loading, setLoading] = useState(true);
   const [rollingBack, setRollingBack] = useState('');
   const [cancelling, setCancelling] = useState('');
+  const [rescheduleTarget, setRescheduleTarget] = useState<Deploy | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [tz, setTz] = useState(currentTimeZone());
+  // Drives the scheduled-deploy countdown re-render.
+  const [, setTick] = useState(0);
 
   async function handleCancel(deployId: string) {
     setCancelling(deployId);
@@ -34,6 +41,21 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
       addToast('error', err.message || 'Failed to cancel deploy');
     }
     setCancelling('');
+  }
+
+  async function handleReschedule(isoUtc: string) {
+    if (!rescheduleTarget) return;
+    setRescheduling(true);
+    try {
+      await api.rescheduleDeploy(rescheduleTarget.id, isoUtc);
+      const { data } = await api.listDeploys(appId);
+      setDeploys(data);
+      setRescheduleTarget(null);
+      addToast('success', 'Deploy rescheduled');
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to reschedule deploy');
+    }
+    setRescheduling(false);
   }
 
   async function handleRollback(deployId: string) {
@@ -56,6 +78,7 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
   }
 
   useEffect(() => {
+    loadTimeZone().then(setTz).catch(() => {});
     api.listDeploys(appId).then(({ data }) => { setDeploys(data); setLoading(false); }).catch(() => setLoading(false));
 
     const sse = createSSEClient('/api/v1/events', {
@@ -67,7 +90,10 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
       },
     });
 
-    return () => sse.close();
+    // Refresh scheduled-deploy countdowns once a minute.
+    const ticker = window.setInterval(() => setTick((t) => t + 1), 60_000);
+
+    return () => { sse.close(); window.clearInterval(ticker); };
   }, [appId]);
 
   if (loading) return <p class={styles.message}>Loading deploys...</p>;
@@ -120,10 +146,16 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
                   {duration ? formatDuration(duration) : '-'}
                 </td>
                 <td class={`${styles.cell} ${styles.time}`}>
-                  {formatRelativeTime(d.created_at)}
+                  {d.status === 'scheduled' && d.scheduled_at ? (
+                    <span class={styles.scheduledTime} title={formatInTimeZone(d.scheduled_at, tz)}>
+                      <CalendarClock size={12} aria-hidden="true" /> {formatCountdown(d.scheduled_at)}
+                    </span>
+                  ) : (
+                    formatRelativeTime(d.created_at)
+                  )}
                 </td>
                 <td class={styles.cell}>
-                  {(d.status === 'pending' || d.status === 'building' || d.status === 'deploying') && (
+                  {(d.status === 'scheduled' || d.status === 'pending' || d.status === 'building' || d.status === 'deploying') && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -131,6 +163,15 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
                       loading={cancelling === d.id}
                     >
                       <X size={12} /> Cancel
+                    </Button>
+                  )}
+                  {d.status === 'scheduled' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRescheduleTarget(d)}
+                    >
+                      <CalendarClock size={12} /> Reschedule
                     </Button>
                   )}
                   {canRollback && (
@@ -152,6 +193,14 @@ export default function DeploysTab({ appId, requireDeployApproval = false, canar
       {canaryEnabled && latestRunning && (
         <CanaryResultsSection deployId={latestRunning.id} canaryEnabled={canaryEnabled} />
       )}
+      <ScheduleDeployDialog
+        open={rescheduleTarget !== null}
+        mode="reschedule"
+        loading={rescheduling}
+        initialIso={rescheduleTarget?.scheduled_at ?? undefined}
+        onConfirm={handleReschedule}
+        onCancel={() => setRescheduleTarget(null)}
+      />
     </div>
   );
 }

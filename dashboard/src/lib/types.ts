@@ -87,17 +87,20 @@ export type Deploy = {
   env_snapshot: string | null;
   no_cache: boolean;
   config_hash: string | null;
+  scheduled_at: string | null;
   created_at: string;
 }
 
 export type DeployStatus =
+  | 'scheduled'
   | 'pending'
   | 'building'
   | 'deploying'
   | 'running'
   | 'failed'
   | 'stopped'
-  | 'cancelled';
+  | 'cancelled'
+  | 'missed';
 
 export type EnvVar = {
   id: string;

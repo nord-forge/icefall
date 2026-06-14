@@ -10,6 +10,10 @@ use crate::db::models::NewNotificationRule;
 const APP_EVENTS: &[&str] = &[
     "deploy.success",
     "deploy.failure",
+    // Scheduled-deploy lifecycle (IF-179).
+    "deploy.scheduled",
+    "deploy.started",
+    "deploy.missed",
     "health.down",
     "health.recovered",
     "health.auto_restart",

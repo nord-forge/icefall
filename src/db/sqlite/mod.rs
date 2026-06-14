@@ -29,6 +29,7 @@ mod projects;
 mod public_ports;
 mod registries;
 mod restore;
+mod scheduled_deploys_tests;
 mod scheduled_tasks;
 mod search;
 mod servers;
@@ -243,6 +244,22 @@ impl Database for SqliteDatabase {
         log: Option<&str>,
     ) -> Result<(), DbError> {
         deploys::update_deploy_status(&self.pool, id, status, log).await
+    }
+
+    async fn list_due_scheduled_deploys(&self) -> Result<Vec<Deploy>, DbError> {
+        deploys::list_due_scheduled_deploys(&self.pool).await
+    }
+
+    async fn start_scheduled_deploy(&self, deploy_id: &str) -> Result<bool, DbError> {
+        deploys::start_scheduled_deploy(&self.pool, deploy_id).await
+    }
+
+    async fn reschedule_deploy(
+        &self,
+        deploy_id: &str,
+        scheduled_at: &str,
+    ) -> Result<bool, DbError> {
+        deploys::reschedule_deploy(&self.pool, deploy_id, scheduled_at).await
     }
 
     // --- Managed Databases ---

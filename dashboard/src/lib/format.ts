@@ -29,6 +29,20 @@ export function formatRelativeTime(isoDate: string): string {
   return date.toLocaleDateString();
 }
 
+/** Time remaining until a future ISO timestamp, e.g. "in 2h 5m" or "due now". */
+export function formatCountdown(isoDate: string): string {
+  const diffSecs = Math.floor((new Date(isoDate).getTime() - Date.now()) / 1000);
+  if (diffSecs <= 0) return 'due now';
+  if (diffSecs < 60) return `in ${diffSecs}s`;
+  if (diffSecs < 3600) return `in ${Math.floor(diffSecs / 60)}m`;
+  if (diffSecs < 86400) {
+    const h = Math.floor(diffSecs / 3600);
+    const m = Math.floor((diffSecs % 3600) / 60);
+    return m ? `in ${h}h ${m}m` : `in ${h}h`;
+  }
+  return `in ${Math.floor(diffSecs / 86400)}d`;
+}
+
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }

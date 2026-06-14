@@ -19,10 +19,10 @@ phases 22/25/26/27 is already implemented (see status columns below).
 5. IF-181 — Built-in API playground
 6. IF-191 — Smart Resource Packer
 
-**Partial — schema/columns exist, enforcement/UI/orchestration missing (21):**
+**Partial — schema/columns exist, enforcement/UI/orchestration missing (20):**
 - Security-relevant first: IF-168 (token ability scoping — not enforced)
 - Phase 25: IF-161, IF-166, IF-167, IF-172, IF-174
-- Phase 26: IF-177, IF-179, IF-184, IF-189, IF-190, IF-193, IF-194
+- Phase 26: IF-177, IF-184, IF-189, IF-190, IF-193, IF-194
 - Phase 27: IF-195 (26/30 tools), IF-197 (missing Windsurf guide + tool ref)
 - Docs (Phase 28): IF-199, IF-201, IF-202, IF-203, IF-207
 
@@ -344,14 +344,14 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | 🟡 | `github_apps`/`github_installations` tables + build use; webhook automation, PR status checks/comments not wired |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 
-### Phase 26 — Icefall+ Differentiators — 12 ✅ · 5 🟡 · 3 ⬜
+### Phase 26 — Icefall+ Differentiators — 13 ✅ · 4 🟡 · 3 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-175](tickets/phase-26-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | ✅ | `analytics.rs` route + AnalyticsPage |
 | [IF-176](tickets/phase-26-icefall-plus/IF-176-resource-usage-forecasting.md) | Resource usage forecasting | ✅ | `forecast.rs` linear regression on metrics history |
 | [IF-177](tickets/phase-26-icefall-plus/IF-177-deploy-preview-screenshots.md) | Deploy preview screenshots | 🟡 | `screenshot_path` column; no capture pipeline |
 | [IF-178](tickets/phase-26-icefall-plus/IF-178-incident-timeline.md) | Incident timeline & status page | ✅ | `incidents`/`incident_notes` tables, route, IncidentsPage |
-| [IF-179](tickets/phase-26-icefall-plus/IF-179-scheduled-deploys.md) | Scheduled deploys | 🟡 | `scheduled_at` column; no scheduler firing deploys at time |
+| [IF-179](tickets/phase-26-icefall-plus/IF-179-scheduled-deploys.md) | Scheduled deploys | ✅ | Migration adds `scheduled`/`missed` statuses; `trigger_deploy` extracted + shared; `deploy::scheduler` fires due deploys every 30s with a 30m miss-grace; create/cancel/reschedule API; dashboard schedule dialog + countdown; all wall-clock times use the user's configured timezone (`@lib/timezone`, browser fallback), stored/compared as UTC; `deploy.scheduled`/`started`/`missed` notifications. Calendar view (stretch) skipped |
 | [IF-180](tickets/phase-26-icefall-plus/IF-180-app-dependency-graph.md) | App dependency graph | ⬜ | No route/page/visualization |
 | [IF-181](tickets/phase-26-icefall-plus/IF-181-api-playground.md) | Built-in API playground | ⬜ | No playground route / OpenAPI explorer |
 | [IF-182](tickets/phase-26-icefall-plus/IF-182-deployment-approvals.md) | Deployment approval gates | ✅ | `deploy_approvals` table, `require_deploy_approval`, UI badge |
@@ -403,7 +403,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 > Re-audit note (2026-06-14): the previous board reported Done 167 / Backlog 52.
 > A code-grounded audit of phases 22 & 25–28 found ~25 more tickets already
 > implemented than the board recorded, and downgraded IF-207 (docs) from done to
-> partial. Remaining real work: **6 missing + 21 partial** tickets.
+> partial. Remaining real work: **6 missing + 20 partial** tickets (IF-179 done).
 
 ### Progress
 | Phase | Status | Tickets |

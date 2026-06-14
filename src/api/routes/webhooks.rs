@@ -218,6 +218,7 @@ async fn trigger_deploy(
             server_id: None,
             tag: None,
             no_cache: false,
+            scheduled_at: None,
         })
         .await
     {

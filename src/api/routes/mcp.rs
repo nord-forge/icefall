@@ -143,6 +143,7 @@ async fn call_tool(
                     server_id: None,
                     tag: None,
                     no_cache,
+                    scheduled_at: None,
                 })
                 .await?;
             serde_json::json!({ "deploy_id": deploy.id, "status": deploy.status, "message": format!("Deploy triggered for {}", app.name) })
@@ -376,6 +377,7 @@ async fn call_tool(
                     server_id: None,
                     tag: None,
                     no_cache: false,
+                    scheduled_at: None,
                 })
                 .await?;
             serde_json::json!({ "deploy_id": rollback.id, "message": "Rollback triggered", "image": image_ref })
@@ -464,6 +466,7 @@ async fn call_tool(
                             server_id: None,
                             tag: None,
                             no_cache: false,
+                            scheduled_at: None,
                         })
                         .await
                     {
@@ -538,6 +541,7 @@ async fn call_tool(
                     server_id: None,
                     tag: None,
                     no_cache,
+                    scheduled_at: None,
                 })
                 .await?;
             serde_json::json!({
@@ -594,6 +598,7 @@ async fn call_tool(
                                 server_id: None,
                                 tag: None,
                                 no_cache: false,
+                                scheduled_at: None,
                             })
                             .await?;
                         serde_json::json!({ "action": "rolled_back", "deploy_id": rb.id, "rolled_back_to": target.id })

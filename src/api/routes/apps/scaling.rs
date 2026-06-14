@@ -81,6 +81,7 @@ pub(super) async fn scale_app(
             server_id: None,
             tag: None,
             no_cache: false,
+            scheduled_at: None,
         })
         .await?;
     let deploy_id = deploy.id.clone();

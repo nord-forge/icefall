@@ -29,4 +29,7 @@ pub struct NewDeploy {
     pub server_id: Option<String>,
     pub tag: Option<String>,
     pub no_cache: bool,
+    /// When set (ISO 8601, UTC), the deploy is created in the `scheduled` state
+    /// and the deploy scheduler fires it once this time is reached (IF-179).
+    pub scheduled_at: Option<String>,
 }

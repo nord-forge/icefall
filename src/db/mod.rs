@@ -78,6 +78,10 @@ pub trait Database: Send + Sync + 'static {
         status: &str,
         log: Option<&str>,
     ) -> Result<(), DbError>;
+    async fn list_due_scheduled_deploys(&self) -> Result<Vec<Deploy>, DbError>;
+    async fn start_scheduled_deploy(&self, deploy_id: &str) -> Result<bool, DbError>;
+    async fn reschedule_deploy(&self, deploy_id: &str, scheduled_at: &str)
+        -> Result<bool, DbError>;
 
     // Managed Databases
     async fn create_managed_db(&self, db: &NewManagedDatabase) -> Result<ManagedDatabase, DbError>;
