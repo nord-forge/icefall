@@ -81,6 +81,12 @@ export const api = {
 
   getApp: (id: string) => request<{ data: App }>(`/apps/${id}`),
 
+  // IF-189: apps with no recent activity (for the sidebar badge).
+  listInactiveApps: () =>
+    request<{ data: { id: string; name: string; reasons: string[] }[]; count: number }>(
+      '/apps/inactive',
+    ),
+
   createApp: (body: {
     name: string;
     git_repo?: string;

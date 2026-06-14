@@ -180,10 +180,7 @@ pub fn spawn_metrics_collector(
                                     &caddy_admin_url,
                                     event,
                                     None,
-                                    &format!(
-                                        "Disk on '{}' at {usage_pct}% ({event})",
-                                        server.name
-                                    ),
+                                    &format!("Disk on '{}' at {usage_pct}% ({event})", server.name),
                                     details,
                                 )
                                 .await;

@@ -1,0 +1,16 @@
+/* IF-189: inactive-apps count badge on the Apps nav item */
+.badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-2, 6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: var(--weight-semibold, 600);
+  line-height: 1;
+  color: var(--color-warning-contrast, #1a1205);
+  background: var(--color-warning, oklch(0.78 0.14 75));
+  border-radius: 999px;
+}
