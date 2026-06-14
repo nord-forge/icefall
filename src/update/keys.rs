@@ -13,7 +13,7 @@ pub struct TrustedKey {
 pub static TRUSTED_RELEASE_KEYS: &[TrustedKey] = &[
     TrustedKey {
         id: "icefall-release-2026-r2",
-        fingerprint: "sha256:a8cea8e10e630adb",
+        fingerprint: "sha256:81ccb1eb308387d3",
         public_key_pem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAO8JVuwYQ3q5YCPvXLHYRj3qaukr3/RzY6lfFVjJoRg8=\n-----END PUBLIC KEY-----",
         not_before: "2026-01-01T00:00:00Z",
         not_after: None,

@@ -5,7 +5,7 @@ This directory contains the public keys used to verify Icefall release artifacts
 ## Current Key
 
 - **ID**: `icefall-release-2026-r2`
-- **Fingerprint**: `sha256:a8cea8e10e630adb`
+- **Fingerprint**: `sha256:81ccb1eb308387d3`
 - **Public key**: `icefall-release.pub`
 - **Active since**: 2026-01-01
 
