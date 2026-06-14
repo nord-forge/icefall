@@ -194,6 +194,7 @@ export type ApiToken = {
   id: string;
   name: string;
   prefix: string;
+  abilities?: string[];
   last_used_at: string | null;
   expires_at: string | null;
   created_at: string;

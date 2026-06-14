@@ -313,10 +313,18 @@ export const api = {
 
   listTokens: () => request<{ data: ApiToken[] }>('/tokens'),
 
-  createToken: (name: string, expiresAt?: string) =>
+  createToken: (name: string, expiresAt?: string, abilities?: string[]) =>
     request<{ data: ApiToken & { token: string } }>(
       '/tokens',
-      { method: 'POST', body: JSON.stringify({ name, expires_at: expiresAt }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          expires_at: expiresAt,
+          // Omit when empty so the backend stores null = full access.
+          abilities: abilities && abilities.length > 0 ? abilities : undefined,
+        }),
+      },
     ),
 
   revokeToken: (tokenId: string) =>

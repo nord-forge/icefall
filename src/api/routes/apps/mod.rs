@@ -1,5 +1,6 @@
 mod crud;
 mod drift;
+mod insights;
 mod lifecycle;
 mod migrate;
 mod scaling;
@@ -12,6 +13,8 @@ use crate::api::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/apps", get(crud::list_apps).post(crud::create_app))
+        .route("/apps/inactive", get(insights::list_inactive))
+        .route("/apps/{id}/branches", get(insights::list_branches))
         .route(
             "/apps/{id}",
             get(crud::get_app)

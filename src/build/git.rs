@@ -155,6 +155,33 @@ async fn resolve_sha(work_dir: &Path) -> Result<String, BuildError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
+/// List remote branch names via `git ls-remote --heads` (IF-166). Works for
+/// public repos and repos the server has ambient credentials for; private
+/// repos without credentials return an error that the caller surfaces.
+pub async fn list_remote_branches(repo_url: &str) -> Result<Vec<String>, BuildError> {
+    let output = tokio::process::Command::new("git")
+        .args(["ls-remote", "--heads", repo_url])
+        .output()
+        .await
+        .map_err(|e| BuildError::GitClone(e.to_string()))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(BuildError::GitClone(stderr.trim().to_string()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut branches: Vec<String> = stdout
+        .lines()
+        .filter_map(|l| l.split_whitespace().nth(1))
+        .filter_map(|r| r.strip_prefix("refs/heads/"))
+        .map(str::to_string)
+        .collect();
+    branches.sort();
+    branches.dedup();
+    Ok(branches)
+}
+
 fn inject_token_into_url(url: &str, token: &str) -> String {
     if let Some(rest) = url.strip_prefix("https://") {
         format!("https://x-access-token:{token}@{rest}")
