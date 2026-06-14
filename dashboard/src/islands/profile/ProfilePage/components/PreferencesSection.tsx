@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Settings2 } from 'lucide-preact';
 import Select from '@islands/shared/Select/Select';
+import { rememberTimeZone } from '@lib/timezone';
 import styles from '../profile-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -55,6 +56,7 @@ export default function PreferencesSection({ preferences, onUpdatePreference }: 
             options={Intl.supportedValuesOf('timeZone').map(tz => ({ value: tz, label: tz.replace(/_/g, ' ') }))}
             value={(preferences.timezone as string) || Intl.DateTimeFormat().resolvedOptions().timeZone}
             onChange={async (timezone) => {
+              rememberTimeZone(timezone);
               await savePreference({ timezone });
             }}
             fullWidth

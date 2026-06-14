@@ -92,6 +92,14 @@
   font-size: var(--text-xs);
 }
 
+.scheduledTime {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-info);
+  font-weight: var(--weight-medium);
+}
+
 /* Tablet+: restore standard table layout */
 @media (min-width: 641px) {
   .table,

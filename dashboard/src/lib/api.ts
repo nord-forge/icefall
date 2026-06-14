@@ -124,7 +124,7 @@ export const api = {
   getLatestDeploys: (appIds: string[]) =>
     request<{ data: Deploy[] }>(`/deploys/latest?app_ids=${appIds.join(',')}`),
 
-  triggerDeploy: (appId: string, options?: { no_cache?: boolean }) =>
+  triggerDeploy: (appId: string, options?: { no_cache?: boolean; scheduled_at?: string }) =>
     request<{ data: Deploy }>(`/apps/${appId}/deploys`, {
       method: 'POST',
       ...(options ? { body: JSON.stringify(options) } : {}),
@@ -135,6 +135,12 @@ export const api = {
 
   cancelDeploy: (deployId: string) =>
     request<{ data: Deploy }>(`/deploys/${deployId}/cancel`, { method: 'POST' }),
+
+  rescheduleDeploy: (deployId: string, scheduledAt: string) =>
+    request<{ data: Deploy }>(`/deploys/${deployId}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify({ scheduled_at: scheduledAt }),
+    }),
 
   checkDrift: (appId: string) =>
     request<{ data: { drifted: boolean; current_hash: string; deployed_hash: string | null; fields: string[] } }>(

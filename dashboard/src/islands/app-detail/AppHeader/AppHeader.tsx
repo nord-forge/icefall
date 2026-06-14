@@ -4,7 +4,8 @@ import Button from '@islands/shared/Button/Button';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import { useState } from 'preact/hooks';
-import { Settings, Rocket, GitBranch, Container, Layers, Square, Play, RotateCw, ChevronDown, Zap } from 'lucide-preact';
+import { Settings, Rocket, GitBranch, Container, Layers, Square, Play, RotateCw, ChevronDown, Zap, CalendarClock } from 'lucide-preact';
+import ScheduleDeployDialog from './components/ScheduleDeployDialog';
 import styles from './app-header.module.css';
 
 type Props = {
@@ -22,6 +23,8 @@ export default function AppHeader({ app, status, onStatusChange, serverName, ser
   const [restarting, setRestarting] = useState(false);
   const [optimisticStatus, setOptimisticStatus] = useState<DeployStatus | 'online' | null>(null);
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
 
   const displayStatus = optimisticStatus ?? status;
   const isRunning = displayStatus === 'running' || displayStatus === 'online';
@@ -38,6 +41,19 @@ export default function AppHeader({ app, status, onStatusChange, serverName, ser
       setOptimisticStatus(null);
       addToast('error', err.message || 'Failed to trigger deploy');
       setDeploying(false);
+    }
+  }
+
+  async function handleSchedule(isoUtc: string) {
+    setScheduling(true);
+    try {
+      await api.triggerDeploy(app.id, { scheduled_at: isoUtc });
+      setScheduleOpen(false);
+      addToast('success', 'Deploy scheduled');
+      window.location.href = `/apps/${app.id}/deploys`;
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to schedule deploy');
+      setScheduling(false);
     }
   }
 
@@ -180,10 +196,24 @@ export default function AppHeader({ app, status, onStatusChange, serverName, ser
               >
                 <Zap size={14} /> Force Rebuild (no cache)
               </button>
+              <button
+                type="button"
+                class={styles.deployMenuItem}
+                role="menuitem"
+                onClick={() => { setDeployMenuOpen(false); setScheduleOpen(true); }}
+              >
+                <CalendarClock size={14} /> Schedule for later
+              </button>
             </div>
           )}
         </div>
       </div>
+      <ScheduleDeployDialog
+        open={scheduleOpen}
+        loading={scheduling}
+        onConfirm={handleSchedule}
+        onCancel={() => setScheduleOpen(false)}
+      />
     </div>
   );
 }

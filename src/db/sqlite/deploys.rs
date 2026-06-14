@@ -10,18 +10,27 @@ pub(super) async fn create_deploy(
     let id = new_id();
     let now = now_iso8601();
 
+    // A scheduled deploy waits in the 'scheduled' state with no start time until
+    // the scheduler fires it; an immediate deploy starts 'pending' right away.
+    let (status, started_at) = match deploy.scheduled_at {
+        Some(_) => ("scheduled", None),
+        None => ("pending", Some(now.as_str())),
+    };
+
     sqlx::query(
-        "INSERT INTO deploys (id, app_id, environment_id, status, git_sha, server_id, tag, no_cache, started_at, created_at)
-         VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO deploys (id, app_id, environment_id, status, git_sha, server_id, tag, no_cache, scheduled_at, started_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&deploy.app_id)
     .bind(&deploy.environment_id)
+    .bind(status)
     .bind(&deploy.git_sha)
     .bind(&deploy.server_id)
     .bind(&deploy.tag)
     .bind(deploy.no_cache)
-    .bind(&now)
+    .bind(&deploy.scheduled_at)
+    .bind(started_at)
     .bind(&now)
     .execute(pool)
     .await?;
@@ -29,6 +38,54 @@ pub(super) async fn create_deploy(
     get_deploy(pool, &id)
         .await?
         .ok_or_else(|| DbError::NotFound(id))
+}
+
+/// Scheduled deploys whose trigger time has arrived (`scheduled_at <= now`),
+/// oldest first. The scheduler decides per-deploy whether to fire or mark it
+/// missed (IF-179).
+pub(super) async fn list_due_scheduled_deploys(pool: &SqlitePool) -> Result<Vec<Deploy>, DbError> {
+    let now = now_iso8601();
+    let deploys = sqlx::query_as::<_, Deploy>(
+        "SELECT * FROM deploys WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ? ORDER BY scheduled_at ASC",
+    )
+    .bind(&now)
+    .fetch_all(pool)
+    .await?;
+    Ok(deploys)
+}
+
+/// Move a scheduled deploy into the active pipeline: 'pending' with a start
+/// time stamped. Returns whether a row actually transitioned, so concurrent
+/// scheduler ticks don't double-fire the same deploy.
+pub(super) async fn start_scheduled_deploy(
+    pool: &SqlitePool,
+    deploy_id: &str,
+) -> Result<bool, DbError> {
+    let now = now_iso8601();
+    let res = sqlx::query(
+        "UPDATE deploys SET status = 'pending', started_at = ? WHERE id = ? AND status = 'scheduled'",
+    )
+    .bind(&now)
+    .bind(deploy_id)
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected() > 0)
+}
+
+/// Change the trigger time of a still-scheduled deploy (reschedule, IF-179).
+/// Returns whether the deploy was still in the 'scheduled' state.
+pub(super) async fn reschedule_deploy(
+    pool: &SqlitePool,
+    deploy_id: &str,
+    scheduled_at: &str,
+) -> Result<bool, DbError> {
+    let res =
+        sqlx::query("UPDATE deploys SET scheduled_at = ? WHERE id = ? AND status = 'scheduled'")
+            .bind(scheduled_at)
+            .bind(deploy_id)
+            .execute(pool)
+            .await?;
+    Ok(res.rows_affected() > 0)
 }
 
 pub(super) async fn get_deploy(pool: &SqlitePool, id: &str) -> Result<Option<Deploy>, DbError> {

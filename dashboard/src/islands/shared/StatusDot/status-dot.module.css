@@ -30,6 +30,8 @@
 .building { color: var(--color-primary); }
 .deploying { color: var(--color-primary); }
 .pending { color: var(--color-text-muted); }
+.scheduled { color: var(--color-info); }
+.missed { color: var(--color-warning); }
 .failed { color: var(--color-error); }
 .stopped { color: var(--color-text-muted); }
 .cancelled { color: var(--color-text-muted); }

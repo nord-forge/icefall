@@ -296,6 +296,9 @@ impl DaemonRunner {
 
         crate::api::routes::agent_ws::spawn_heartbeat_checker(state.clone());
 
+        // IF-179: fire deploys parked in the 'scheduled' state when due.
+        crate::deploy::scheduler::spawn_deploy_scheduler(state.clone());
+
         let app = api::build_router(state);
 
         // Start HTTP server — prefer inherited socket from systemd, fall back to bind

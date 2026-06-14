@@ -75,6 +75,7 @@ pub(super) async fn migrate_app(
             server_id: Some(body.target_server_id.clone()),
             tag: None,
             no_cache: false,
+            scheduled_at: None,
         })
         .await?;
 

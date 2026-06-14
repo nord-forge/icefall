@@ -7,6 +7,7 @@ pub mod native;
 pub mod preview;
 pub mod remote;
 pub mod s3_mount;
+pub mod scheduler;
 
 use thiserror::Error;
 
