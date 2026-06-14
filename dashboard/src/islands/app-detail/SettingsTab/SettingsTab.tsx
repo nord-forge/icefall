@@ -323,6 +323,7 @@ export default function SettingsTab({ app, servers = [] }: Props) {
   return (
     <div class={styles.container}>
       <GeneralSettingsCard
+        appId={app.id}
         name={form.name}
         gitRepo={form.git_repo}
         gitBranch={form.git_branch}

@@ -96,6 +96,10 @@ export const api = {
   updateApp: (id: string, body: Partial<App>) =>
     request<{ data: App }>(`/apps/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
+  // IF-166: list the app's remote branches for the branch picker.
+  listBranches: (id: string) =>
+    request<{ data: string[]; current: string }>(`/apps/${id}/branches`),
+
   deleteApp: (id: string) =>
     request<{ message: string }>(`/apps/${id}`, { method: 'DELETE' }),
 
