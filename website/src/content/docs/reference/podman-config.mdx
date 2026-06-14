@@ -1,0 +1,211 @@
+---
+title: Podman configuration reference
+description: Configuration fields, environment variables, and host settings for running Icefall on Podman.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+This page is the configuration reference for running Icefall on Podman. It
+covers the Icefall `config.toml` fields, the environment-variable overrides,
+and the host-level Podman settings Icefall relies on. For a task-oriented setup
+walkthrough see the [Podman runtime guide](/reference/podman/).
+
+## Icefall configuration
+
+### Config file fields
+
+Two fields in `config.toml` select and locate the container runtime:
+
+```toml title="/etc/icefall/config.toml"
+runtime = "podman"
+container_socket = "/run/podman/podman.sock"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `runtime` | `"docker"` \| `"podman"` | `"docker"` | Which container runtime to drive. |
+| `container_socket` | string | auto-detected | Path to the runtime's API socket. Also accepts the legacy key `docker_socket`. |
+
+If `container_socket` is omitted, Icefall probes for a socket in this order and
+uses the first that exists:
+
+1. The rootless Podman socket from `$XDG_RUNTIME_DIR/podman/podman.sock`
+2. `/run/podman/podman.sock` (rootful Podman)
+3. `/var/run/podman/podman.sock` (alternate rootful Podman)
+4. `/var/run/docker.sock` (Docker)
+
+The runtime is inferred from the socket path: a path containing `podman`
+selects Podman. So setting only `container_socket = "/run/podman/podman.sock"`
+is enough — you do not also need `runtime = "podman"`.
+
+### Worker server configuration
+
+A worker server's agent uses the same two fields. Set them on each worker so the
+agent talks to the worker's local Podman socket:
+
+```toml title="worker config.toml"
+runtime = "podman"
+container_socket = "/run/podman/podman.sock"
+```
+
+A multi-server fleet may mix runtimes — the control plane can run Docker while a
+worker runs Podman, or vice versa. Each node is detected independently from its
+own socket.
+
+### Environment variables
+
+Environment variables override the config file at startup. They are the simplest
+way to switch runtime without editing a file (for example in a systemd unit).
+
+| Variable | Effect |
+|----------|--------|
+| `ICEFALL_RUNTIME` | `podman` or `docker`. Selecting `podman` also switches `container_socket` to `/run/podman/podman.sock` **unless** you set a custom socket. |
+| `ICEFALL_CONTAINER_SOCKET` | Socket path. The runtime is auto-detected from the path (a `podman` substring selects Podman). |
+| `ICEFALL_DOCKER_SOCKET` | Legacy alias for `ICEFALL_CONTAINER_SOCKET`. Same behavior. |
+
+```bash
+# Select Podman explicitly (socket defaults to /run/podman/podman.sock)
+export ICEFALL_RUNTIME=podman
+
+# Or point at a specific socket — runtime inferred from the path
+export ICEFALL_CONTAINER_SOCKET=/run/user/1000/podman/podman.sock
+```
+
+<Aside type="note">
+There is no `DOCKER_HOST` override. Icefall reads `ICEFALL_CONTAINER_SOCKET`
+(or `ICEFALL_DOCKER_SOCKET`) — it does not consult the standard Docker/Podman
+client environment variables.
+</Aside>
+
+## Host-level Podman configuration
+
+These settings live on the host, not in Icefall. Icefall talks to Podman over
+its API socket, so the socket must be active and the storage/registry config
+must be valid for builds and pulls to work.
+
+### Socket activation
+
+Icefall communicates over a Unix socket. Podman's API socket is socket-activated
+by systemd, so enabling the unit is enough:
+
+<Tabs>
+  <TabItem label="Rootful">
+    ```bash
+    # System-wide socket at /run/podman/podman.sock
+    sudo systemctl enable --now podman.socket
+
+    # Verify it is listening
+    sudo systemctl status podman.socket
+    ```
+  </TabItem>
+  <TabItem label="Rootless">
+    ```bash
+    # Per-user socket at $XDG_RUNTIME_DIR/podman/podman.sock
+    systemctl --user enable --now podman.socket
+
+    # Survive logout/reboot
+    sudo loginctl enable-linger "$USER"
+    ```
+  </TabItem>
+</Tabs>
+
+Confirm the socket answers API calls:
+
+```bash
+sudo curl --unix-socket /run/podman/podman.sock \
+  http://localhost/v4.0.0/libpod/info | head -c 200
+```
+
+### Storage configuration
+
+Podman's storage driver and image location are set in
+`/etc/containers/storage.conf` (rootful) or
+`~/.config/containers/storage.conf` (rootless).
+
+```toml title="/etc/containers/storage.conf"
+[storage]
+driver = "overlay"
+runroot = "/run/containers/storage"
+graphroot = "/var/lib/containers/storage"
+```
+
+| Setting | Recommendation | Why |
+|---------|----------------|-----|
+| `driver` | `overlay` | Best build/run performance. Avoid `vfs` — it copies whole layers and makes builds noticeably slower. |
+| `graphroot` | A volume with room to grow | Images and layers live here. Rootful default is `/var/lib/containers/storage`; rootless is `~/.local/share/containers/storage`. |
+
+Check the active driver:
+
+```bash
+podman info --format '{{.Store.GraphDriverName}}'
+# overlay is what you want; vfs means a config or kernel-support problem
+```
+
+### Registry configuration
+
+For private registries, configure `/etc/containers/registries.conf` (rootful) or
+`~/.config/containers/registries.conf` (rootless). Podman has no implicit Docker
+Hub default for unqualified names — list your search registries explicitly:
+
+```toml title="/etc/containers/registries.conf"
+unqualified-search-registries = ["docker.io"]
+
+[[registry]]
+location = "registry.example.com"
+# Credentials come from `podman login registry.example.com`
+```
+
+<Aside type="caution">
+On Docker an unqualified image like `redis` silently resolves to Docker Hub. On
+Podman it does **not** unless `docker.io` is in
+`unqualified-search-registries`, and you may see
+`short-name "redis" did not resolve to an alias`. Fully qualify images
+(`docker.io/library/redis`) or add the search registry.
+</Aside>
+
+Authenticate to a private registry before deploying images from it:
+
+```bash
+podman login registry.example.com
+# Credentials are written to $XDG_RUNTIME_DIR/containers/auth.json (rootless)
+# or /run/containers/0/auth.json (rootful)
+```
+
+### Resource limits and cgroups v2
+
+Icefall sets CPU and memory limits on the containers it runs. Whether Podman
+enforces them depends on cgroups:
+
+- **Rootful Podman** enforces CPU/memory limits like Docker.
+- **Rootless Podman** only enforces them with **cgroups v2** *and* controller
+  delegation enabled. Without delegation, Podman accepts the limit but the
+  kernel ignores it. Icefall detects this case and logs a warning rather than
+  pretending the limit applies.
+
+Verify cgroups v2 is the active hierarchy:
+
+```bash
+# v2 is unified; this file exists only under cgroups v2
+stat -fc %T /sys/fs/cgroup
+# Expect: cgroup2fs
+
+# Which cgroup version Podman sees
+podman info --format '{{.Host.CgroupsVersion}}'
+# Expect: v2
+```
+
+For rootless enforcement, the user session also needs the cpu/memory
+controllers delegated:
+
+```bash
+cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers
+# The list should include "cpu" and "memory"
+```
+
+If those controllers are missing, rootless limits will be silently ignored —
+keep workloads on rootful Podman, or enable delegation, when hard limits matter.
+
+## Related
+
+- [Podman runtime guide](/reference/podman/) — installation, rootless setup, and migration.
+- [Behavioral differences](/reference/podman-differences/) — how Podman behaves differently from Docker.

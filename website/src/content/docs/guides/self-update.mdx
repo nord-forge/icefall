@@ -1,0 +1,95 @@
+---
+title: Update Icefall
+description: Update Icefall to the latest version and roll back if needed.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Icefall updates itself in place. It downloads the new release, verifies its
+signature, swaps the binary, and restarts the daemon. If a new version fails to
+come up cleanly, you can roll back to the previous one.
+
+## Prerequisites
+
+- Shell access on the Icefall host (the self-update CLI runs locally).
+- Administrator privileges to restart the service.
+
+## Check for an update
+
+```bash
+icefall update check
+```
+
+This reports the installed version and whether a newer release is available,
+without changing anything.
+
+## Apply the update
+
+<Steps>
+
+1. Run the update:
+
+   ```bash
+   icefall update
+   ```
+
+2. Confirm when prompted, or skip the prompt in automation:
+
+   ```bash
+   icefall update --yes
+   ```
+
+3. To pull from a specific channel, pass `--channel`:
+
+   ```bash
+   icefall update --channel beta
+   ```
+
+4. For scripted runs, add `--json` to emit one structured object per step.
+
+</Steps>
+
+Icefall verifies the release signature before applying it; an update with an
+invalid signature is refused.
+
+## Roll back
+
+If the new version misbehaves, return to the previous one:
+
+```bash
+icefall update rollback
+```
+
+Add `--yes` to skip the confirmation prompt.
+
+## Offline and air-gapped updates
+
+On a host without internet access, update from local files you transferred in:
+
+```bash
+icefall update from-file ./icefall-release.tar.gz \
+  --manifest ./manifest.json \
+  --signature ./manifest.sig
+```
+
+## Verify
+
+After updating, confirm the running version:
+
+```bash
+icefall --version
+```
+
+## Troubleshooting
+
+- **Signature verification failed**: re-download the release and manifest; do not
+  bypass verification.
+- **Daemon does not come back**: run `icefall update rollback`, then investigate
+  with the service logs before retrying.
+
+## Related
+
+- [Migrate your instance to a new server](/guides/server-migration)
+- [Add a worker server](/guides/add-server)

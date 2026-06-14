@@ -1,0 +1,251 @@
+---
+title: Users API
+description: Manage users, roles, invites, account settings, and OAuth identities over the Icefall REST API.
+---
+
+These endpoints manage users and roles, handle invites, expose self-service
+account settings, and link OAuth identities. All paths are relative to
+`/api/v1`. See the [API overview](/api/overview/) for authentication, the
+required `X-Icefall-Request` header on writes, and the shared error format.
+
+## Account roles
+
+Account-level operations check the user's account role, distinct from team
+roles: `admin` (full management), `deployer` (deploy and manage apps), and
+`viewer` (read-only).
+
+## Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/users` | admin | List all users |
+| GET | `/users/me` | auth | Get the current user |
+| DELETE | `/users/me` | auth | Delete own account |
+| POST | `/users/invite` | admin | Invite a user |
+| POST | `/users/accept-invite` | — | Accept an invite |
+| PUT | `/users/{id}/role` | admin | Change a user's role |
+| DELETE | `/users/{id}` | admin | Delete a user |
+| POST | `/users/{id}/reset-password` | admin | Issue a temporary password |
+| DELETE | `/users/{id}/2fa` | admin | Reset a user's 2FA |
+| PUT | `/users/me/password` | auth | Change own password |
+| PUT | `/users/me/email` | auth | Change own email |
+| GET | `/users/me/sessions` | auth | List own sessions |
+| DELETE | `/users/me/sessions` | auth | Revoke other sessions |
+| GET | `/users/me/preferences` | auth | Get preferences |
+| PUT | `/users/me/preferences` | auth | Update preferences |
+
+OAuth identity endpoints are at the [end of this page](#oauth-identities).
+
+## List users
+
+```
+GET /users
+```
+
+Admin only.
+
+```json
+{
+  "data": [
+    {
+      "id": "usr_nick",
+      "email": "nick@acme.com",
+      "role": "admin",
+      "totp_enabled": true,
+      "is_active": true,
+      "last_login_at": "2026-06-14T08:00:00Z",
+      "created_at": "2026-05-01T08:00:00Z"
+    }
+  ]
+}
+```
+
+## Current user
+
+```
+GET /users/me
+DELETE /users/me
+```
+
+Get returns the authenticated user. Delete removes the account; it requires
+the password and refuses to remove the last admin.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `password` | string | yes | Current password |
+
+```json
+{ "message": "Account deleted successfully" }
+```
+
+## Invite a user
+
+```
+POST /users/invite
+```
+
+Admin only. Creates an invite and returns the acceptance URL.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | yes | Invitee email |
+| `role` | string | no | `admin`, `deployer`, or `viewer` (default `viewer`) |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/users/invite \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "sam@acme.com", "role": "deployer" }'
+```
+
+```json
+{
+  "data": {
+    "id": "inv_01",
+    "email": "sam@acme.com",
+    "role": "deployer",
+    "token": "invtok_abc",
+    "expires_at": "2026-06-21T10:00:00Z",
+    "created_at": "2026-06-14T10:00:00Z"
+  },
+  "invite_url": "https://icefall.example.com/auth/accept-invite?token=invtok_abc"
+}
+```
+
+## Accept an invite
+
+```
+POST /users/accept-invite
+```
+
+Public. Creates the account from a valid token. The password must be at least
+12 characters.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | yes | Invite token |
+| `password` | string | yes | At least 12 characters |
+
+```json
+{ "data": { "id": "usr_sam", "email": "sam@acme.com", "role": "deployer" } }
+```
+
+## Change a role
+
+```
+PUT /users/{id}/role
+```
+
+Admin only.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | string | yes | `admin`, `deployer`, or `viewer` |
+
+```json
+{ "message": "role updated", "user_id": "usr_sam", "new_role": "admin" }
+```
+
+## Delete a user
+
+```
+DELETE /users/{id}
+```
+
+Admin only. Refuses to delete yourself or the last admin.
+
+```json
+{ "message": "User deleted successfully" }
+```
+
+## Reset a password
+
+```
+POST /users/{id}/reset-password
+```
+
+Admin only. Issues a one-time temporary password and invalidates the user's
+sessions.
+
+```json
+{
+  "data": { "user_id": "usr_sam", "email": "sam@acme.com", "temporary_password": "Tmp-9fQ2-Lk7" },
+  "warning": "This temporary password will only be shown once. Share it securely with the user."
+}
+```
+
+## Reset a user's 2FA
+
+```
+DELETE /users/{id}/2fa
+```
+
+Admin only. Disables 2FA for the user and invalidates their sessions.
+
+```json
+{
+  "message": "Two-factor authentication has been reset for this user",
+  "user_id": "usr_sam",
+  "email": "sam@acme.com"
+}
+```
+
+## Account self-service
+
+```
+PUT /users/me/password
+PUT /users/me/email
+GET /users/me/sessions
+DELETE /users/me/sessions
+GET /users/me/preferences
+PUT /users/me/preferences
+```
+
+Change own password (current plus new, 12-character minimum) or email (new
+email plus current password). List active sessions, where `is_current` marks
+the calling session:
+
+```json
+{
+  "data": [
+    { "id": "sess_abc", "created_at": "2026-06-14T08:00:00Z", "expires_at": "2026-06-21T08:00:00Z", "is_current": true }
+  ]
+}
+```
+
+`DELETE /users/me/sessions` revokes every session except the current one.
+Preferences are a free-form JSON object; `PUT` merges the body into it.
+
+## OAuth identities
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/auth/oauth/{provider}/authorize` | — | Start OAuth login (redirect) |
+| GET | `/auth/oauth/{provider}/callback` | — | OAuth callback (redirect) |
+| GET | `/auth/oauth/{provider}/link` | auth | Link a provider to the account |
+| DELETE | `/auth/oauth/{provider}/unlink` | auth | Unlink a provider |
+| GET | `/auth/oauth/identities` | auth | List linked identities |
+| GET | `/settings/oauth/providers` | — | Which providers are enabled |
+| GET | `/settings/oauth` | admin | Read OAuth settings |
+| PUT | `/settings/oauth` | admin | Update OAuth settings |
+
+`{provider}` is `github` or `google`. The `authorize`, `callback`, and `link`
+endpoints respond with `307` redirects. Unlinking the last provider requires
+the account password in the body.
+
+List linked identities:
+
+```json
+{
+  "data": [
+    { "id": "oid_01", "provider": "github", "provider_email": "nick@acme.com", "created_at": "2026-05-02T10:00:00Z" }
+  ]
+}
+```
+
+Which providers are enabled (public):
+
+```json
+{ "data": { "github": true, "google": false } }
+```

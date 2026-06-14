@@ -1,0 +1,71 @@
+---
+title: Enable two-factor authentication
+description: Protect your account with a TOTP authenticator app and backup codes.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Two-factor authentication (2FA) adds a time-based one-time code (TOTP) to your
+login. After enabling it, you enter a 6-digit code from your authenticator app
+in addition to your password.
+
+## Prerequisites
+
+- An authenticator app such as 1Password, Aegis, Google Authenticator, or Authy.
+- Access to your Icefall account.
+
+## Enable 2FA
+
+<Steps>
+
+1. Open **Settings > Two-factor authentication**.
+
+2. Choose **Enable**. Icefall generates a TOTP secret and shows a QR code.
+
+3. Scan the QR code with your authenticator app. If you cannot scan, use the
+   manual key shown below the code to add the account by hand.
+
+4. Enter the 6-digit code from your app to confirm and turn on 2FA.
+
+</Steps>
+
+## Save your backup codes
+
+When 2FA is enabled, Icefall shows a set of 10 single-use backup codes.
+
+<Steps>
+
+1. Store the codes in a password manager or another safe place. Each code works
+   only once and is your way back in if you lose your authenticator.
+
+2. Confirm that you have saved them to finish setup.
+
+</Steps>
+
+You can regenerate backup codes later from the same settings section; doing so
+invalidates the previous set.
+
+## Sign in with 2FA
+
+After your password, Icefall asks for a 6-digit code. Enter the current code from
+your authenticator app. If you no longer have the app, enter one of your backup
+codes instead.
+
+## Disable 2FA
+
+Open **Settings > Two-factor authentication** and choose **Disable**. You must
+provide a current TOTP code or a backup code to confirm.
+
+## Troubleshooting
+
+- **"Invalid code"**: TOTP codes are time-based. Make sure your device clock is
+  accurate. Icefall allows a small amount of clock drift.
+- **Lost authenticator and backup codes**: ask an instance administrator to
+  reset 2FA on your account.
+
+## Related
+
+- [Invite team members](/guides/invite-users)
+- [Create API tokens](/guides/api-tokens)

@@ -1,0 +1,183 @@
+---
+title: Notifications API
+description: Configure notification channels, per-app rules, and outbound webhook endpoints over the Icefall REST API.
+---
+
+Notifications have three parts: channels (where messages go), rules (which app
+events fire on which channel), and outbound webhook endpoints (HTTP callbacks
+with delivery tracking). All paths are relative to `/api/v1`. See the
+[API overview](/api/overview/) for authentication, the required
+`X-Icefall-Request` header on writes, and the shared error format.
+
+## Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/notifications/channels` | auth | List channels |
+| POST | `/notifications/channels` | admin | Create a channel |
+| DELETE | `/notifications/channels/{id}` | admin | Delete a channel |
+| POST | `/notifications/channels/{id}/test` | auth | Send a test message |
+| GET | `/apps/{app_id}/notifications` | auth | List an app's rules |
+| POST | `/apps/{app_id}/notifications` | auth | Create a rule |
+| DELETE | `/apps/{app_id}/notifications/{rule_id}` | auth | Delete a rule |
+| GET | `/notifications/webhooks` | auth | List webhook endpoints |
+| POST | `/notifications/webhooks` | auth | Create a webhook endpoint |
+| DELETE | `/notifications/webhooks/{id}` | auth | Delete a webhook endpoint |
+| GET | `/notifications/webhooks/{id}/deliveries` | auth | List recent deliveries |
+| POST | `/notifications/webhooks/{id}/test` | auth | Send a test payload |
+
+## Channels
+
+```
+GET /notifications/channels
+POST /notifications/channels
+DELETE /notifications/channels/{id}
+POST /notifications/channels/{id}/test
+```
+
+A channel has a `channel_type` and a type-specific `config`. Supported types:
+`smtp`, `webhook`, `ntfy`, `plunk`, `slack`, `discord`.
+
+Create (admin only):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `channel_type` | string | yes | One of the supported types |
+| `config` | object | yes | Type-specific settings |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/notifications/channels \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "channel_type": "slack", "config": { "webhook_url": "https://hooks.slack.com/services/T/B/x" } }'
+```
+
+```json
+{ "data": { "id": "ntf_01", "channel_type": "slack" } }
+```
+
+Config by type:
+
+- **smtp** — `host`, `port`, `username`, `password`, `from`, `to`, `tls`
+  (`none`, `starttls`, or `tls`)
+- **webhook** — `url`
+- **ntfy** — `topic`, `server` (default `https://ntfy.sh`), `token`
+- **plunk** — `api_key`, `to_email`
+- **slack** — `webhook_url`
+- **discord** — `webhook_url`
+
+List responses redact `config` to `••••••••`. Sending a test always returns
+`200`, reporting failure in the message:
+
+```json
+{ "message": "test notification sent" }
+```
+
+## Rules
+
+```
+GET /apps/{app_id}/notifications
+POST /apps/{app_id}/notifications
+DELETE /apps/{app_id}/notifications/{rule_id}
+```
+
+A rule binds a channel to an app event.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `notification_id` | string | yes | Channel ID |
+| `event_type` | string | yes | Event to fire on |
+
+Valid `event_type` values: `deploy.success`, `deploy.failure`, `health.down`,
+`health.recovered`, `health.auto_restart`, `backup.success`, `backup.failure`.
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps/app_a1b2c3/notifications \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "notification_id": "ntf_01", "event_type": "deploy.failure" }'
+```
+
+```json
+{
+  "data": { "id": "rule_01", "app_id": "app_a1b2c3", "notification_id": "ntf_01", "event_type": "deploy.failure" }
+}
+```
+
+An unknown `event_type` returns `400 bad_request`.
+
+## Outbound webhook endpoints
+
+These send signed HTTP callbacks to your own services and record each delivery.
+They are distinct from the inbound Git webhooks on the
+[Webhooks](/api/webhooks/) page.
+
+```
+GET /notifications/webhooks
+POST /notifications/webhooks
+DELETE /notifications/webhooks/{id}
+GET /notifications/webhooks/{id}/deliveries
+POST /notifications/webhooks/{id}/test
+```
+
+Create:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Label |
+| `url` | string | yes | Destination URL |
+| `method` | string | no | HTTP method (default `POST`) |
+| `secret` | string | no | HMAC signing secret |
+| `headers` | string | no | JSON-encoded extra headers |
+
+```json
+{
+  "data": {
+    "id": "whe_01",
+    "name": "ops-bridge",
+    "url": "https://ops.acme.com/icefall",
+    "method": "POST",
+    "secret": null,
+    "headers": null,
+    "enabled": true,
+    "created_at": "2026-06-14T10:00:00Z",
+    "updated_at": "2026-06-14T10:00:00Z"
+  }
+}
+```
+
+URLs that fail SSRF validation return `400 bad_request`.
+
+When a `secret` is set, deliveries are signed with
+`X-Icefall-Signature: sha256=<hmac>`. The test endpoint sends:
+
+```json
+{ "event": "test", "summary": "Test webhook delivery", "details": {}, "timestamp": "2026-06-14T10:00:00Z" }
+```
+
+Test returns the result (always `200`):
+
+```json
+{ "data": { "status_code": 200, "response_time_ms": 142 } }
+```
+
+Deliveries lists up to 50 recent attempts:
+
+```json
+{
+  "data": [
+    {
+      "id": "del_01",
+      "endpoint_id": "whe_01",
+      "event": "deploy.failure",
+      "status_code": 200,
+      "response_time_ms": 142,
+      "attempt": 1,
+      "error": null,
+      "delivered_at": "2026-06-14T09:55:00Z"
+    }
+  ]
+}
+```

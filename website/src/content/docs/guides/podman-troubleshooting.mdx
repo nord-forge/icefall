@@ -1,0 +1,109 @@
+---
+title: Troubleshoot Podman
+description: Fix common Podman socket, networking, exec, and stats issues with Icefall.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 15 minutes.
+
+Most Podman issues with Icefall fall into four areas: the socket Icefall connects
+to, container DNS, exec into containers, and host metrics in rootless mode. This
+guide is the quick-fix companion to the deeper
+[Docker vs Podman differences](/reference/podman-differences) reference.
+
+## Socket not found or connection refused
+
+Icefall probes for the Podman socket automatically, but it has to be running.
+
+<Steps>
+
+1. Check which socket exists:
+
+   ```bash
+   ls -la /run/podman/podman.sock 2>/dev/null
+   ls -la "$XDG_RUNTIME_DIR/podman/podman.sock" 2>/dev/null
+   ```
+
+2. Enable the socket if it is missing:
+
+   ```bash
+   # rootful
+   sudo systemctl enable --now podman.socket
+   # rootless
+   systemctl --user enable --now podman.socket
+   ```
+
+3. Confirm Podman responds:
+
+   ```bash
+   podman info
+   ```
+
+</Steps>
+
+If your socket is in a non-default location, set it explicitly for the Icefall
+process.
+
+## Containers can't resolve each other by name
+
+Podman uses the netavark and aardvark-dns stack for inter-container DNS. Without
+aardvark-dns, name resolution on a network fails and Icefall logs a warning.
+
+```bash
+sudo apt-get install -y aardvark-dns   # Debian/Ubuntu
+sudo dnf install -y aardvark-dns       # Fedora/RHEL
+```
+
+Look for an `aardvark-dns` note in the daemon logs to confirm this was the cause.
+
+## Published ports unreachable in rootless mode
+
+Rootless Podman binds published ports on `127.0.0.1`, not `0.0.0.0`, and cannot
+publish host ports below 1024. Caddy runs on the same host and proxies to those
+loopback ports, so apps remain reachable on 80 and 443.
+
+- If an app requested a privileged host port (below 1024), change it to a high
+  port and redeploy. Caddy still fronts it on 80/443.
+
+## Exec and container access
+
+Exec works the same over the socket Icefall uses. If exec fails only in rootless
+mode, it is usually a permission or user-namespace issue with the target path
+rather than Icefall itself — confirm the command runs with `podman exec`
+directly.
+
+## Host CPU stats read zero
+
+In rootless mode some host-wide metrics (notably `system_cpu_usage`) can report
+`0`, because an unprivileged daemon cannot see host-wide CPU accounting.
+Per-container metrics still work. Treat the server overview's host CPU figures as
+approximate under rootless Podman, or run rootful Podman where exact host metrics
+matter.
+
+## Volume permission errors
+
+On SELinux hosts, Podman volumes often need a relabel suffix (`:Z`, `:z`, or
+`:U`). In rootless mode the container's root maps to your unprivileged host UID,
+so a database may report permission errors on its data volume. Re-own it inside
+the user namespace:
+
+```bash
+podman unshare chown -R 999:999 \
+  ~/.local/share/containers/storage/volumes/<volume>/_data
+```
+
+## Restart policy doesn't survive reboot
+
+Podman is daemonless, so rootless restart policies survive a reboot only with
+user lingering enabled:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+## Related
+
+- [Docker vs Podman differences](/reference/podman-differences)
+- [Install and configure Podman](/guides/podman-setup)
+- [Switch from Docker to Podman](/guides/podman-migration)

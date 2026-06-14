@@ -1,0 +1,71 @@
+---
+title: Manage environment variables
+description: Set scoped variables, import a .env file, and reuse shared values.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Environment variables configure your app at runtime. Icefall supports
+per-environment scoping, bulk import from a `.env` file, and shared variables
+reused across apps. Values are stored masked and revealed only on request.
+
+## Prerequisites
+
+- A deployed app.
+
+## Set a variable
+
+<Steps>
+
+1. Open the app and go to the **Environment variables** editor.
+
+2. Add a key and value, and choose a **scope**:
+
+   - **shared** — applies to every environment (the default).
+   - **production** — applies to production only and overrides the shared value.
+   - **preview** — applies to preview deploys only and overrides the shared
+     value.
+
+3. Save. The value is masked as dots; use the reveal control to view it.
+
+</Steps>
+
+Resolution is layered: shared values apply first, then a matching scoped value
+overrides them for that environment.
+
+## Import a .env file
+
+<Steps>
+
+1. In the editor, choose **Import .env**.
+
+2. Paste the file contents. Icefall parses `KEY=value` lines, skips comments and
+   blank lines, and strips surrounding quotes.
+
+3. Review the parsed variables and save.
+
+</Steps>
+
+## Shared variables across apps
+
+For values reused by many apps, define **shared variables** at the project or
+server scope. Apps in that scope inherit them, so you set a value once rather
+than per app.
+
+## Apply changes
+
+Environment variable changes take effect on the next deploy or restart. Redeploy
+or restart the app after editing.
+
+## Troubleshooting
+
+- **Variable not picked up**: redeploy or restart so the new values are injected.
+- **Wrong value in production**: a production-scoped variable overrides the
+  shared one — check both scopes.
+
+## Related
+
+- [Connect an external database](/guides/external-database)
+- [Set up preview environments](/guides/preview-environments)

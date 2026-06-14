@@ -1,0 +1,266 @@
+---
+title: Servers API
+description: Enroll and manage servers, read metrics and forecasts, and update agents over the Icefall REST API.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+These endpoints manage the servers Icefall deploys to: enrollment, metadata,
+metrics, capacity forecasting, and agent updates. Most require the account
+`admin` role. All paths are relative to `/api/v1`. See the
+[API overview](/api/overview/) for authentication, the required
+`X-Icefall-Request` header on writes, and the shared error format.
+
+## Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/servers` | admin | List servers with metrics |
+| POST | `/servers` | admin | Add a server, get an enrollment token |
+| GET | `/servers/{id}` | admin | Get one server |
+| PUT | `/servers/{id}` | admin | Update server metadata |
+| DELETE | `/servers/{id}` | admin | Delete a server |
+| POST | `/servers/{id}/token` | admin | Regenerate the enrollment token |
+| GET | `/servers/{id}/instances` | admin | List instances on the server |
+| GET | `/servers/{id}/containers` | — | List containers on the server |
+| POST | `/servers/{id}/update` | admin | Update the agent on one server |
+| POST | `/servers/update-all` | admin | Update agents on all online servers |
+| GET | `/servers/{id}/forecast` | auth | 30-day capacity forecast |
+| GET | `/servers/setup` | — | Agent install script |
+| GET | `/agent/download/{target}` | — | Download an agent binary |
+| GET | `/server/status` | — | Control-plane metrics snapshot |
+| GET | `/server/metrics/history` | — | Recent metrics snapshots |
+| GET | `/server/metrics/range` | — | Metrics over a date range |
+
+## List servers
+
+```
+GET /servers
+```
+
+Returns each server with resource metrics, app and instance counts, and a
+placement recommendation score.
+
+```bash
+curl https://icefall.example.com/api/v1/servers \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "srv_eu1",
+      "name": "eu-west-1",
+      "host": "10.0.0.5",
+      "role": "worker",
+      "status": "online",
+      "agent_version": "1.4.0",
+      "labels": "region=eu",
+      "resources": "{\"cpu\":8,\"memory_gb\":32}",
+      "last_heartbeat_at": "2026-06-14T10:00:00Z",
+      "registered_at": "2026-05-01T08:00:00Z",
+      "app_count": 12,
+      "instance_count": 18,
+      "recommendation_score": 0.82,
+      "recommended": true,
+      "created_at": "2026-05-01T07:55:00Z",
+      "updated_at": "2026-06-14T10:00:00Z"
+    }
+  ]
+}
+```
+
+`recommended` is present only on the best-scoring online server.
+
+## Add a server
+
+```
+POST /servers
+```
+
+Creates the server record and returns a one-time enrollment token used by the
+agent install script.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Display name |
+| `host` | string | yes | Hostname or IP |
+| `labels` | string \| null | no | Free-form labels |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/servers \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "eu-west-2", "host": "10.0.0.6", "labels": "region=eu" }'
+```
+
+```json
+{
+  "data": { "id": "srv_eu2", "name": "eu-west-2", "host": "10.0.0.6", "role": "worker", "status": "pending" },
+  "meta": { "enrollment_token": "Zm9vYmFy..." }
+}
+```
+
+The `enrollment_token` is shown once. Use it with the
+[setup script](#enrollment-script) to install and enroll the agent.
+
+## Get, update, delete
+
+```
+GET /servers/{id}
+PUT /servers/{id}
+DELETE /servers/{id}
+```
+
+Update accepts `name`, `host`, and `labels` (send `null` for `labels` to
+clear). Get and update return the server object with `app_count`.
+
+Delete refuses (`409 conflict`) while apps are assigned. Pass `?force=true` to
+reassign those apps to the control plane first:
+
+```bash
+curl -X DELETE "https://icefall.example.com/api/v1/servers/srv_eu2?force=true" \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1"
+```
+
+```json
+{ "data": { "deleted": true } }
+```
+
+## Regenerate the enrollment token
+
+```
+POST /servers/{id}/token
+```
+
+```json
+{ "data": { "server_id": "srv_eu2" }, "meta": { "enrollment_token": "bmV3dG9rZW4..." } }
+```
+
+## Instances and containers
+
+```
+GET /servers/{id}/instances
+GET /servers/{id}/containers
+```
+
+Instances are Icefall-managed app instances; containers lists what is actually
+running on the host. Pass `?unmanaged=true` to the containers endpoint to show
+only containers Icefall does not manage.
+
+```json
+{
+  "data": [
+    {
+      "id": "c0ffee",
+      "name": "billing-api-1",
+      "image": "registry.local/billing-api:1ab4c9d",
+      "status": "running",
+      "managed": true,
+      "labels": { "icefall.app": "app_a1b2c3" }
+    }
+  ]
+}
+```
+
+<Aside type="note">
+The `image` and `status` fields come straight from the container runtime
+(Docker or Podman). The shape is identical for both — only the underlying
+daemon differs. See the [API overview](/api/overview/#container-runtime).
+</Aside>
+
+## Agent updates
+
+```
+POST /servers/{id}/update
+POST /servers/update-all
+```
+
+Single-server update:
+
+```json
+{ "data": { "status": "update_sent", "target_version": "1.4.1" } }
+```
+
+If the agent is already current, `status` is `up_to_date` with the running
+`version`. `update-all` skips the control plane and reports counts:
+
+```json
+{ "data": { "updated": 3, "skipped": 1, "target_version": "1.4.1" } }
+```
+
+## Capacity forecast
+
+```
+GET /servers/{id}/forecast
+```
+
+Projects disk, memory, and CPU 30 days ahead using linear regression over the
+last 30 days of metrics. Needs at least 7 days of data.
+
+```bash
+curl https://icefall.example.com/api/v1/servers/srv_eu1/forecast \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+```json
+{
+  "data": {
+    "disk": { "current_ratio": 0.61, "daily_growth": 0.004, "days_until_full": 97 },
+    "memory": { "current_ratio": 0.55, "daily_growth": 0.001, "days_until_full": null },
+    "cpu": { "current_percent": 38.2, "daily_trend": 0.3 },
+    "data_points": 720
+  }
+}
+```
+
+With fewer than 7 days of data the response carries a `message` and
+`days_available` instead.
+
+## Enrollment script
+
+```
+GET /servers/setup
+```
+
+Returns a shell script (content type `text/x-shellscript`) that installs the
+agent and enrolls it using an enrollment token. This endpoint is public.
+
+## Agent binaries
+
+```
+GET /agent/download/{target}
+```
+
+`{target}` is `x86_64-linux`, `aarch64-linux`, or one of those with a
+`.sha256` suffix for the checksum. Returns the binary or checksum, or `404`
+for an unknown target.
+
+## Control-plane metrics
+
+```
+GET /server/status
+GET /server/metrics/history
+GET /server/metrics/range
+```
+
+`GET /server/status` is a public snapshot of the control plane host:
+
+```json
+{
+  "status": "ok",
+  "version": "1.4.0",
+  "cpu_percent": 22.5,
+  "memory_used_bytes": 4294967296,
+  "memory_total_bytes": 17179869184,
+  "disk_used_bytes": 53687091200,
+  "disk_total_bytes": 214748364800
+}
+```
+
+`metrics/history` returns recent snapshots (cap 120 via `limit`).
+`metrics/range` queries by `from` and `to` (ISO 8601, required) with an
+optional `limit` (default 500, max 2000) and includes a `total` count.

@@ -16,6 +16,9 @@ pub struct ApiToken {
     pub name: String,
     pub token_hash: String,
     pub team_id: Option<String>,
+    /// JSON array of granted ability scopes, e.g. `["apps:read","apps:deploy"]`.
+    /// `None` means full access (the token inherits the user's permissions).
+    pub abilities: Option<String>,
     pub last_used_at: Option<String>,
     pub expires_at: Option<String>,
     pub created_at: String,

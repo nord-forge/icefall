@@ -1,0 +1,73 @@
+---
+title: Configure notifications
+description: Send deploy, health, and backup events to Slack, Discord, email, and more.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 10 minutes.
+
+Notifications tell you when deploys finish, when an app's health changes, and
+when backups run. You add one or more channels, then subscribe specific events
+to each channel.
+
+## Prerequisites
+
+- For chat channels: an incoming webhook URL from Slack or Discord.
+- For email: SMTP server details, or a Plunk API key.
+
+## Add a channel
+
+<Steps>
+
+1. Open **Settings > Notifications** and choose **Add channel**.
+
+2. Pick a channel type and fill in its fields:
+
+   - **Slack** — incoming webhook URL.
+   - **Discord** — webhook URL.
+   - **Email (SMTP)** — host, port, username, password, from and to addresses,
+     and TLS mode (`starttls`, `tls`, or `none`).
+   - **Webhook** — a URL that receives a JSON `POST` with the event, summary,
+     details, and timestamp.
+   - **ntfy** — topic, and optionally a server URL and token.
+   - **Plunk** — API key and recipient email.
+
+3. Use **Test** to send a sample message and confirm the channel works before
+   saving.
+
+</Steps>
+
+## Subscribe events
+
+<Steps>
+
+1. Open the **Event subscriptions** section. It shows a matrix of events against
+   your channels.
+
+2. Tick the events you want each channel to receive:
+
+   - `deploy.success`, `deploy.failure`
+   - `health.down`, `health.recovered`, `health.auto_restart`
+   - `backup.success`, `backup.failure`
+
+3. Save the subscriptions.
+
+</Steps>
+
+## Verify
+
+Trigger a deploy or run a manual backup and confirm the message arrives on the
+subscribed channels. Use **Test** on a channel at any time to re-check delivery.
+
+## Troubleshooting
+
+- **No messages**: re-run **Test** on the channel. For Slack and Discord, confirm
+  the webhook URL is still valid.
+- **SMTP errors**: check the TLS mode matches the port (`starttls` on 587, `tls`
+  on 465) and that the credentials are correct.
+
+## Related
+
+- [Configure health checks](/guides/health-checks)
+- [Stream logs to a drain](/guides/log-drains)

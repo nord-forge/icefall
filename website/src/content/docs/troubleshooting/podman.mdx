@@ -1,0 +1,164 @@
+---
+title: Podman issues
+description: Fix socket, networking, volume, and runtime problems specific to Podman.
+---
+
+Icefall talks to Podman over its API socket using the same client it uses for
+Docker, but a few Podman behaviours differ enough to cause confusion. This page
+covers the ones you're most likely to hit. For the conceptual comparison, see
+[Container runtime](/concepts/container-runtime/).
+
+## Podman socket not active
+
+**Symptom**: Icefall reports it can't reach the container runtime; the installer
+prints `Podman is installed but its API socket is not reachable`.
+
+**Cause**: Unlike `dockerd`, Podman's API socket is socket-activated and may be
+disabled.
+
+**Fix**:
+
+```bash
+# rootful
+sudo systemctl enable --now podman.socket
+
+# rootless
+systemctl --user enable --now podman.socket
+```
+
+Then confirm it answers:
+
+```bash
+curl --unix-socket /run/podman/podman.sock http://localhost/v4.0.0/libpod/info
+```
+
+## "Connection refused" on the Podman socket
+
+**Symptom**: Icefall logs a connection-refused error against the socket path.
+
+**Cause**: The socket service isn't running, or Icefall is pointed at the wrong
+path. Rootful Podman uses `/run/podman/podman.sock`; rootless uses a per-user
+path under `$XDG_RUNTIME_DIR/podman/podman.sock`.
+
+**Fix**:
+1. Start the socket (see above).
+2. Make sure `container_socket` in `config.toml` matches the runtime you're
+   running. Icefall infers Podman when the socket path contains `podman`; set
+   `ICEFALL_CONTAINER_SOCKET` to override.
+
+## Podman version too old
+
+**Symptom**: The installer warns `Podman ... detected but Icefall requires >= 4.0`.
+
+**Cause**: Icefall requires **Podman 4.0 or newer**. 4.0 introduced the netavark
+network stack and the API stability Icefall depends on.
+
+**Fix**: Upgrade Podman through your distribution's packages, then re-run the
+installer. Check the version with `podman --version`.
+
+## Containers can't reach each other by name
+
+**Symptom**: One container can't resolve another's hostname
+(`my-db.icefall.internal`); DNS lookups fail.
+
+**Cause**: Podman only provides container DNS on **named** bridge networks via
+netavark and `aardvark-dns`, not on the default network. Icefall creates a named
+bridge network for exactly this reason, but DNS still needs `aardvark-dns`
+present.
+
+**Fix**:
+1. Install `aardvark-dns` (Icefall warns at startup if name resolution looks
+   unavailable).
+2. Confirm both containers are attached to Icefall's named network, not the
+   default Podman network.
+
+## Volume permission errors in rootless mode
+
+**Symptom**: A container can't write to its volume — permission denied — even
+though the volume exists.
+
+**Cause**: In rootless Podman, container UIDs are mapped into your user
+namespace, so the on-disk owner of the volume data doesn't match the UID the
+container runs as. Icefall mounts volumes with the standard syntax and does not
+add `:Z` or `:U` suffixes, so it doesn't relabel or chown them for you.
+
+**Fix**: Fix ownership inside the user namespace, matching the UID your container
+expects (for example `999`):
+
+```bash
+podman unshare chown -R 999:999 \
+  /var/lib/containers/storage/volumes/<volume>/_data
+```
+
+## CPU stats show 0%
+
+**Symptom**: An app's CPU graph reads a flat 0% even under load, on rootless
+Podman.
+
+**Cause**: Icefall computes CPU percentage from the delta in system CPU usage
+reported by the stats API. On rootless Podman without cgroups v2 delegation, that
+system value isn't populated, the delta is zero, and the calculation correctly
+returns 0%. This is a stats-reporting limitation, not your app idling.
+
+**Fix**: Enable cgroups v2 delegation for your user, or run rootful Podman, to
+get accurate CPU stats. Memory limits depend on the same delegation — without it
+they're ignored too.
+
+## Terminal or exec not working
+
+**Symptom**: The in-dashboard terminal or an exec into a container behaves
+oddly or fails to stream.
+
+**Cause**: Container exec and attach are the most likely place for Docker/Podman
+API differences to surface. Icefall uses the generic, Docker-compatible exec
+path with no Podman-specific handling.
+
+**Fix**: Make sure you're on a current Podman 4.x or newer release, where the API
+compatibility is best, and that the socket is healthy. Report reproducible cases
+— this is a known sensitive area.
+
+## Image build differences
+
+**Symptom**: A build behaves differently or caches differently than it did on
+Docker.
+
+**Cause**: Podman builds with Buildah while Docker builds with BuildKit. Icefall
+doesn't select a builder — it hands the build to whichever runtime is configured
+— so cache behaviour follows the runtime and its storage driver.
+
+**Fix**: Expect different (but valid) layer-cache behaviour on Podman. If a build
+misbehaves, force a clean rebuild to rule out a stale cache.
+
+## Compose stack issues
+
+**Symptom**: A Compose-mode app fails to come up on Podman.
+
+**Cause**: Icefall invokes `podman compose` (the Podman-integrated subcommand),
+not the separate `podman-compose` Python tool. If only `podman-compose` is
+installed, the integrated subcommand may be missing.
+
+**Fix**: Install the `podman compose` provider that ships with current Podman, or
+make sure the integrated subcommand resolves on the server's `PATH`.
+
+## Switching from Docker to Podman
+
+**Symptom**: After changing runtimes, apps aren't running.
+
+**Cause**: Containers and images are runtime-specific — they don't carry over
+between Docker and Podman.
+
+**Fix**:
+1. Stop Icefall.
+2. Install Podman (4.0+) and enable its socket.
+3. Set `runtime = "podman"` in `config.toml` (and update `container_socket` if
+   needed).
+4. Start Icefall and **redeploy** your apps so they're rebuilt under Podman.
+
+See the [FAQ](/troubleshooting/faq/) entry on switching runtimes for the short
+version.
+
+## See also
+
+- [Container runtime](/concepts/container-runtime/) — Docker vs Podman behaviour
+- [Performance issues](/troubleshooting/performance/) — rootless limits and stats
+- [Podman runtime reference](/reference/podman/)

@@ -1,0 +1,143 @@
+---
+title: Domains API
+description: Attach custom domains to apps and verify DNS over the Icefall REST API.
+---
+
+These endpoints attach custom domains to apps and verify their DNS. SSL is
+provisioned automatically by the built-in proxy once a domain resolves. All
+paths are relative to `/api/v1`. See the [API overview](/api/overview/) for
+authentication, the required `X-Icefall-Request` header on writes, and the
+shared error format.
+
+## Endpoints
+
+| Method | Path | Min role | Description |
+|--------|------|----------|-------------|
+| GET | `/apps/{id}/domains` | viewer | List an app's domains |
+| POST | `/apps/{id}/domains` | member | Add a domain |
+| DELETE | `/apps/{id}/domains/{domain_id}` | member | Remove a domain |
+| POST | `/apps/{id}/domains/{domain_id}/verify` | member | Verify DNS and activate |
+| GET | `/server/ip` | — | Get the server's detected public IP |
+
+## The domain object
+
+```json
+{
+  "id": "dom_01",
+  "app_id": "app_a1b2c3",
+  "domain": "billing.acme.com",
+  "path": null,
+  "verified": true,
+  "is_primary": true,
+  "ssl_status": "active",
+  "ssl_issuer": "Let's Encrypt",
+  "ssl_expires_at": "2026-09-12T00:00:00Z",
+  "ssl_last_checked_at": "2026-06-14T06:00:00Z",
+  "created_at": "2026-05-01T09:20:00Z"
+}
+```
+
+## List domains
+
+```
+GET /apps/{id}/domains
+```
+
+```bash
+curl https://icefall.example.com/api/v1/apps/app_a1b2c3/domains \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+## Add a domain
+
+```
+POST /apps/{id}/domains
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `domain` | string | yes | Hostname; lowercased and trimmed |
+| `path` | string \| null | no | Path prefix; must start with `/` if set |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps/app_a1b2c3/domains \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "domain": "billing.acme.com" }'
+```
+
+The response returns the new domain plus DNS instructions:
+
+```json
+{
+  "data": {
+    "id": "dom_01",
+    "app_id": "app_a1b2c3",
+    "domain": "billing.acme.com",
+    "path": null,
+    "verified": false,
+    "is_primary": false,
+    "ssl_status": "pending",
+    "created_at": "2026-06-14T10:00:00Z"
+  },
+  "dns_instructions": {
+    "type": "A",
+    "name": "billing.acme.com",
+    "value": "203.0.113.10",
+    "note": "Point this domain to your server's IP address. SSL will be provisioned automatically by Caddy."
+  }
+}
+```
+
+A `path` that does not start with `/` returns `400 bad_request`.
+
+## Remove a domain
+
+```
+DELETE /apps/{id}/domains/{domain_id}
+```
+
+```json
+{ "message": "deleted" }
+```
+
+## Verify DNS
+
+```
+POST /apps/{id}/domains/{domain_id}/verify
+```
+
+Resolves the domain and activates it if it points at the server. Send with an
+empty body.
+
+```bash
+curl -X POST \
+  https://icefall.example.com/api/v1/apps/app_a1b2c3/domains/dom_01/verify \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1"
+```
+
+```json
+{
+  "verified": true,
+  "resolved_ips": ["203.0.113.10"],
+  "expected_ip": "203.0.113.10",
+  "error": null
+}
+```
+
+When the records do not match, `verified` is `false` and `error` explains why.
+
+## Server IP
+
+```
+GET /server/ip
+```
+
+Returns the server's detected public IP, useful for building the A record.
+This endpoint is public.
+
+```json
+{ "ip": "203.0.113.10" }
+```

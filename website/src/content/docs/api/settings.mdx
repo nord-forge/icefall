@@ -1,0 +1,161 @@
+---
+title: Settings API
+description: Read instance settings and runtime info, configure the base domain, and manage registration over the Icefall REST API.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+These endpoints expose instance-level settings: the base domain, container
+runtime, and registration policy. OAuth settings live on the
+[Users API](/api/users/#oauth-identities) page. All paths are relative to
+`/api/v1`. See the [API overview](/api/overview/) for authentication, the
+required `X-Icefall-Request` header on writes, and the shared error format.
+
+## Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/settings` | — | Base instance settings |
+| GET | `/settings/runtime` | auth | Resolved container runtime info |
+| POST | `/settings/base-domain` | auth | Set the base domain |
+| POST | `/settings/base-domain/verify` | auth | Verify base-domain DNS |
+| GET | `/settings/registration` | admin | Read registration settings |
+| PUT | `/settings/registration` | admin | Update registration settings |
+
+## Base settings
+
+```
+GET /settings
+```
+
+Public. Returns the base domain, version, and configured container runtime.
+
+```bash
+curl https://icefall.example.com/api/v1/settings
+```
+
+```json
+{
+  "data": {
+    "base_domain": "acme.com",
+    "version": "1.4.0",
+    "runtime": "docker"
+  }
+}
+```
+
+<Aside type="note">
+`runtime` is `"docker"` or `"podman"`. It reports which container runtime the
+instance is configured for. The API surface is identical for both — see the
+[API overview](/api/overview/#container-runtime).
+</Aside>
+
+## Runtime info
+
+```
+GET /settings/runtime
+```
+
+Returns the configured and detected runtime, the socket path, and version
+details from the runtime daemon.
+
+```json
+{
+  "data": {
+    "configured_runtime": "podman",
+    "detected_runtime": "podman",
+    "version": "5.0.2",
+    "api_version": "1.41",
+    "os": "linux",
+    "arch": "amd64",
+    "socket": "/run/podman/podman.sock"
+  }
+}
+```
+
+<Aside type="note">
+`configured_runtime` reflects the instance configuration; `socket` is the
+container socket path Icefall connects to (for example
+`/var/run/docker.sock` for Docker or `/run/podman/podman.sock` for Podman).
+The runtime is configured at the instance level via `config.toml` or the
+`ICEFALL_RUNTIME` and `ICEFALL_CONTAINER_SOCKET` environment variables — see
+the [Podman configuration reference](/reference/podman-config/).
+</Aside>
+
+## Base domain
+
+```
+POST /settings/base-domain
+POST /settings/base-domain/verify
+```
+
+Set the base domain and receive the DNS records to create:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `base_domain` | string | yes | The apex domain to serve apps under |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/settings/base-domain \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "base_domain": "acme.com" }'
+```
+
+```json
+{
+  "base_domain": "acme.com",
+  "dns_instructions": {
+    "records": [{ "type": "A", "name": "acme.com", "value": "203.0.113.10" }],
+    "note": "Create these records, then verify."
+  }
+}
+```
+
+Verify checks both the apex and wildcard records:
+
+```json
+{
+  "configured": true,
+  "base_domain": "acme.com",
+  "server_ip": "203.0.113.10",
+  "base_dns_ok": true,
+  "wildcard_dns_ok": true,
+  "fully_verified": true
+}
+```
+
+If no base domain is set, verify returns `configured: false` with an `error`.
+
+## Registration
+
+```
+GET /settings/registration
+PUT /settings/registration
+```
+
+Admin only. Controls self-service account creation.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `allow_registration` | boolean | Whether open registration is enabled |
+| `allowed_domains` | string \| null | Comma-separated allowed email domains |
+| `default_role` | string | Role for new users: `admin`, `deployer`, or `viewer` |
+
+```bash
+curl -X PUT https://icefall.example.com/api/v1/settings/registration \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "allow_registration": true, "allowed_domains": "acme.com", "default_role": "viewer" }'
+```
+
+```json
+{
+  "data": { "allow_registration": true, "allowed_domains": "acme.com", "default_role": "viewer" },
+  "message": "Registration settings updated"
+}
+```
+
+A `default_role` outside the allowed set returns `400 bad_request`.

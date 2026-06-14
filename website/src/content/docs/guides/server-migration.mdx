@@ -1,0 +1,109 @@
+---
+title: Migrate your instance to a new server
+description: Export your entire Icefall instance and restore it on another host.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 20 minutes.
+
+Server migration moves your whole Icefall instance — its database, logs, backups,
+Docker volumes, and managed database containers — to a new host. You export an
+archive on the old server and import it on the new one.
+
+## Prerequisites
+
+- Shell access on both the old and the new server.
+- Icefall installed on the new server.
+- Enough disk space for the export archive on both ends, or an S3/R2 bucket to
+  stage it.
+
+## Export from the old server
+
+<Steps>
+
+1. Preview what will be exported without writing anything:
+
+   ```bash
+   icefall migrate export --dry-run
+   ```
+
+   The summary lists the SQLite database, logs, backup archives, Docker volumes,
+   and managed database containers, with an estimated size.
+
+2. For a fully consistent export, stop the daemon first:
+
+   ```bash
+   systemctl stop icefall
+   ```
+
+3. Create the archive:
+
+   ```bash
+   icefall migrate export --output icefall-backup.tar.gz
+   ```
+
+   You can write directly to object storage instead of a local file:
+
+   ```bash
+   icefall migrate export --output s3://my-bucket/icefall-backup.tar.gz
+   ```
+
+   `r2://` URLs are supported as well.
+
+</Steps>
+
+## Import on the new server
+
+<Steps>
+
+1. Inspect the archive before restoring:
+
+   ```bash
+   icefall migrate import --from icefall-backup.tar.gz --dry-run
+   ```
+
+2. Restore it:
+
+   ```bash
+   icefall migrate import --from icefall-backup.tar.gz
+   ```
+
+   An `s3://` or `r2://` source works here too:
+
+   ```bash
+   icefall migrate import --from s3://my-bucket/icefall-backup.tar.gz
+   ```
+
+3. Start the daemon on the new server:
+
+   ```bash
+   systemctl start icefall
+   ```
+
+</Steps>
+
+## Cut over
+
+<Steps>
+
+1. Point DNS for your instance and app domains at the new server.
+
+2. Sign in and confirm apps, databases, and settings are present.
+
+3. Redeploy an app to confirm the build pipeline works on the new host.
+
+</Steps>
+
+## Troubleshooting
+
+- **Data directory not found**: the export reads from the Icefall data directory
+  (`/var/lib/icefall` by default, or `ICEFALL_DATA_DIR`). Run the export on the
+  server that holds the data.
+- **Inconsistent export**: re-run the export with the daemon stopped to avoid
+  capturing data mid-write.
+
+## Related
+
+- [Update Icefall](/guides/self-update)
+- [Add a worker server](/guides/add-server)

@@ -1,0 +1,64 @@
+---
+title: Override the auto-detected build
+description: Use your own Dockerfile instead of Icefall's framework detection.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+Icefall detects your framework and generates a Dockerfile for you, covering
+common stacks such as Astro, Next.js, Nuxt, Vite, Node, and static sites. When
+you need full control over the build, commit your own `Dockerfile` and Icefall
+uses it as-is.
+
+## Prerequisites
+
+- A deployed or new app from a Git repository.
+
+## Use your own Dockerfile
+
+<Steps>
+
+1. Add a `Dockerfile` to the root of your repository.
+
+2. Commit and push it. On the next deploy, Icefall detects the `Dockerfile` and
+   builds from it directly instead of generating one.
+
+3. Watch the **Logs** tab during the deploy to confirm your build steps run.
+
+</Steps>
+
+When a `Dockerfile` is present at the repository root, Icefall does not generate
+or overwrite it — your build is used exactly as written.
+
+## Adjust build settings
+
+For generated builds you do not want to replace entirely, the app's build
+settings let you override pieces such as the framework, base image, build
+command, start command, and port — without committing a full `Dockerfile`.
+
+## Verify
+
+<Steps>
+
+1. Trigger a deploy.
+
+2. In the build logs, confirm the steps match your `Dockerfile` (or your
+   overridden build settings).
+
+3. Confirm the app starts and passes its health check.
+
+</Steps>
+
+## Troubleshooting
+
+- **Generated build still runs**: confirm the `Dockerfile` is at the repository
+  root and was committed to the deploy branch.
+- **Build fails**: read the build logs for the failing step. A custom
+  `Dockerfile` is your responsibility to keep working.
+
+## Related
+
+- [Deploy a pre-built Docker image](/guides/deploy-docker-image)
+- [Configure resource limits](/guides/resource-limits)

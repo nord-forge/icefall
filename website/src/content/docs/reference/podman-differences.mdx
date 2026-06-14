@@ -1,0 +1,194 @@
+---
+title: Docker vs Podman behavioral differences
+description: How the Podman runtime behaves differently from Docker, and how Icefall handles each case.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Podman is API-compatible with Docker over the same socket interface Icefall
+uses, so the great majority of operations behave identically. A handful of
+behaviors do differ — mostly in rootless mode — and Icefall resolves them once
+at connect time into a small set of runtime "quirks". This page documents each
+difference, what Icefall does about it, and how to verify it on your host.
+
+## How Icefall detects runtime behavior
+
+When Icefall connects to a runtime it resolves five behavioral facts. Docker
+always uses the rootful baseline; Podman is examined further (the socket path
+and the runtime's `security_options` both reveal rootless mode).
+
+| Behavior | Docker | Rootful Podman | Rootless Podman |
+|----------|--------|----------------|-----------------|
+| Reported as rootless | No | No | Yes |
+| Host bind IP for published ports | `0.0.0.0` | `0.0.0.0` | `127.0.0.1` |
+| cgroup CPU/memory limits enforced | Yes | Yes | Only with cgroups v2 + delegation |
+| DNS backend | Docker built-in | netavark | netavark |
+| Lowest publishable host port | 0 (any) | 0 (any) | 1024 (no privileged ports) |
+
+Rootless mode is detected if the socket path is under `/run/user/...` (or under
+`$XDG_RUNTIME_DIR`), or if the runtime reports a `rootless` entry in its
+security options. Either signal alone is enough.
+
+## Networking and DNS
+
+Docker provides built-in DNS on user-defined networks automatically. Podman uses
+the **netavark + aardvark-dns** stack, and inter-container name resolution
+requires aardvark-dns to be installed and a named network in use.
+
+Icefall always creates its networks explicitly and attaches containers to them
+by name, so this is handled. On Podman, install `aardvark-dns` if you rely on
+containers resolving each other by name:
+
+```bash
+sudo apt-get install -y aardvark-dns   # Debian/Ubuntu
+sudo dnf install -y aardvark-dns       # Fedora/RHEL
+```
+
+<Aside type="caution">
+If aardvark-dns is missing on Podman, containers on the same Icefall network may
+fail to resolve each other by hostname. Icefall's startup DNS check logs a
+warning when this is the case — look for an `aardvark-dns` note in the daemon
+logs.
+</Aside>
+
+## Image building: BuildKit vs Buildah
+
+Docker builds with BuildKit; Podman builds with **Buildah**. The Dockerfile
+format and result are equivalent, but layer caching differs in subtle ways:
+
+- Buildah's cache behavior depends on the storage driver. On first build, or on
+  `vfs`, builds can be slower than the BuildKit equivalent.
+- Subsequent builds with `overlay` storage are comparable to Docker.
+
+If builds are consistently slow, confirm the storage driver is `overlay`, not
+`vfs` (see the [configuration reference](/reference/podman-config/#storage-configuration)).
+
+## Resource limits in rootless mode
+
+Rootful Podman enforces CPU and memory limits the same way Docker does. Rootless
+Podman only enforces them with **cgroups v2 and controller delegation**. Without
+delegation the kernel ignores the limit even though Podman accepts it.
+
+Icefall does not pretend the limit applies: when it detects rootless Podman
+without cgroup-limit support it logs a warning. If hard limits matter for a
+workload, run it under rootful Podman or enable cgroups v2 delegation — see the
+[configuration reference](/reference/podman-config/#resource-limits-and-cgroups-v2).
+
+## Stats and metrics
+
+In rootless mode some host-level metrics that Docker exposes are unavailable or
+report zero — most notably `system_cpu_usage`, which can read `0` because the
+unprivileged daemon cannot see host-wide CPU accounting. Per-container metrics
+remain available. Icefall's server overview is best-effort under rootless Podman;
+treat host CPU figures as approximate there.
+
+## Port binding and privileged ports
+
+Docker and rootful Podman bind published ports on `0.0.0.0`. **Rootless Podman**
+binds on `127.0.0.1` instead, and cannot publish host ports below **1024**.
+
+Icefall adapts automatically:
+
+- Published ports bind to `127.0.0.1` under rootless Podman. Caddy runs on the
+  same host and proxies to them, so apps stay reachable on 80/443.
+- A request to publish a privileged host port (below 1024) under rootless Podman
+  is rejected up front with a clear error, rather than failing obscurely later.
+
+<Aside type="caution">
+If you migrate an app that explicitly requested a privileged host port to
+rootless Podman, change it to a high port before redeploying. Caddy fronts it on
+80/443 either way.
+</Aside>
+
+## Volume permissions and SELinux
+
+Bind-mount syntax is identical (`-v /host:/container`). On SELinux-enforcing
+hosts, Podman volumes often need a relabel suffix that Docker users may not be
+used to:
+
+| Suffix | Effect |
+|--------|--------|
+| `:Z` | Relabel the volume with a **private** SELinux label (one container). |
+| `:z` | Relabel with a **shared** label (multiple containers). |
+| `:U` | Chown the volume contents to the container's mapped UID/GID (useful in rootless, where host UIDs are mapped). |
+
+In rootless mode, the container's root maps to your unprivileged host UID, so
+files written by a container appear owned by a high subuid on the host. If a
+database container reports permission errors on its data volume, relabel or
+re-own the volume:
+
+```bash
+# Fix ownership inside the rootless user namespace
+podman unshare chown -R 999:999 \
+  ~/.local/share/containers/storage/volumes/<volume>/_data
+```
+
+## Compose
+
+There are two Compose options on Podman, and they are not the same tool:
+
+| Tool | What it is | Notes |
+|------|-----------|-------|
+| `podman compose` | A shim that drives an installed Compose v2 (or podman-compose) backend | What Icefall invokes — its compose command for Podman is `podman compose`. |
+| `podman-compose` | A separate community Python implementation | Can be installed as one backend for `podman compose`. |
+
+Install a backend so `podman compose` resolves to something:
+
+```bash
+pip install podman-compose
+# or use the docker-compose v2 binary as the backend
+```
+
+## Restart policies
+
+Docker restart policies (`always`, `unless-stopped`) are honored by the
+always-running daemon. Podman is daemonless, so a container restart policy only
+survives a reboot when the work is owned by systemd:
+
+- **Rootful Podman** restart policies behave like Docker for the running host.
+- **Rootless Podman** policies survive logout/reboot only when **user lingering**
+  is enabled: `sudo loginctl enable-linger $USER`.
+- For durable, systemd-native restart behavior, Podman Quadlet/systemd units are
+  the idiomatic mechanism.
+
+## Log drivers
+
+Docker defaults to the `json-file` log driver. Podman defaults to **journald**.
+Icefall streams container logs over the API regardless of driver, so its own log
+view is unaffected. The difference matters only if you inspect logs directly on
+the host: use `journalctl` for Podman rather than reading JSON log files.
+
+## Socket paths
+
+Default socket locations differ, and Icefall probes for them automatically.
+
+| Runtime | Default socket |
+|---------|----------------|
+| Docker | `/var/run/docker.sock` |
+| Rootful Podman | `/run/podman/podman.sock` (also `/var/run/podman/podman.sock`) |
+| Rootless Podman | `$XDG_RUNTIME_DIR/podman/podman.sock` (e.g. `/run/user/1000/podman/podman.sock`) |
+
+Verify which socket is present:
+
+```bash
+ls -la /run/podman/podman.sock 2>/dev/null
+ls -la "$XDG_RUNTIME_DIR/podman/podman.sock" 2>/dev/null
+ls -la /var/run/docker.sock 2>/dev/null
+```
+
+## Rootful vs rootless: what Icefall supports
+
+Icefall supports **Docker (rootful), rootful Podman, and rootless Podman** as
+first-class runtimes. The daemon, the runtime, and the apps can all run as an
+unprivileged user under rootless Podman — a real security improvement, since a
+compromised app cannot escalate to host root.
+
+The trade-offs above (loopback port binding, no privileged ports, cgroup-limit
+delegation, lingering for restart policies) are the price of rootless. Icefall
+handles each automatically and logs a warning where a host capability is
+missing, so nothing fails silently.
+
+## Related
+
+- [Podman runtime guide](/reference/podman/) — installation, rootless setup, and migration.
+- [Configuration reference](/reference/podman-config/) — config fields, env vars, and host settings.

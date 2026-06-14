@@ -13,6 +13,16 @@ use super::helpers::{generate_random_hex, sha256_hex};
 pub(super) struct CreateTokenRequest {
     name: String,
     expires_at: Option<String>,
+    /// Optional ability scopes. Omitted/empty = full access (null in storage).
+    abilities: Option<Vec<String>>,
+}
+
+/// Parse a token's stored abilities JSON into a list for API responses.
+fn abilities_list(stored: &Option<String>) -> Vec<String> {
+    stored
+        .as_deref()
+        .and_then(|j| serde_json::from_str::<Vec<String>>(j).ok())
+        .unwrap_or_default()
 }
 
 pub(super) async fn list_tokens(
@@ -25,10 +35,10 @@ pub(super) async fn list_tokens(
 
     let tokens = state.db.list_api_tokens(&user.id).await?;
     let safe: Vec<serde_json::Value> = tokens.iter().map(|t| serde_json::json!({
-        "id": t.id, "name": t.name, "last_used_at": t.last_used_at, "expires_at": t.expires_at, "created_at": t.created_at,
+        "id": t.id, "name": t.name, "abilities": abilities_list(&t.abilities), "last_used_at": t.last_used_at, "expires_at": t.expires_at, "created_at": t.created_at,
     })).collect();
 
-    Ok(Json(serde_json::json!({ "data": safe })))
+    Ok(Json(serde_json::json!({ "data": safe, "available_abilities": crate::api::abilities::ALL_ABILITIES })))
 }
 
 pub(super) async fn create_token(
@@ -43,6 +53,21 @@ pub(super) async fn create_token(
     let raw_token = format!("icefall_{}", generate_random_hex(48));
     let token_hash = sha256_hex(&raw_token);
 
+    // Empty/omitted abilities → null (full access). Otherwise keep only valid
+    // scopes and store as a JSON array.
+    let abilities_json = match body.abilities {
+        Some(ref list) if !list.is_empty() => {
+            let valid = crate::api::abilities::sanitize_abilities(list);
+            if valid.is_empty() {
+                return Err(ApiError::BadRequest(
+                    "No valid abilities provided. Omit the field for full access.".into(),
+                ));
+            }
+            Some(serde_json::to_string(&valid).unwrap_or_default())
+        }
+        _ => None,
+    };
+
     let token = state
         .db
         .create_api_token(
@@ -51,11 +76,12 @@ pub(super) async fn create_token(
             &token_hash,
             body.expires_at.as_deref(),
             auth.team_id.as_deref(),
+            abilities_json.as_deref(),
         )
         .await?;
 
     Ok(Json(serde_json::json!({
-        "data": { "id": token.id, "name": token.name, "token": raw_token },
+        "data": { "id": token.id, "name": token.name, "token": raw_token, "abilities": abilities_list(&token.abilities) },
         "warning": "This token will only be shown once. Store it securely."
     })))
 }

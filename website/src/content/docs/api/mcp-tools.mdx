@@ -1,0 +1,340 @@
+---
+title: MCP tools, resources, and prompts
+description: Complete reference for every tool, resource, and prompt exposed by the Icefall MCP server.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+This is the complete reference for the Icefall [MCP server](/api/mcp/). It lists
+every tool, resource, and prompt the server exposes, with inputs and behavior.
+The same capabilities are available to any MCP client — [Claude Code](/guides/mcp-claude-code/),
+[Cursor](/guides/mcp-cursor/), [Windsurf](/guides/mcp-windsurf/), or a
+[generic client](/guides/mcp-generic/).
+
+## Authentication and roles
+
+Every call uses a bearer [API token](/auth/tokens/):
+
+```
+Authorization: Bearer icefall_xxxxxxxx
+```
+
+The token carries the role of the user who created it. Read tools work for any
+role; **write tools require the `deployer` or `admin` role**. A write tool
+called with an insufficient role returns an error explaining the requirement.
+
+Write tools: `deploy_app`, `set_env_var`, `create_database`, `add_domain`,
+`restart_app`, `cancel_deploy`, `rollback_deploy`, `approve_deploy`,
+`bulk_restart`, `bulk_deploy`, `create_app`.
+
+Resources and apps created or mutated through MCP are scoped to the caller's
+active team.
+
+## Tools
+
+The server exposes 27 tools. Each is invoked via `POST /api/v1/mcp/call` with a
+body of `{ "tool": "<name>", "params": { ... } }`.
+
+### App management
+
+#### `list_apps`
+List all deployed applications with their status. No parameters.
+
+#### `get_app`
+Get detailed information about a specific app.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+#### `create_app`
+Create a new app with full configuration. Also creates a default `production` environment. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | App name |
+| `git_repo` | string | no | Git repo URL |
+| `branch` | string | no | Branch (default: `main`) |
+| `framework` | string | no | Framework hint |
+
+#### `restart_app`
+Restart an app's running containers. Returns the number restarted. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+#### `export_bundle`
+Export an app as a portable `.icefall` bundle (name, repo, branch, framework, deploy mode).
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+### Deploys
+
+#### `deploy_app`
+Trigger a new deploy for an app, using its first environment. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+| `no_cache` | boolean | no | Force rebuild without cache |
+| `tag` | string | no | Git tag to deploy |
+
+#### `get_deploy_status`
+Get current deploy status and recent history (last 5 deploys).
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+#### `cancel_deploy`
+Cancel an in-progress deployment. Only valid while status is `pending`, `building`, or `deploying`. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `deploy_id` | string | yes | The deploy ID |
+
+#### `rollback_deploy`
+Roll back to a previous deploy by re-deploying its image. The target deploy must have an image. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+| `deploy_id` | string | yes | The deploy ID to roll back to |
+
+#### `approve_deploy`
+Approve a deployment that is waiting for approval. Only valid while status is `pending_approval`. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `deploy_id` | string | yes | The deploy ID |
+
+### Logs, health, and diagnostics
+
+#### `get_logs`
+Retrieve recent logs for an app, with optional search.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+| `search` | string | no | Search term |
+| `limit` | number | no | Max lines (default 100) |
+
+#### `get_health_status`
+Get health check status for an app, including recent event counts per check.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+#### `diagnose`
+Pull logs, health status, metrics, and recent deploys for an app into a single structured diagnostic summary.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+#### `suggest_fix`
+Given an app and an issue description, return actionable next steps. Heuristics match on terms like `crash`, `OOM`, `slow`, `timeout`, `502`, and `health`.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+| `issue` | string | no | Description of the issue |
+
+### Environment variables
+
+#### `set_env_var`
+Set an environment variable on the app's first environment. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+| `key` | string | yes | Variable name |
+| `value` | string | yes | Variable value |
+| `scope` | string | no | `shared`, `production`, or `preview` (default `shared`) |
+
+#### `get_env_vars`
+List environment variables for an app. Values are masked.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+
+### Domains
+
+#### `add_domain`
+Add a custom domain to an app. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `app_id` | string | yes | The app ID |
+| `domain` | string | yes | Domain name |
+
+### Databases
+
+#### `create_database`
+Provision a managed database, scoped to the caller's active team. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Database name |
+| `db_type` | string | yes | `postgres`, `mysql`, `redis`, or `mongo` |
+
+#### `list_databases`
+List all managed databases. No parameters.
+
+### Bulk operations
+
+#### `bulk_restart`
+Restart all apps matching a project or tag filter. Provide one filter. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_id` | string | no | Project ID filter |
+| `tag` | string | no | Tag filter |
+
+#### `bulk_deploy`
+Deploy all apps matching a project or tag filter. **Write.**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_id` | string | no | Project ID filter |
+| `tag` | string | no | Tag filter |
+
+### Servers and infrastructure
+
+#### `get_server_status`
+Get a server resource overview: version, CPU percent, memory, and disk usage. No parameters.
+
+#### `list_servers`
+List all servers with health and metrics. No parameters.
+
+#### `server_forecast`
+Get a resource usage forecast for a server. Needs at least 7 days of data.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `server_id` | string | yes | The server ID |
+
+### Utility
+
+#### `search`
+Search across all resources (apps, databases, servers, domains).
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | string | yes | Search query |
+
+#### `get_analytics`
+Get deploy analytics (frequency, success rate, build times) over a time range.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `days` | number | no | Time range in days (default 30) |
+
+## Resources
+
+List resources with `GET /api/v1/mcp/resources`; read one with
+`POST /api/v1/mcp/resources/read` and a body of `{ "uri": "<uri>" }`. Reading a
+resource requires authentication.
+
+### Static resources
+
+| URI | Name | Returns |
+|-----|------|---------|
+| `icefall://apps` | Applications | All deployed applications |
+| `icefall://databases` | Databases | All managed databases |
+| `icefall://servers` | Servers | All connected servers |
+| `icefall://deploys/recent` | Recent Deploys | Latest deploy per app |
+| `icefall://incidents` | Incidents | Active and recent incidents (last 20) |
+| `icefall://settings` | Settings | Non-sensitive platform settings (version) |
+
+### Parameterized resources
+
+These URI patterns are read directly even though they are not in the list above:
+
+| URI pattern | Returns |
+|-------------|---------|
+| `icefall://apps/<app_id>` | A single app |
+| `icefall://apps/<app_id>/logs` | Recent logs for an app (last 100 lines) |
+| `icefall://servers/<server_id>` | A single server |
+| `icefall://servers/<server_id>/metrics` | Live CPU, memory, and disk metrics for a server |
+
+## Prompts
+
+List prompts with `GET /api/v1/mcp/prompts`; render one with
+`POST /api/v1/mcp/prompts/get` and a body of `{ "name": "<name>", "arguments": { ... } }`.
+A prompt returns ready-made messages that walk the assistant through an
+operation using the tools above.
+
+### `deploy-app`
+Deploy an application with guided options.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `app_name` | yes | Name of the app to deploy |
+| `branch` | no | Branch or tag (default: configured branch) |
+
+### `troubleshoot`
+Diagnose an unhealthy or failing application.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `app_name` | yes | Name of the app having issues |
+| `symptom` | no | What's wrong (e.g. `slow`, `502 errors`, `crashes`) |
+
+### `create-app`
+Set up a new application step by step.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `repo_url` | yes | Git repository URL |
+| `name` | no | App name (auto-generated if omitted) |
+
+### `security-audit`
+Check for common security issues across all apps. No arguments.
+
+### `setup-monitoring`
+Configure health checks and alerts for an app.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `app_name` | yes | Name of the app |
+
+## JSON-RPC examples
+
+Call a tool:
+
+```bash
+curl -X POST https://your-instance.com/api/v1/mcp/call \
+  -H "Authorization: Bearer icefall_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "deploy_app", "params": {"app_id": "abc123", "no_cache": true}}'
+```
+
+Read a resource:
+
+```bash
+curl -X POST https://your-instance.com/api/v1/mcp/resources/read \
+  -H "Authorization: Bearer icefall_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"uri": "icefall://apps/abc123/logs"}'
+```
+
+Render a prompt:
+
+```bash
+curl -X POST https://your-instance.com/api/v1/mcp/prompts/get \
+  -H "Authorization: Bearer icefall_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "troubleshoot", "arguments": {"app_name": "my-api", "symptom": "502 errors"}}'
+```
+
+<Aside type="caution">
+An MCP token can take real actions — deploying apps, changing environment
+variables, provisioning databases. Scope it to the least-privileged role that
+works, set an expiry, and revoke it when it is no longer needed.
+</Aside>

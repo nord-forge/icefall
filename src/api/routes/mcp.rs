@@ -58,6 +58,11 @@ async fn list_tools() -> Json<serde_json::Value> {
             tool_def("export_bundle", "Export an app as a portable .icefall bundle", &[param("app_id", "string", "The app ID")]),
             tool_def("search", "Search across all resources (apps, databases, servers, domains)", &[param("query", "string", "Search query")]),
             tool_def("get_analytics", "Get deploy analytics (frequency, success rate, build times)", &[param("days", "number", "Time range in days (default 30)")]),
+
+            // IF-195: Workflow orchestration
+            tool_def("bulk_env_set", "Set an environment variable across all apps in a project or matching a tag", &[param("key", "string", "Variable name"), param("value", "string", "Variable value"), param("scope", "string", "Scope: shared, production, or preview (default shared)"), param("project_id", "string", "Project ID (optional)"), param("tag", "string", "Tag filter (optional)")]),
+            tool_def("deploy_workflow", "Deploy an app and return the deploy id plus the tools/resources to monitor it", &[param("app_id", "string", "The app ID"), param("no_cache", "boolean", "Force rebuild without cache (optional)")]),
+            tool_def("rollback_if_unhealthy", "Check an app's health and roll back to the previous deploy if it is unhealthy", &[param("app_id", "string", "The app ID")]),
         ]
     }))
 }
@@ -90,6 +95,9 @@ async fn call_tool(
         "bulk_restart",
         "bulk_deploy",
         "create_app",
+        "bulk_env_set",
+        "deploy_workflow",
+        "rollback_if_unhealthy",
     ];
 
     if !can_write && write_tools.contains(&body.tool.as_str()) {
@@ -464,6 +472,133 @@ async fn call_tool(
                 }
             }
             serde_json::json!({ "apps_matched": filtered.len(), "deploys_triggered": deploy_ids.len(), "deploy_ids": deploy_ids })
+        }
+        "bulk_env_set" => {
+            let key = str_param(p, "key")?;
+            let value = str_param(p, "value")?;
+            let scope = p.get("scope").and_then(|v| v.as_str()).unwrap_or("shared");
+            let project_filter = p.get("project_id").and_then(|v| v.as_str());
+            let tag_filter = p.get("tag").and_then(|v| v.as_str());
+            let apps = state.db.list_apps().await?;
+            let filtered: Vec<_> = apps
+                .iter()
+                .filter(|a| {
+                    if let Some(pid) = project_filter {
+                        a.project_id.as_deref() == Some(pid)
+                    } else if let Some(tag) = tag_filter {
+                        a.tags.as_deref().is_some_and(|t| t.contains(tag))
+                    } else {
+                        false
+                    }
+                })
+                .collect();
+            let mut updated = 0;
+            for app in &filtered {
+                let envs = state.db.list_environments(&app.id).await.unwrap_or_default();
+                if let Some(env) = envs.first() {
+                    if state
+                        .db
+                        .set_env_var(&crate::db::models::NewEnvVar {
+                            environment_id: env.id.clone(),
+                            key: key.clone(),
+                            value: value.clone(),
+                            scope: scope.to_string(),
+                        })
+                        .await
+                        .is_ok()
+                    {
+                        updated += 1;
+                    }
+                }
+            }
+            serde_json::json!({ "apps_matched": filtered.len(), "apps_updated": updated, "key": key })
+        }
+        "deploy_workflow" => {
+            let id = str_param(p, "app_id")?;
+            let app = state
+                .db
+                .get_app(&id)
+                .await?
+                .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
+            let no_cache = p.get("no_cache").and_then(|v| v.as_bool()).unwrap_or(false);
+            let envs = state.db.list_environments(&id).await?;
+            let env = envs
+                .first()
+                .ok_or_else(|| ApiError::BadRequest("app has no environments".into()))?;
+            let deploy = state
+                .db
+                .create_deploy(&crate::db::models::NewDeploy {
+                    app_id: id.clone(),
+                    environment_id: env.id.clone(),
+                    git_sha: None,
+                    server_id: None,
+                    tag: None,
+                    no_cache,
+                })
+                .await?;
+            serde_json::json!({
+                "deploy_id": deploy.id,
+                "app": app.name,
+                "message": "Deploy triggered. Poll status, then verify health.",
+                "monitor": {
+                    "status_tool": "get_deploy_status",
+                    "health_tool": "get_health_status",
+                    "logs_resource": format!("icefall://apps/{id}/logs")
+                }
+            })
+        }
+        "rollback_if_unhealthy" => {
+            let id = str_param(p, "app_id")?;
+            state
+                .db
+                .get_app(&id)
+                .await?
+                .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
+            let checks = state.db.get_health_checks(&id).await?;
+            let check_ids: Vec<String> = checks.iter().map(|c| c.id.clone()).collect();
+            let events = state.db.get_health_events_for_checks(&check_ids, 5).await?;
+            let healthy_states = ["healthy", "up", "passing", "ok"];
+            let mut determined = false;
+            let mut unhealthy = false;
+            for check in &checks {
+                if let Some(latest) = events.iter().find(|e| e.health_check_id == check.id) {
+                    determined = true;
+                    if !healthy_states.contains(&latest.status.as_str()) {
+                        unhealthy = true;
+                    }
+                }
+            }
+            if !determined {
+                serde_json::json!({ "action": "none", "message": "No health data available — not rolling back" })
+            } else if !unhealthy {
+                serde_json::json!({ "action": "none", "message": "App is healthy" })
+            } else {
+                // Roll back to the most recent prior deploy that produced an image.
+                let deploys = state.db.list_deploys(&id, 10).await?;
+                match deploys.iter().skip(1).find(|d| d.image_ref.is_some()) {
+                    Some(target) => {
+                        let envs = state.db.list_environments(&id).await?;
+                        let env = envs
+                            .first()
+                            .ok_or_else(|| ApiError::BadRequest("No environments".into()))?;
+                        let rb = state
+                            .db
+                            .create_deploy(&crate::db::models::NewDeploy {
+                                app_id: id.clone(),
+                                environment_id: env.id.clone(),
+                                git_sha: target.git_sha.clone(),
+                                server_id: None,
+                                tag: None,
+                                no_cache: false,
+                            })
+                            .await?;
+                        serde_json::json!({ "action": "rolled_back", "deploy_id": rb.id, "rolled_back_to": target.id })
+                    }
+                    None => {
+                        serde_json::json!({ "action": "none", "message": "Unhealthy, but no prior deploy with an image to roll back to" })
+                    }
+                }
+            }
         }
         "create_app" => {
             let name = str_param(p, "name")?;

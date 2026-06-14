@@ -1,0 +1,140 @@
+---
+title: Multi-server
+description: How the control plane orchestrates a fleet of worker servers through agents.
+---
+
+A single Icefall install can manage more than the server it runs on. Add worker
+servers and the control plane orchestrates builds and deployments across all of
+them — over an encrypted WebSocket, with no extra database, message broker, or
+SSH access required.
+
+## Control plane vs workers
+
+```
+        ┌──────────────────────────────┐
+        │     Control plane (daemon)    │
+        │  REST API · dashboard · DB    │
+        │  agent registry · scheduler   │
+        └───┬───────────────┬───────────┘
+            │ WebSocket      │ WebSocket
+            ▼                ▼
+     ┌────────────┐    ┌────────────┐
+     │  Agent A   │    │  Agent B   │
+     │ Docker/    │    │ Docker/    │
+     │ Podman     │    │ Podman     │
+     └────────────┘    └────────────┘
+```
+
+**Control plane** — the main Icefall daemon. It owns the database, the REST API,
+the dashboard, and the agent registry. It also acts as its own deploy target:
+the built-in control-plane server has a fixed ID (`cp_ctrl_0000000001`), so apps
+with no assigned server, or assigned to that ID, deploy locally.
+
+**Workers** — every additional server runs `icefall-agent`, a separate binary
+from the daemon. Workers have no database access and never expose their container
+socket to the network. They do exactly what the control plane tells them over
+the WebSocket and report back.
+
+Unlike clustering systems that need a shared datastore or a control protocol on
+every node, Icefall keeps all state on the control plane. A worker is stateless
+beyond its running containers and its keypair.
+
+## The agent connection
+
+The agent dials back to the control plane and holds a persistent WebSocket open
+to `/api/v1/agent/ws`, authenticating with a bearer worker token. Because the
+agent initiates the connection outbound, workers only need to reach the control
+plane on 443 — they do not need to accept inbound connections themselves.
+
+Messages on the link are JSON with three shapes: requests (RPC the control plane
+sends, like `container.create`, `image.build`, `caddy.add_route`,
+`terminal.open`), responses, and events (heartbeats, status). Large image
+transfers stream as chunked binary frames.
+
+## Enrollment
+
+Enrollment turns a fresh server into a trusted worker.
+
+1. **Add the server** in the dashboard. The control plane mints a one-time
+   enrollment token and stores only its SHA-256 hash. The token is valid for
+   **15 minutes**.
+2. **Run the setup command** on the new server. It detects the architecture,
+   installs a container runtime and Caddy if missing, and downloads the agent
+   binary.
+3. **The agent enrolls.** It generates an X25519 keypair, then posts its public
+   key with the enrollment token. The control plane verifies the token hash and
+   that it has not expired, stores the agent's public key, and returns a
+   long-lived worker token.
+4. **The agent connects** over the WebSocket using the worker token and the
+   server flips to `online`.
+
+The private key never leaves the worker — it is written to the agent's data
+directory with `0600` permissions. The control plane only ever holds the
+public key.
+
+## Choosing a server
+
+When you create an app you can pin it to a specific server or let Icefall
+recommend one. The recommendation is a score from 0 to 1, averaged across four
+factors:
+
+- available CPU — `(100 − cpu_percent) / 100`
+- available RAM — `1 − (ram_used / ram_total)`
+- available disk — `1 − (disk_used / disk_total)`
+- app load — `1 / (app_count + 1)`
+
+Only `online` servers are considered, and the highest-scoring one is flagged as
+recommended. The score uses the metrics each agent reports, so a server under
+memory pressure or already hosting many apps naturally scores lower.
+
+## Migrating an app
+
+You can move an app to another server. The target must be `online`. Icefall
+creates a new deploy bound to the target server, then builds and deploys the app
+there through that server's agent. Once the new container is healthy, the old
+Caddy route is removed.
+
+:::caution
+Volumes do not migrate. Container images and configuration move, but data in
+volumes stays on the source server — the API requires you to acknowledge this
+before a migration with volumes proceeds. Back up volume data and restore it on
+the target before cutting over anything stateful.
+:::
+
+## Heartbeats and offline servers
+
+The link is kept alive with heartbeats every **15 seconds**. A background checker
+on the control plane marks any server that has gone **45 seconds** without a
+heartbeat as `offline` and emits a disconnect event.
+
+Going offline does not stop running containers — the agent disconnecting is not
+the same as the host dying, and existing containers keep serving traffic. What
+changes is that the control plane will not target an offline server for new
+deploys; attempts fail fast rather than hang. When the agent reconnects, the
+server returns to `online` automatically.
+
+## Envelope encryption for secrets
+
+Environment variables are sensitive, so they are never sent to a worker in the
+clear — even though the WebSocket already runs over TLS. Icefall adds a second
+layer using the worker's X25519 key.
+
+For each remote deploy the control plane:
+
+1. generates an ephemeral X25519 keypair,
+2. performs Diffie-Hellman with the worker's enrolled public key to derive a
+   shared secret,
+3. hashes that secret with SHA-256 into an AES-256-GCM key,
+4. encrypts the env vars JSON with a fresh random nonce.
+
+The result — ephemeral public key, nonce, ciphertext, and a key fingerprint — is
+sent alongside the container config. Only the worker, holding the matching
+private key, can derive the same shared secret and decrypt the values. The
+control plane never transmits the symmetric key, and a captured WebSocket frame
+reveals nothing without the worker's private key.
+
+## See also
+
+- [Architecture](/concepts/architecture/) — how the daemon, runtime, and Caddy fit together
+- [Security](/concepts/security/) — encryption at rest and in transit
+- [Multi-server troubleshooting](/troubleshooting/multi-server/) — agent connection and remote deploy problems

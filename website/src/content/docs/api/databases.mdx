@@ -1,0 +1,285 @@
+---
+title: Databases API
+description: Provision managed databases, link them to apps, run backups and restores, and manage SSL over the Icefall REST API.
+---
+
+These endpoints provision and operate managed databases, link them to apps,
+and handle backups, restores, and TLS. All paths are relative to `/api/v1`.
+See the [API overview](/api/overview/) for authentication, the required
+`X-Icefall-Request` header on writes, and the shared error format.
+
+## Endpoints
+
+| Method | Path | Min role | Description |
+|--------|------|----------|-------------|
+| GET | `/databases` | viewer | List databases in the team |
+| POST | `/databases` | member | Provision a database |
+| GET | `/databases/{id}` | viewer | Get one database |
+| DELETE | `/databases/{id}` | admin | Delete a database |
+| POST | `/databases/{id}/start` | member | Start the container |
+| POST | `/databases/{id}/stop` | member | Stop the container |
+| POST | `/databases/{id}/restart` | member | Restart the container |
+| POST | `/databases/{id}/link/{app_id}` | member | Link to an app |
+| DELETE | `/databases/{id}/link/{app_id}` | member | Unlink from an app |
+| GET | `/databases/{id}/backups` | viewer | List backups |
+| POST | `/databases/{id}/backup` | member | Trigger a backup |
+| POST | `/databases/{id}/restore` | member | Restore from a backup or command |
+| GET | `/databases/{id}/restore/history` | viewer | List restore runs |
+| PUT | `/databases/{id}/ssl` | member | Configure SSL |
+| GET | `/databases/{id}/certificate` | viewer | Read the SSL certificate |
+| POST | `/databases/{id}/certificate/regenerate` | member | Regenerate the certificate |
+
+## The database object
+
+```json
+{
+  "id": "db_p1",
+  "name": "billing-pg",
+  "db_type": "postgres",
+  "container_id": "c0ffee",
+  "app_id": "app_a1b2c3",
+  "project_id": null,
+  "team_id": "team_acme",
+  "backup_schedule": "0 3 * * *",
+  "backup_retention_count": 7,
+  "ssl_enabled": true,
+  "ssl_mode": "require",
+  "ssl_expires_at": "2027-06-14T00:00:00Z",
+  "created_at": "2026-05-01T09:00:00Z"
+}
+```
+
+## Supported database types
+
+`db_type` accepts: `postgres`, `mysql`, `mariadb`, `mongo`, `redis`, `keydb`,
+`dragonfly`, `valkey`, `clickhouse`, `cockroachdb`, `cassandra`.
+
+## List databases
+
+```
+GET /databases
+```
+
+```bash
+curl https://icefall.example.com/api/v1/databases \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+## Provision a database
+
+```
+POST /databases
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Database name; must be non-empty |
+| `db_type` | string | yes | One of the supported types above |
+| `app_id` | string \| null | no | App to associate; must be in the team |
+| `memory_mb` | number \| null | no | Memory limit; type-specific default |
+| `expose_port` | boolean \| null | no | Publish a host port (default `false`) |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/databases \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "billing-pg", "db_type": "postgres", "app_id": "app_a1b2c3" }'
+```
+
+On success (`201`) the response includes generated credentials. The plaintext
+password is returned only here:
+
+```json
+{
+  "data": {
+    "id": "db_p1",
+    "name": "billing-pg",
+    "db_type": "postgres",
+    "container_id": "c0ffee",
+    "connection_string": "postgres://billing:s3cr3t@db_p1:5432/billing",
+    "credentials": {
+      "user": "billing",
+      "password": "s3cr3t",
+      "host": "db_p1",
+      "port": 5432,
+      "connection_string": "postgres://billing:s3cr3t@db_p1:5432/billing",
+      "readonly": { "user": "billing_ro", "password": "r3ad0nly" }
+    }
+  }
+}
+```
+
+`readonly` is provisioned for `postgres`, `mysql`, and `mongo`; for other
+types it is `null`.
+
+Errors:
+
+- `400 bad_request` — invalid `db_type` or empty name.
+- `404 not_found` — `app_id` not in the team.
+
+## Delete a database
+
+```
+DELETE /databases/{id}
+```
+
+Stops and removes the container and deletes the record. Requires `admin`.
+
+```json
+{ "message": "deleted" }
+```
+
+## Start, stop, restart
+
+```
+POST /databases/{id}/start
+POST /databases/{id}/stop
+POST /databases/{id}/restart
+```
+
+```json
+{ "message": "started" }
+```
+
+## Link and unlink an app
+
+```
+POST /databases/{id}/link/{app_id}
+DELETE /databases/{id}/link/{app_id}
+```
+
+Linking injects a connection-string environment variable into the app's first
+environment. The variable name depends on the database type
+(`DATABASE_URL`, `REDIS_URL`, `MONGODB_URL`, and so on):
+
+```bash
+curl -X POST \
+  https://icefall.example.com/api/v1/databases/db_p1/link/app_a1b2c3 \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1"
+```
+
+```json
+{ "message": "linked", "env_var": "DATABASE_URL" }
+```
+
+Unlinking removes the injected variables:
+
+```json
+{ "message": "unlinked" }
+```
+
+## Backups
+
+```
+GET /databases/{id}/backups
+POST /databases/{id}/backup
+```
+
+List returns the backup history; trigger creates one immediately:
+
+```json
+{
+  "data": {
+    "id": "bkp_01",
+    "database_id": "db_p1",
+    "timestamp": "2026-06-14T03:00:00Z",
+    "size_bytes": 10485760,
+    "path": "/backups/db_p1/2026-06-14T03-00-00.dump"
+  }
+}
+```
+
+## Restore
+
+```
+POST /databases/{id}/restore
+GET /databases/{id}/restore/history
+```
+
+Restore runs asynchronously and returns the initial run record.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `source_type` | string | `file` | `file`, `s3`, or `custom` |
+| `source_ref` | string \| null | — | Backup filename or S3 key |
+| `custom_command` | string \| null | — | Override restore command |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/databases/db_p1/restore \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "source_type": "file", "source_ref": "2026-06-14T03-00-00.dump" }'
+```
+
+```json
+{
+  "data": {
+    "id": "rst_01",
+    "database_id": "db_p1",
+    "source_type": "file",
+    "source_ref": "2026-06-14T03-00-00.dump",
+    "status": "pending",
+    "output": null,
+    "started_at": "2026-06-14T09:00:00Z",
+    "finished_at": null
+  }
+}
+```
+
+`status` progresses through `pending`, `running`, then `success` or `failed`.
+The history endpoint returns up to the 20 most recent runs.
+
+## SSL
+
+```
+PUT /databases/{id}/ssl
+GET /databases/{id}/certificate
+POST /databases/{id}/certificate/regenerate
+```
+
+Configure SSL:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ssl_enabled` | boolean | yes | Enable or disable TLS |
+| `ssl_mode` | string \| null | no | e.g. `require`, `prefer` |
+
+```bash
+curl -X PUT https://icefall.example.com/api/v1/databases/db_p1/ssl \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "ssl_enabled": true, "ssl_mode": "require" }'
+```
+
+```json
+{ "message": "updated" }
+```
+
+Read the current certificate:
+
+```json
+{
+  "data": {
+    "ssl_enabled": true,
+    "ssl_mode": "require",
+    "ssl_ca_cert": "-----BEGIN CERTIFICATE-----\n...",
+    "ssl_expires_at": "2027-06-14T00:00:00Z"
+  }
+}
+```
+
+Regenerate a self-signed certificate (365-day expiry):
+
+```json
+{
+  "data": {
+    "ca_cert": "-----BEGIN CERTIFICATE-----\n...",
+    "expires_at": "2027-06-14T09:00:00Z",
+    "message": "Certificate regenerated"
+  }
+}
+```

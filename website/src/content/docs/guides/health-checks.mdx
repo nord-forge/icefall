@@ -1,0 +1,75 @@
+---
+title: Configure health checks
+description: Monitor an app with TCP or HTTP checks and automatic restarts.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+A health check tells Icefall whether your app is actually serving traffic. When a
+check fails repeatedly, Icefall marks the app unhealthy, can restart it
+automatically, and fires notification events.
+
+## Prerequisites
+
+- A deployed app.
+- The port your app listens on, and a path that returns a success response for
+  HTTP checks.
+
+## Add a health check
+
+<Steps>
+
+1. Open the app, go to **Settings**, and find the **Health checks** card.
+
+2. Choose a check type:
+
+   - **TCP** — Icefall opens a connection to a port. Supply the port (default
+     `3000`). A successful connection counts as healthy.
+   - **HTTP** — Icefall sends a `GET` request and expects a `2xx` response.
+     Supply the port (default `80`) and path (default `/`).
+   - **Docker** — Icefall reads the container's built-in `HEALTHCHECK` status, if
+     your image defines one.
+
+3. Set the **interval** (how often to check, default 30 seconds) and the
+   **failure threshold** (consecutive failures before the app is marked
+   unhealthy, default 3).
+
+4. Leave **auto-restart** on if you want Icefall to restart the container when it
+   becomes unhealthy. Save.
+
+</Steps>
+
+## Verify
+
+<Steps>
+
+1. The health card shows the current status and an uptime percentage.
+
+2. Recent transitions appear as events: `health.down` when a check starts
+   failing, `health.recovered` when it comes back, and `health.auto_restart` when
+   Icefall restarts the container.
+
+3. To confirm recovery behavior, temporarily stop the app's listener and watch
+   the status change, then restore it.
+
+</Steps>
+
+## Notify on health changes
+
+Health events can trigger notifications. Subscribe `health.down`,
+`health.recovered`, and `health.auto_restart` to a channel in
+[notification settings](/guides/setup-notifications).
+
+## Troubleshooting
+
+- **Always unhealthy on HTTP**: confirm the path returns `2xx` and that the port
+  matches the port your app listens on inside the container.
+- **Flapping status**: raise the failure threshold or the interval so transient
+  blips do not trip the check.
+
+## Related
+
+- [Configure notifications](/guides/setup-notifications)
+- [Search application logs](/guides/log-search)

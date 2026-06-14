@@ -1,0 +1,133 @@
+---
+title: Managed databases
+description: How Icefall provisions, secures, backs up, and links managed databases.
+---
+
+Icefall can run databases as managed containers next to your apps. You pick an
+engine, Icefall provisions a container with a persistent volume and generated
+credentials, encrypts those credentials at rest, and injects a connection string
+into the apps you link.
+
+## Provisioning
+
+Creating a database runs a single flow:
+
+1. A random 32-character password is generated for a fixed admin user, `icefall`.
+2. A container named `icefall-db-{name}` starts from the engine's image, with a
+   persistent volume `icefall-db-{name}-data`, a per-engine memory limit, and a
+   restart policy of `unless-stopped`.
+3. The container is labelled `icefall.managed-db=true` and given the internal
+   hostname `{name}.icefall.internal`.
+4. Where the engine supports it, a least-privileged read-only account is
+   provisioned for the database browser.
+5. The credentials — connection string, user, password, host, port, and any
+   read-only account — are encrypted and stored in SQLite.
+
+```
+   create database
+        │
+        ▼
+  generate password ──▶ start icefall-db-{name}
+                              │
+        ┌─────────────────────┴───────────────┐
+        ▼                                       ▼
+  volume icefall-db-{name}-data          read-only account
+        │                                       │
+        └──────────▶ encrypt + store ◀──────────┘
+                          │
+                          ▼
+              link → inject connection string
+```
+
+## Supported engines
+
+Each engine has a pinned default image, default port, and a sensible memory
+allocation:
+
+| Engine | Image | Port | Connection env var |
+|---|---|---|---|
+| PostgreSQL | `postgres:17` | 5432 | `DATABASE_URL` |
+| MySQL | `mysql:8` | 3306 | `DATABASE_URL` |
+| MariaDB | `mariadb:11` | 3306 | `DATABASE_URL` |
+| MongoDB | `mongo:7` | 27017 | `MONGODB_URL` |
+| Redis | `redis:7` | 6379 | `REDIS_URL` |
+| Valkey | `valkey/valkey:8` | 6379 | `REDIS_URL` |
+| KeyDB | `eqalpha/keydb` | 6379 | `REDIS_URL` |
+| DragonFly | `dragonflydb/dragonfly` | 6379 | `REDIS_URL` |
+| ClickHouse | `clickhouse/clickhouse-server:24` | 8123 | `CLICKHOUSE_URL` |
+| CockroachDB | `cockroachdb/cockroach` | 26257 | `DATABASE_URL` |
+| Cassandra | `cassandra:5` | 9042 | `CASSANDRA_URL` |
+
+The Redis-protocol engines (Redis, Valkey, KeyDB, DragonFly) are
+interchangeable from an app's point of view — all four expose a `REDIS_URL`.
+
+## Linking
+
+Linking a database to an app resolves the database's connection string from its
+encrypted credentials and writes it as an environment variable on the app's
+first environment. The variable name depends on the engine (see the table
+above), so a Postgres link produces `DATABASE_URL`, a Redis link produces
+`REDIS_URL`, and so on. The connection string targets the internal hostname,
+for example:
+
+```
+postgresql://icefall:PASSWORD@icefall-db-mydb:5432/icefall
+redis://:PASSWORD@icefall-db-cache:6379
+```
+
+Because the variable lands in the app's environment, the app picks it up on its
+next deploy. Unlinking removes the variable.
+
+## Credentials at rest
+
+Credentials are never stored in plaintext. They are serialized to JSON and
+encrypted with AES-256-GCM, with a random 12-byte nonce per record, before being
+written to SQLite. They are decrypted on demand when a link is created or the
+connection details are displayed.
+
+## The database browser
+
+The dashboard includes a read-only SQL browser. It is built to be safe by
+construction rather than trusted:
+
+- It connects with the **least-privileged account** — the read-only role where
+  the engine provides one, falling back to the admin account only for engines
+  that cannot create one (the Redis-family engines).
+- It runs queries **inside the container** against `localhost`, so no extra port
+  is exposed to the network.
+- Queries are validated: only `SELECT` is allowed, stacked statements and `psql`
+  backslash commands are rejected, dangerous primitives such as `INTO OUTFILE`,
+  `COPY`, `pg_read_file`, and `dblink` are blocked, and a `LIMIT 100` is appended
+  if you omit one.
+
+## Backups
+
+A scheduler wakes hourly and runs a backup for any database with a schedule
+configured. Backups use the engine's native dump tool — `pg_dumpall`,
+`mysqldump`, `mongodump`, a Redis `BGSAVE`, and so on — gzipped to disk. Each
+database keeps its most recent **7** backups by default; older ones are pruned
+after each successful run. The retention count is configurable per database.
+
+Instance-level backups are separate. If the `ICEFALL_BACKUP_S3_BUCKET`
+environment variable is set, they are uploaded to S3; otherwise they are written
+locally.
+
+See [Backups & restore](/databases/backups/) for the operational details.
+
+## Scaling and external access
+
+Managed databases are single containers — there is no built-in replication or
+clustering. Scale by raising the container's memory limit, by choosing an engine
+suited to your workload, or by pointing apps at an external managed database
+instead.
+
+By default a database is reachable only on the internal network, by apps on the
+same server. Enabling public access allocates a host TCP port and binds it so the
+database can be reached from outside. Treat that as a deliberate exposure and
+keep it firewalled.
+
+## See also
+
+- [Provisioning](/databases/provisioning/) — step-by-step setup in the dashboard
+- [Backups & restore](/databases/backups/) — schedules, retention, restoring
+- [Database troubleshooting](/troubleshooting/databases/) — connection and backup problems

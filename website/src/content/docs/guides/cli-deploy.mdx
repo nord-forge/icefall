@@ -1,0 +1,84 @@
+---
+title: Deploy from the command line
+description: Authenticate the Icefall CLI and deploy the current project.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+The `icefall` CLI deploys the project in your current directory and streams the
+result, which makes it ideal for local workflows and CI pipelines.
+
+## Prerequisites
+
+- The `icefall` CLI installed and on your `PATH`.
+- An [API token](/guides/api-tokens) for your account.
+- A project directory linked to an Icefall app.
+
+## Authenticate
+
+<Steps>
+
+1. Point the CLI at your instance and sign in:
+
+   ```bash
+   icefall login
+   ```
+
+2. Paste your API token when prompted. The CLI stores it for subsequent
+   commands.
+
+</Steps>
+
+## Deploy
+
+<Steps>
+
+1. From the project directory, run:
+
+   ```bash
+   icefall deploy
+   ```
+
+2. To force a clean build that ignores the build cache, add `--no-cache`:
+
+   ```bash
+   icefall deploy --no-cache
+   ```
+
+3. The CLI triggers the deploy and reports build progress and the final status.
+
+</Steps>
+
+## Check status and logs
+
+```bash
+icefall status            # server status overview
+icefall logs <app>        # stream an app's logs
+icefall logs <app> --search error
+```
+
+## Use in CI
+
+In a pipeline, provide the token through the environment rather than an
+interactive login, then run the deploy:
+
+```bash
+icefall login   # or supply credentials non-interactively in CI
+icefall deploy --no-cache
+```
+
+Use a dedicated, expiring [API token](/guides/api-tokens) for CI so it can be
+rotated independently.
+
+## Troubleshooting
+
+- **Not authenticated**: re-run `icefall login` with a valid token.
+- **No app for this directory**: create or link the app first, then deploy.
+- **Build fails**: stream `icefall logs <app>` to see the failing build step.
+
+## Related
+
+- [Manage apps from the CLI](/guides/cli-management)
+- [Create API tokens](/guides/api-tokens)

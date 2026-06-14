@@ -1,0 +1,76 @@
+---
+title: Configure Google OAuth login
+description: Let users sign in to Icefall with their Google account.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 10 minutes.
+
+Google OAuth lets users sign in to Icefall with their Google account. You
+configure it once as an administrator by creating OAuth credentials in Google
+Cloud and entering the client ID and secret in Icefall.
+
+## Prerequisites
+
+- Administrator access to Icefall.
+- A Google Cloud project where you can create OAuth credentials.
+- Your Icefall base URL, served over HTTPS.
+
+## Create Google OAuth credentials
+
+<Steps>
+
+1. In the Google Cloud console, open **APIs & Services > Credentials** and
+   create an **OAuth client ID** of type **Web application**.
+
+2. Add an **Authorized redirect URI**:
+
+   ```
+   https://your-icefall-instance.com/api/v1/auth/oauth/google/callback
+   ```
+
+3. Create the client and copy the **Client ID** and **Client secret**.
+
+</Steps>
+
+## Configure Icefall
+
+<Steps>
+
+1. In Icefall, open **Settings > OAuth providers**.
+
+2. In the Google section, paste the **Client ID** and **Client secret**. The
+   callback URL is shown there for reference.
+
+3. Turn on the **Enable** toggle and save. The secret field clears after saving
+   and shows a configured indicator.
+
+</Steps>
+
+## Verify
+
+<Steps>
+
+1. Sign out, then return to the login page. A **Sign in with Google** option
+   should appear.
+
+2. Complete the Google consent screen. You should return to Icefall, signed in.
+
+3. To attach Google to an existing account, open your **Profile** and link the
+   Google identity there.
+
+</Steps>
+
+## Troubleshooting
+
+- **redirect_uri_mismatch**: the redirect URI in Google Cloud must match the
+  Icefall callback URL exactly.
+- **Access blocked**: if your OAuth consent screen is in testing mode, add the
+  signing-in user as a test user, or publish the consent screen.
+- **Button does not appear**: confirm the Google provider is enabled and saved.
+
+## Related
+
+- [Configure GitHub OAuth login](/guides/oauth-github)
+- [Enable two-factor authentication](/guides/setup-2fa)

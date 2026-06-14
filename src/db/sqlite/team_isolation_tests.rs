@@ -333,10 +333,10 @@ mod team_isolation {
         let team_a = create_team_for_user(&db, "Team A", &user).await;
         let team_b = create_team_for_user(&db, "Team B", &user).await;
 
-        db.create_api_token(&user.id, "Token A", "hash-a", None, Some(&team_a.id))
+        db.create_api_token(&user.id, "Token A", "hash-a", None, Some(&team_a.id), None)
             .await
             .expect("create token A");
-        db.create_api_token(&user.id, "Token B", "hash-b", None, Some(&team_b.id))
+        db.create_api_token(&user.id, "Token B", "hash-b", None, Some(&team_b.id), None)
             .await
             .expect("create token B");
 

@@ -1,0 +1,226 @@
+---
+title: Deploys API
+description: Trigger, list, cancel, roll back, and approve deploys over the Icefall REST API.
+---
+
+A deploy represents one build-and-release of an app. These endpoints trigger
+deploys, read their history and events, and handle cancellation, rollback, and
+approval. All paths are relative to `/api/v1`. See the
+[API overview](/api/overview/) for authentication, the required
+`X-Icefall-Request` header on writes, and the shared error format.
+
+## Endpoints
+
+| Method | Path | Min role | Description |
+|--------|------|----------|-------------|
+| GET | `/apps/{id}/deploys` | viewer | List recent deploys for an app |
+| POST | `/apps/{id}/deploys` | member | Trigger a deploy |
+| GET | `/deploys/latest` | viewer | Latest deploy for multiple apps |
+| POST | `/apps/{id}/deploys/{deploy_id}/rollback` | member | Roll back to a deploy |
+| POST | `/deploys/{deploy_id}/cancel` | member | Cancel an in-progress deploy |
+| GET | `/deploys/{deploy_id}/events` | — | List a deploy's events |
+| POST | `/deploys/{deploy_id}/approve` | admin | Approve or reject a deploy |
+| GET | `/analytics/deploys` | — | Deploy analytics over a range |
+
+## The deploy object
+
+```json
+{
+  "id": "dpl_77aa",
+  "app_id": "app_a1b2c3",
+  "environment_id": "env_prod",
+  "status": "running",
+  "git_sha": "1ab4c9d",
+  "image_ref": "registry.local/billing-api:1ab4c9d",
+  "container_id": "c0ffee",
+  "server_id": "srv_eu1",
+  "tag": null,
+  "no_cache": false,
+  "config_hash": "9f2c...",
+  "started_at": "2026-06-10T14:30:00Z",
+  "finished_at": "2026-06-10T14:32:11Z",
+  "created_at": "2026-06-10T14:29:58Z"
+}
+```
+
+`status` is one of `pending`, `building`, `deploying`, `running`, `failed`,
+`cancelled`, or `pending_approval`.
+
+## Trigger a deploy
+
+```
+POST /apps/{id}/deploys
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `no_cache` | boolean | no | Skip the build cache |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/apps/app_a1b2c3/deploys \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "no_cache": true }'
+```
+
+```js
+const res = await fetch(
+  "https://icefall.example.com/api/v1/apps/app_a1b2c3/deploys",
+  {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer icefall_xxxxxxxx",
+      "X-Icefall-Request": "1",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ no_cache: true }),
+  },
+);
+const { data } = await res.json();
+```
+
+The build and release run asynchronously; the response returns the new deploy
+immediately under `data`. If the app has approval required, the deploy lands in
+`pending_approval` until it is approved.
+
+`400 bad_request` is returned when the app has no git repo and no image or
+Compose source, or no environments configured.
+
+## List deploys
+
+```
+GET /apps/{id}/deploys
+```
+
+Returns the most recent deploys for an app (capped at 50, newest first):
+
+```json
+{ "data": [ { "id": "dpl_77aa", "status": "running" } ] }
+```
+
+## Latest deploys for several apps
+
+```
+GET /deploys/latest?app_ids=app_a1b2c3,app_d4e5f6
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `app_ids` | string | yes | Comma-separated app IDs |
+
+Returns the latest deploy for each requested app that belongs to the caller's
+team. IDs outside the team are silently dropped.
+
+## Roll back
+
+```
+POST /apps/{id}/deploys/{deploy_id}/rollback
+```
+
+Redeploys the image and environment from a previous deploy. The target deploy
+must belong to the app and must have an image reference.
+
+```bash
+curl -X POST \
+  https://icefall.example.com/api/v1/apps/app_a1b2c3/deploys/dpl_55zz/rollback \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1"
+```
+
+Returns the new deploy under `data`. `400 bad_request` is returned if the
+target deploy has no image reference.
+
+## Cancel
+
+```
+POST /deploys/{deploy_id}/cancel
+```
+
+Cancels a deploy that is `pending`, `building`, or `deploying`. Any other
+status returns `400 bad_request`.
+
+```json
+{ "data": { "id": "dpl_77aa", "status": "cancelled" } }
+```
+
+## Deploy events
+
+```
+GET /deploys/{deploy_id}/events
+```
+
+Returns the ordered event log (build and release steps) for a deploy:
+
+```json
+{
+  "data": [
+    {
+      "id": "evt_01",
+      "deploy_id": "dpl_77aa",
+      "event_type": "build_started",
+      "data": "{\"step\":\"clone\"}",
+      "timestamp": "2026-06-10T14:30:00Z"
+    }
+  ]
+}
+```
+
+## Approve or reject
+
+```
+POST /deploys/{deploy_id}/approve
+```
+
+For apps with `require_deploy_approval` enabled, a deploy waits in
+`pending_approval` until an account `admin` resolves it.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `action` | string | yes | `approved` to release; anything else rejects |
+| `comment` | string | no | Reviewer note |
+
+```bash
+curl -X POST https://icefall.example.com/api/v1/deploys/dpl_77aa/approve \
+  -H "Authorization: Bearer icefall_xxxxxxxx" \
+  -H "X-Icefall-Request: 1" \
+  -H "Content-Type: application/json" \
+  -d '{ "action": "approved", "comment": "Looks good" }'
+```
+
+```json
+{
+  "data": {
+    "id": "apr_01",
+    "deploy_id": "dpl_77aa",
+    "action": "approved",
+    "user_id": "usr_nick",
+    "comment": "Looks good",
+    "created_at": "2026-06-10T14:35:00Z"
+  }
+}
+```
+
+Approving moves the deploy to `pending` and queues it; rejecting cancels it.
+A deploy that is not in `pending_approval` returns `400 bad_request`.
+
+## Deploy analytics
+
+```
+GET /analytics/deploys
+```
+
+Aggregated deploy counts, timing, and status breakdown over a window.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `from` | string | `days` ago | ISO 8601 start |
+| `to` | string | now | ISO 8601 end |
+| `days` | number | 30 | Lookback used when `from` is omitted |
+
+```bash
+curl "https://icefall.example.com/api/v1/analytics/deploys?days=7" \
+  -H "Authorization: Bearer icefall_xxxxxxxx"
+```
+
+Returns the aggregated metrics under `data`.

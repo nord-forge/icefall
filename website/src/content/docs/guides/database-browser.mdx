@@ -1,0 +1,87 @@
+---
+title: Database browser
+description: Run read-only queries against a managed database from the dashboard.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Time to complete: about 5 minutes.
+
+The database browser lets you inspect tables and run read-only queries against a
+managed database without leaving the dashboard. Queries run as a least-privileged
+read-only account, so the browser cannot modify data.
+
+## Prerequisites
+
+- A managed database created in Icefall (Postgres, MySQL, MariaDB, MongoDB,
+  Redis, or another supported engine).
+- An app the database is linked to.
+
+## Open the browser
+
+<Steps>
+
+1. Open the app and go to the **Databases** section.
+
+2. Select the database you want to inspect.
+
+3. Browse the table, collection, or key list in the sidebar to see what the
+   database contains.
+
+</Steps>
+
+## Run a query
+
+<Steps>
+
+1. Open the query panel for the selected database.
+
+2. For SQL engines, write a single `SELECT` statement. Statements are limited to
+   one query with no trailing semicolon:
+
+   ```sql
+   SELECT id, email, created_at
+   FROM users
+   ORDER BY created_at DESC
+   ```
+
+   If you omit a `LIMIT`, Icefall caps the result at 100 rows.
+
+3. For MongoDB, supply a structured filter rather than raw JavaScript:
+
+   ```json
+   {
+     "collection": "orders",
+     "filter": { "status": "paid" },
+     "sort": { "createdAt": -1 },
+     "limit": 100
+   }
+   ```
+
+4. Run the query and review the results in the table view.
+
+</Steps>
+
+## What is blocked
+
+The browser is read-only by design:
+
+- Only `SELECT` is accepted for SQL engines. Writes, DDL, and multi-statement
+  queries are rejected.
+- File and system functions (such as `COPY`, `LOAD DATA`, `pg_read_file`,
+  `pg_sleep`, and `dblink`) are blocked.
+- MongoDB queries cannot use `$where` or `$function`.
+- Redis access is restricted to a safe, read-only command allowlist
+  (`GET`, `MGET`, `HGETALL`, and similar).
+
+## Troubleshooting
+
+- **"Query rejected"**: confirm you are running a single read-only statement
+  with no semicolon and no forbidden keyword.
+- **Empty results**: check that you selected the right database and that the
+  table or collection name matches exactly.
+
+## Related
+
+- [Connect a database](/guides/connect-database)
+- [Back up and restore](/guides/backup-restore)
