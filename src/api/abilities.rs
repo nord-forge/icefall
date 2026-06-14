@@ -40,7 +40,9 @@ fn is_write(method: &Method) -> bool {
 ///
 /// `path` is the full request path, e.g. `/api/v1/apps/abc/deploy`.
 pub fn required_ability(method: &Method, path: &str) -> Option<String> {
-    let rest = path.strip_prefix("/api/v1/").or_else(|| path.strip_prefix("/api/"))?;
+    let rest = path
+        .strip_prefix("/api/v1/")
+        .or_else(|| path.strip_prefix("/api/"))?;
     let segments: Vec<&str> = rest.split('/').filter(|s| !s.is_empty()).collect();
     let resource = *segments.first()?;
     let write = is_write(method);
@@ -48,18 +50,24 @@ pub fn required_ability(method: &Method, path: &str) -> Option<String> {
     // Deploy/rollback actions on apps need the dedicated deploy ability. These
     // are always writes (POST), so a read-only token can still GET deploy
     // history under apps:read.
-    let is_deploy_action = segments
-        .iter()
-        .any(|s| matches!(*s, "deploy" | "deploys" | "redeploy" | "rollback" | "cancel"));
+    let is_deploy_action = segments.iter().any(|s| {
+        matches!(
+            *s,
+            "deploy" | "deploys" | "redeploy" | "rollback" | "cancel"
+        )
+    });
     if write && is_deploy_action && matches!(resource, "apps" | "projects" | "services" | "deploys")
     {
         return Some("apps:deploy".to_string());
     }
 
     // Environment variables are nested under apps but scoped separately.
-    let touches_env = segments
-        .iter()
-        .any(|s| matches!(*s, "env" | "env-vars" | "environment-variables" | "variables"));
+    let touches_env = segments.iter().any(|s| {
+        matches!(
+            *s,
+            "env" | "env-vars" | "environment-variables" | "variables"
+        )
+    });
     if touches_env {
         return Some(if write { "env:write" } else { "env:read" }.to_string());
     }

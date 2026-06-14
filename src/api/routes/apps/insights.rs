@@ -89,5 +89,7 @@ pub(super) async fn list_inactive(
     }
 
     let count = inactive.len();
-    Ok(Json(serde_json::json!({ "data": inactive, "count": count })))
+    Ok(Json(
+        serde_json::json!({ "data": inactive, "count": count }),
+    ))
 }

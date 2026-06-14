@@ -494,7 +494,11 @@ async fn call_tool(
                 .collect();
             let mut updated = 0;
             for app in &filtered {
-                let envs = state.db.list_environments(&app.id).await.unwrap_or_default();
+                let envs = state
+                    .db
+                    .list_environments(&app.id)
+                    .await
+                    .unwrap_or_default();
                 if let Some(env) = envs.first() {
                     if state
                         .db
