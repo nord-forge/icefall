@@ -162,6 +162,7 @@ pub fn spawn_backup_scheduler(
     docker: Arc<DockerClient>,
     db: Arc<dyn Database>,
     backup_store: Arc<BackupStore>,
+    caddy_admin_url: String,
 ) {
     tokio::spawn(async move {
         loop {
@@ -188,9 +189,32 @@ pub fn spawn_backup_scheduler(
                             mdb.db_type,
                             info.filename
                         );
+                        // IF-167: backup outcome notification.
+                        crate::api::routes::notifications::emit_event(
+                            &db,
+                            &caddy_admin_url,
+                            "backup.success",
+                            None,
+                            &format!("Backup completed for database '{}'", mdb.name),
+                            serde_json::json!({
+                                "database": mdb.name,
+                                "db_type": mdb.db_type,
+                                "filename": info.filename,
+                            }),
+                        )
+                        .await;
                     }
                     Err(e) => {
                         tracing::error!("Backup failed for {}: {e}", mdb.name);
+                        crate::api::routes::notifications::emit_event(
+                            &db,
+                            &caddy_admin_url,
+                            "backup.failure",
+                            None,
+                            &format!("Backup failed for database '{}'", mdb.name),
+                            serde_json::json!({ "database": mdb.name, "error": e }),
+                        )
+                        .await;
                     }
                 }
             }

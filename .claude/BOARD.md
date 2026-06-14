@@ -323,7 +323,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-224](tickets/phase-24-feature-parity/IF-224-git-submodule-lfs-support.md) | Git submodule & LFS support | 2026-05-14 | submodules/lfs/shallow toggles on GitCloneOptions, post-clone steps |
 | [IF-225](tickets/phase-24-feature-parity/IF-225-database-ssl-certificates.md) | Database SSL certificates | 2026-05-14 | rcgen self-signed certs, per-DB SSL toggle + mode, regenerate endpoint |
 
-### Phase 25 — Parity Gaps — 12 ✅ · 3 🟡 · 2 ⬜
+### Phase 25 — Parity Gaps — 13 ✅ · 2 🟡 · 2 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-159](tickets/phase-25-parity-gaps/IF-159-registration-toggle.md) | Registration enable/disable | ✅ | `registration_settings` table, settings PUT, RegistrationSettings UI |
@@ -334,7 +334,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-164](tickets/phase-25-parity-gaps/IF-164-backup-retention-config.md) | Configurable backup retention | ✅ | `backup_retention_count` field (default 7) |
 | [IF-165](tickets/phase-25-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | ⬜ | Terminal exists for apps/servers only; no DB terminal route/UI |
 | [IF-166](tickets/phase-25-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | 🟡 | `GET /apps/{id}/branches` added (git ls-remote) for autocomplete (2026-06-14); deploy-branch picker UI still pending |
-| [IF-167](tickets/phase-25-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | 🟡 | Disk + backup events wired; server offline/online dispatch missing |
+| [IF-167](tickets/phase-25-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | ✅ | Built the event→rules→channels fan-out (`notifications/emit.rs`); wired server.online/offline, backup.success/failure, disk warning/critical/recovered + global-rules API (2026-06-14). Subscription-matrix UI follow-up |
 | [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | ✅ | Enforced in `require_auth` (`api/abilities.rs`), 403 `insufficient_scope`; token UI has presets + ability checkboxes + badges (2026-06-14) |
 | [IF-169](tickets/phase-25-parity-gaps/IF-169-ssh-key-management.md) | SSH key management | ✅ | `ssh_keys` table, model (ed25519/rsa), encrypted private key |
 | [IF-170](tickets/phase-25-parity-gaps/IF-170-docker-registry-credentials.md) | Container registry credentials | ✅ | `registries` table, encrypted creds, dockerhub/ghcr/gitlab/custom |
@@ -394,8 +394,8 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | Metric | Count |
 |--------|-------|
 | Total tickets | 220 |
-| Done (✅) | ~203 |
-| Partial (🟡) | 10 |
+| Done (✅) | ~204 |
+| Partial (🟡) | 9 |
 | Missing (⬜) | 6 |
 | Phases fully complete | 23 / 28 |
 | Superseded | 1 |
@@ -430,7 +430,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | 22 — Expansion (v1.2) | Near done | 4✅ 1🟡 1⬜ / 6 |
 | 23 — Rust Quality | **Done** | 7/7 |
 | 24 — Feature Parity | **Done** | 18/18 |
-| 25 — Parity Gaps | Near done | 12✅ 3🟡 2⬜ / 17 |
+| 25 — Parity Gaps | Near done | 13✅ 2🟡 2⬜ / 17 |
 | 26 — Icefall+ | Near done | 11✅ 6🟡 3⬜ / 20 |
 | 27 — MCP Expansion | **Done** | 3/3 |
 | 28 — Comprehensive Docs | **Done** | 8/8 |

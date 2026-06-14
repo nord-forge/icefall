@@ -86,6 +86,7 @@ pub fn spawn_metrics_collector(
     history: Arc<ServerMetricsHistory>,
     db: Arc<dyn Database>,
     event_bus: Arc<EventBus>,
+    caddy_admin_url: String,
 ) {
     tokio::spawn(async move {
         let mut tick: u64 = 0;
@@ -153,21 +154,39 @@ pub fn spawn_metrics_collector(
                             };
 
                             if let Some(event) = event_name {
+                                let threshold = if new_state == "critical" {
+                                    server.disk_alert_critical_threshold
+                                } else {
+                                    server.disk_alert_warning_threshold
+                                };
+                                let details = serde_json::json!({
+                                    "event": event,
+                                    "server": server.name,
+                                    "disk_usage_percent": usage_pct,
+                                    "threshold": threshold,
+                                });
                                 event_bus.emit(
                                     EventType::DiskAlert,
                                     None,
                                     Some(CONTROL_PLANE_SERVER_ID),
-                                    serde_json::json!({
-                                        "event": event,
-                                        "server": server.name,
-                                        "disk_usage_percent": usage_pct,
-                                        "threshold": if new_state == "critical" {
-                                            server.disk_alert_critical_threshold
-                                        } else {
-                                            server.disk_alert_warning_threshold
-                                        },
-                                    }),
+                                    details.clone(),
                                 );
+
+                                // IF-167: disk threshold notification. The state
+                                // machine only fires on transition, which is the
+                                // re-alert cooldown.
+                                crate::api::routes::notifications::emit_event(
+                                    &db,
+                                    &caddy_admin_url,
+                                    event,
+                                    None,
+                                    &format!(
+                                        "Disk on '{}' at {usage_pct}% ({event})",
+                                        server.name
+                                    ),
+                                    details,
+                                )
+                                .await;
                             }
 
                             let _ = db

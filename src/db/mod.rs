@@ -468,6 +468,11 @@ pub trait Database: Send + Sync + 'static {
         rule: &NewNotificationRule,
     ) -> Result<NotificationRule, DbError>;
     async fn get_notification_rules(&self, app_id: &str) -> Result<Vec<NotificationRule>, DbError>;
+    /// All rules subscribed to `event_type`, across scopes (IF-167 dispatch).
+    async fn get_notification_rules_by_event(
+        &self,
+        event_type: &str,
+    ) -> Result<Vec<NotificationRule>, DbError>;
 
     // Lookup helpers
     async fn get_app_by_repo(&self, repo_url: &str) -> Result<Option<App>, DbError>;

@@ -975,6 +975,13 @@ impl Database for SqliteDatabase {
         notifications::get_notification_rules(&self.pool, app_id).await
     }
 
+    async fn get_notification_rules_by_event(
+        &self,
+        event_type: &str,
+    ) -> Result<Vec<NotificationRule>, DbError> {
+        notifications::get_notification_rules_by_event(&self.pool, event_type).await
+    }
+
     // --- Lookup helpers ---
 
     async fn get_app_by_repo(&self, repo_url: &str) -> Result<Option<App>, DbError> {

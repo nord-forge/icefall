@@ -158,6 +158,7 @@ impl DaemonRunner {
             server_metrics_history.clone(),
             db.clone(),
             event_bus.clone(),
+            config.caddy_admin_url.clone(),
         );
         spawn_health_runner(db.clone(), docker.clone(), event_bus.clone());
         spawn_container_metrics(
@@ -167,7 +168,12 @@ impl DaemonRunner {
             metrics_store.clone(),
         );
         spawn_log_capture(docker.clone(), db.clone(), log_store.clone());
-        spawn_backup_scheduler(docker.clone(), db.clone(), backup_store.clone());
+        spawn_backup_scheduler(
+            docker.clone(),
+            db.clone(),
+            backup_store.clone(),
+            config.caddy_admin_url.clone(),
+        );
         crate::monitoring::ssl_checker::spawn_ssl_checker(
             db.clone(),
             event_bus.clone(),
