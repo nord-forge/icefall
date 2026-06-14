@@ -134,7 +134,9 @@ async fn set_primary(
     }
 
     state.db.set_primary_domain(&app_id, &domain_id).await?;
-    Ok(Json(serde_json::json!({ "message": "primary domain updated" })))
+    Ok(Json(
+        serde_json::json!({ "message": "primary domain updated" }),
+    ))
 }
 
 async fn verify_domain(

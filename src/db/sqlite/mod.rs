@@ -1071,13 +1071,7 @@ impl Database for SqliteDatabase {
         abilities: Option<&str>,
     ) -> Result<ApiToken, DbError> {
         sessions::create_api_token(
-            &self.pool,
-            user_id,
-            name,
-            token_hash,
-            expires_at,
-            team_id,
-            abilities,
+            &self.pool, user_id, name, token_hash, expires_at, team_id, abilities,
         )
         .await
     }

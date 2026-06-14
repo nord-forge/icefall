@@ -38,7 +38,9 @@ pub(super) async fn list_tokens(
         "id": t.id, "name": t.name, "abilities": abilities_list(&t.abilities), "last_used_at": t.last_used_at, "expires_at": t.expires_at, "created_at": t.created_at,
     })).collect();
 
-    Ok(Json(serde_json::json!({ "data": safe, "available_abilities": crate::api::abilities::ALL_ABILITIES })))
+    Ok(Json(
+        serde_json::json!({ "data": safe, "available_abilities": crate::api::abilities::ALL_ABILITIES }),
+    ))
 }
 
 pub(super) async fn create_token(
