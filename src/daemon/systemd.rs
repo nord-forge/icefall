@@ -53,13 +53,15 @@ pub fn is_systemd_managed() -> bool {
 }
 
 pub fn notify_ready() {
-    let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
+    // Plain `notify` (not the `unsafe` env-unsetting variant): we don't fork
+    // children that inherit NOTIFY_SOCKET, so mutating the environment is unneeded.
+    let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
 }
 
 pub fn notify_watchdog() {
-    let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
+    let _ = sd_notify::notify(&[sd_notify::NotifyState::Watchdog]);
 }
 
 pub fn notify_stopping() {
-    let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Stopping]);
+    let _ = sd_notify::notify(&[sd_notify::NotifyState::Stopping]);
 }

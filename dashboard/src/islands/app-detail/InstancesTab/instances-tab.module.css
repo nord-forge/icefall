@@ -1,0 +1,47 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.loading {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.summaryCount {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.cell {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  text-align: right;
+}
+
+.refreshRow {
+  display: flex;
+  justify-content: flex-end;
+}

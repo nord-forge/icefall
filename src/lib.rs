@@ -9,5 +9,6 @@ pub mod db;
 pub mod deploy;
 pub mod docker;
 pub mod events;
+pub mod github;
 pub mod monitoring;
 pub mod update;

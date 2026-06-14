@@ -47,11 +47,6 @@ async fn setup_admin(
     State(state): State<AppState>,
     Json(body): Json<SetupRequest>,
 ) -> Result<axum::response::Response, ApiError> {
-    let users = state.db.list_users().await?;
-    if !users.is_empty() {
-        return Err(ApiError::BadRequest("Admin account already exists".into()));
-    }
-
     if body.password.len() < 12 {
         return Err(ApiError::BadRequest(
             "Password must be at least 12 characters".into(),
@@ -59,14 +54,22 @@ async fn setup_admin(
     }
 
     let password_hash = hash_password(&body.password)?;
+    // Atomic guard against a setup race (audit H8): create_first_admin
+    // inserts only if no user exists, otherwise returns Duplicate.
     let user = state
         .db
-        .create_user(&NewUser {
+        .create_first_admin(&NewUser {
             email: body.email,
             password_hash,
             role: "admin".to_string(),
         })
-        .await?;
+        .await
+        .map_err(|e| match e {
+            crate::db::DbError::Duplicate(_) => {
+                ApiError::Conflict("Admin account already exists".into())
+            }
+            other => other.into(),
+        })?;
 
     let session = create_session_for_user(&state, &user.id).await?;
 
@@ -76,10 +79,7 @@ async fn setup_admin(
             "session_id": session.id,
         }
     });
-    let cookie = format!(
-        "icefall_session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800",
-        session.id
-    );
+    let cookie = session_cookie(&session.id, state.config.base_domain.as_deref());
     let mut headers = HeaderMap::new();
     headers.insert(
         "set-cookie",
@@ -90,8 +90,18 @@ async fn setup_admin(
 
 async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<LoginRequest>,
 ) -> Result<axum::response::Response, ApiError> {
+    // Per-IP rate limit before any DB work — blocks credential brute-force
+    // (audit H1). 5 attempts / 15 min.
+    let ip = crate::api::rate_limit::client_ip(&headers);
+    if !crate::api::rate_limit::LOGIN.check(&ip).await {
+        return Err(ApiError::TooManyRequests(
+            "Too many login attempts. Try again later.".into(),
+        ));
+    }
+
     let user = state
         .db
         .get_user_by_email(&body.email)
@@ -102,11 +112,13 @@ async fn login(
         return Err(ApiError::BadRequest("Invalid email or password".into()));
     }
 
-    // If 2FA is enabled, don't create a session yet — require 2FA validation first
+    // If 2FA is enabled, hand the client an opaque single-use challenge token instead
+    // of a session: the user_id must never leak and /2fa/validate must not be drivable with an attacker-chosen id.
     if user.totp_enabled {
+        let challenge = crate::api::routes::two_factor_challenge::issue_challenge(&user.id).await;
         let body = serde_json::json!({
             "requires_2fa": true,
-            "user_id": user.id,
+            "challenge": challenge,
         });
         return Ok(Json(body).into_response());
     }
@@ -119,10 +131,7 @@ async fn login(
             "session_id": session.id,
         }
     });
-    let cookie = format!(
-        "icefall_session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800",
-        session.id
-    );
+    let cookie = session_cookie(&session.id, state.config.base_domain.as_deref());
     let mut headers = HeaderMap::new();
     headers.insert(
         "set-cookie",
@@ -148,7 +157,7 @@ async fn change_password(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !verify_password(&body.current_password, &user.password_hash) {
         return Err(ApiError::BadRequest("Current password is incorrect".into()));
@@ -258,6 +267,95 @@ pub async fn authenticate_from_headers(
 
     let users = state.db.list_users().await?;
     Ok(users.into_iter().find(|u| u.id == session.user_id))
+}
+
+pub struct AuthContext {
+    pub user: crate::db::models::User,
+    pub session_id: Option<String>,
+    pub team_id: Option<String>,
+    pub team_role: Option<String>,
+}
+
+pub async fn authenticate_with_team(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<AuthContext>, ApiError> {
+    let user = match authenticate_from_headers(state, headers).await? {
+        Some(u) => u,
+        None => return Ok(None),
+    };
+
+    let session_id = extract_session_id(headers);
+
+    // Check if authenticating via API token — use token's team_id
+    let token_team_id = if let Some(auth) = headers.get("authorization") {
+        if let Ok(auth_str) = auth.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer icefall_") {
+                let full_token = format!("icefall_{token}");
+                let token_hash = sha256_hex(&full_token);
+                state
+                    .db
+                    .get_api_token_by_hash(&token_hash)
+                    .await?
+                    .and_then(|t| t.team_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Priority: token team_id > session active_team_id > first team
+    let team_id = if let Some(tid) = token_team_id {
+        Some(tid)
+    } else if let Some(ref sid) = session_id {
+        if let Some(session) = state.db.get_session(sid).await? {
+            session.active_team_id
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let team_id = match team_id {
+        Some(tid) => Some(tid),
+        None => {
+            let teams = state.db.list_teams_for_user(&user.id).await?;
+            teams.first().map(|t| t.id.clone())
+        }
+    };
+
+    let team_role = if let Some(ref tid) = team_id {
+        state
+            .db
+            .get_team_membership(tid, &user.id)
+            .await?
+            .map(|m| m.role)
+    } else {
+        None
+    };
+
+    Ok(Some(AuthContext {
+        user,
+        session_id,
+        team_id,
+        team_role,
+    }))
+}
+
+/// Build the `Set-Cookie` header for a session: `HttpOnly`, `Secure` behind TLS, and
+/// `SameSite=Lax` so the OAuth top-level redirect keeps the cookie (CSRF covered by header check).
+pub fn session_cookie(session_id: &str, base_domain: Option<&str>) -> String {
+    let secure = if base_domain.is_some() {
+        "; Secure"
+    } else {
+        ""
+    };
+    format!("icefall_session={session_id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800{secure}")
 }
 
 fn sha256_hex(input: &str) -> String {

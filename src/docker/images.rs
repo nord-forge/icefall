@@ -63,6 +63,60 @@ impl DockerClient {
         Ok(())
     }
 
+    /// Export an image to an in-memory tar archive (`docker save` format), used
+    /// to transfer a built image to remote servers. Loads cleanly into Docker or Podman.
+    pub async fn export_image(&self, image: &str) -> Result<Bytes, DockerError> {
+        let mut stream = self.inner().export_image(image);
+        let mut buf = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            buf.extend_from_slice(&chunk?);
+        }
+        if buf.is_empty() {
+            return Err(DockerError::Unavailable(format!(
+                "image '{image}' exported as an empty archive"
+            )));
+        }
+        Ok(Bytes::from(buf))
+    }
+
+    /// Import an image from a tar archive (`docker load`). Works on Docker and
+    /// Podman, including multi-tag archives.
+    pub async fn import_image(&self, tar: Bytes) -> Result<(), DockerError> {
+        let mut stream = self.inner().import_image(
+            bollard::query_parameters::ImportImageOptions::default(),
+            bollard::body_full(tar),
+            None,
+        );
+        while let Some(result) = stream.next().await {
+            result?;
+        }
+        Ok(())
+    }
+
+    /// Import an image and verify the expected tag is present afterward, since a
+    /// Podman OCI-archive edge case can report success yet leave the tag unresolved.
+    pub async fn import_image_verified(
+        &self,
+        tar: Bytes,
+        expected_ref: &str,
+    ) -> Result<(), DockerError> {
+        self.import_image(tar).await?;
+
+        let present = self
+            .list_images(Some(expected_ref))
+            .await?
+            .iter()
+            .any(|img| img.repo_tags.iter().any(|t| t == expected_ref) || img.id == expected_ref);
+
+        if !present {
+            return Err(DockerError::ImageNotFound(format!(
+                "image '{expected_ref}' not found after load — the transferred \
+                 archive may be in an incompatible format"
+            )));
+        }
+        Ok(())
+    }
+
     pub async fn list_images(
         &self,
         reference: Option<&str>,

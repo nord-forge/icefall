@@ -16,6 +16,9 @@ pub struct ManagedDatabase {
     pub ssl_cert: Option<String>,
     pub ssl_key: Option<String>,
     pub ssl_expires_at: Option<String>,
+    /// Owning team. NOT NULL in the schema — every database belongs to a team.
+    pub team_id: String,
+    pub backup_retention_count: i32,
     pub created_at: String,
 }
 
@@ -23,4 +26,6 @@ pub struct NewManagedDatabase {
     pub name: String,
     pub db_type: String,
     pub app_id: Option<String>,
+    /// Owning team — required; every database is team-scoped.
+    pub team_id: String,
 }

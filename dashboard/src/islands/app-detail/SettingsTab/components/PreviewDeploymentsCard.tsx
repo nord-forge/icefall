@@ -1,3 +1,4 @@
+import Input from '@islands/shared/Input/Input';
 import styles from '../settings-tab.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -33,15 +34,16 @@ export default function PreviewDeploymentsCard({
       </div>
       {previewEnabled && (
         <div style={{ marginTop: 'var(--space-3)' }}>
-          <label htmlFor="settings-preview-pattern" class={formStyles.label}>Branch Pattern</label>
-          <input
+          <Input
+            label="Branch Pattern"
+            name="preview-pattern"
             id="settings-preview-pattern"
-            class={formStyles.inputMono}
+            mono
             value={previewBranchPattern}
-            onInput={(e) => onPreviewBranchPatternChange((e.target as HTMLInputElement).value)}
+            onChange={onPreviewBranchPatternChange}
             placeholder="feature/*"
+            helpText="Glob pattern. Use * to match all branches except the main deploy branch."
           />
-          <span class={styles.fieldHint}>Glob pattern. Use * to match all branches except the main deploy branch.</span>
         </div>
       )}
     </div>

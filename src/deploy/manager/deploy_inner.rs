@@ -121,6 +121,8 @@ impl DeployManager {
                     }
                 }
 
+                let internal_hostname = format!("{}.icefall.internal", app.name);
+
                 let container_config = ContainerConfig {
                     name: container_name,
                     image: image_ref.to_string(),
@@ -137,6 +139,7 @@ impl DeployManager {
                     restart_policy: Some("unless-stopped".to_string()),
                     labels,
                     network: Some(network_name),
+                    hostname: Some(internal_hostname),
                 };
 
                 self.docker
@@ -158,10 +161,10 @@ impl DeployManager {
         self.db
             .update_deploy_image_ref(&deploy.id, image_ref)
             .await?;
-        let _ = self
-            .db
-            .update_deploy_env_snapshot(&deploy.id, &snapshot)
-            .await;
+        let _ = crate::deploy::retry_state_write("update_deploy_env_snapshot", || {
+            self.db.update_deploy_env_snapshot(&deploy.id, &snapshot)
+        })
+        .await;
 
         self.emit_status(app, deploy, "starting");
 
@@ -234,6 +237,7 @@ impl DeployManager {
                                 environment_id: env.id.clone(),
                                 git_sha: prev.git_sha.clone(),
                                 server_id: None,
+                                tag: None,
                                 no_cache: false,
                             })
                             .await
@@ -395,6 +399,50 @@ impl DeployManager {
                 .collect();
             let hash = crate::deploy::drift::compute_config_hash(app, &env_pairs, &domain_list);
             let _ = self.db.update_deploy_config_hash(&deploy.id, &hash).await;
+        }
+
+        // IF-163: Run post-deploy commands if configured
+        if let Some(ref commands) = app.post_deploy_commands {
+            let cmd_lines: Vec<&str> = commands
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .collect();
+
+            for cmd_line in &cmd_lines {
+                let cmd_parts: Vec<String> =
+                    vec!["sh".to_string(), "-c".to_string(), cmd_line.to_string()];
+
+                let exec_result = match &remote {
+                    Some(exec) => exec.exec_in_container(&container_id, &cmd_parts).await,
+                    None => self
+                        .docker
+                        .exec_in_container(&container_id, &cmd_parts)
+                        .await
+                        .map_err(|e| DeployError::ContainerCreate(e.to_string())),
+                };
+
+                match exec_result {
+                    Ok(output) => {
+                        let msg = format!("Post-deploy '{}': {}", cmd_line, output.trim());
+                        let _ = self
+                            .db
+                            .update_deploy_status(&deploy.id, "running", Some(&msg))
+                            .await;
+                    }
+                    Err(e) => {
+                        let msg = format!(
+                            "Post-deploy command '{}' failed: {} (deploy continues)",
+                            cmd_line, e
+                        );
+                        tracing::warn!("{msg}");
+                        let _ = self
+                            .db
+                            .update_deploy_status(&deploy.id, "running", Some(&msg))
+                            .await;
+                    }
+                }
+            }
         }
 
         // Stop old containers

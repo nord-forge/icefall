@@ -11,11 +11,12 @@ pub(super) async fn create_app(pool: &SqlitePool, app: &NewApp) -> Result<App, D
     let server_id = app.server_id.as_deref().unwrap_or(CONTROL_PLANE_SERVER_ID);
 
     sqlx::query(
-        "INSERT INTO apps (id, name, git_repo, git_branch, framework, image_ref, compose_content, deploy_mode, server_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO apps (id, name, team_id, git_repo, git_branch, framework, image_ref, compose_content, deploy_mode, server_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&app.name)
+    .bind(&app.team_id)
     .bind(&app.git_repo)
     .bind(&app.git_branch)
     .bind(&app.framework)
@@ -126,6 +127,10 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.server_id.as_deref(),
     };
+    let base_directory = match &update.base_directory {
+        Some(v) => v.as_deref(),
+        None => existing.base_directory.as_deref(),
+    };
     let disable_build_cache = update
         .disable_build_cache
         .unwrap_or(existing.disable_build_cache);
@@ -151,6 +156,52 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.pre_deploy_commands.as_deref(),
     };
+    let post_deploy_commands = match &update.post_deploy_commands {
+        Some(v) => v.as_deref(),
+        None => existing.post_deploy_commands.as_deref(),
+    };
+    let ssh_key_id = match &update.ssh_key_id {
+        Some(v) => v.as_deref(),
+        None => existing.ssh_key_id.as_deref(),
+    };
+    let ghost_mode_enabled = update
+        .ghost_mode_enabled
+        .unwrap_or(existing.ghost_mode_enabled);
+    let ghost_mode_idle_minutes = update
+        .ghost_mode_idle_minutes
+        .unwrap_or(existing.ghost_mode_idle_minutes);
+    let canary_enabled = update.canary_enabled.unwrap_or(existing.canary_enabled);
+    let canary_config = match &update.canary_config {
+        Some(v) => v.as_deref(),
+        None => existing.canary_config.as_deref(),
+    };
+    let log_noise_patterns = match &update.log_noise_patterns {
+        Some(v) => v.as_deref(),
+        None => existing.log_noise_patterns.as_deref(),
+    };
+    let log_highlight_patterns = match &update.log_highlight_patterns {
+        Some(v) => v.as_deref(),
+        None => existing.log_highlight_patterns.as_deref(),
+    };
+    let tunnel_enabled = update.tunnel_enabled.unwrap_or(existing.tunnel_enabled);
+    let require_deploy_approval = update
+        .require_deploy_approval
+        .unwrap_or(existing.require_deploy_approval);
+    let project_environment_id = match &update.project_environment_id {
+        Some(v) => v.as_deref(),
+        None => existing.project_environment_id.as_deref(),
+    };
+    let desired_instances = update
+        .desired_instances
+        .unwrap_or(existing.desired_instances);
+    let lb_policy = update.lb_policy.as_deref().unwrap_or(&existing.lb_policy);
+    let lb_health_check_path = update
+        .lb_health_check_path
+        .as_deref()
+        .unwrap_or(&existing.lb_health_check_path);
+    let lb_sticky_sessions = update
+        .lb_sticky_sessions
+        .unwrap_or(existing.lb_sticky_sessions);
     let now = now_iso8601();
 
     sqlx::query(
@@ -158,9 +209,17 @@ pub(super) async fn update_app(
          build_config = ?, resource_limits = ?, preview_enabled = ?,
          preview_branch_pattern = ?, tags = ?, volumes = ?, image_ref = ?,
          compose_content = ?, project_id = ?, deploy_mode = ?, server_id = ?,
-         disable_build_cache = ?, git_submodules_enabled = ?, git_lfs_enabled = ?,
-         git_shallow_clone = ?, basic_auth_enabled = ?, basic_auth_username = ?,
-         basic_auth_password_hash = ?, pre_deploy_commands = ?,
+         base_directory = ?, disable_build_cache = ?, git_submodules_enabled = ?,
+         git_lfs_enabled = ?, git_shallow_clone = ?, basic_auth_enabled = ?,
+         basic_auth_username = ?, basic_auth_password_hash = ?, pre_deploy_commands = ?,
+         post_deploy_commands = ?, ssh_key_id = ?,
+         ghost_mode_enabled = ?, ghost_mode_idle_minutes = ?,
+         canary_enabled = ?, canary_config = ?,
+         log_noise_patterns = ?, log_highlight_patterns = ?,
+         tunnel_enabled = ?, require_deploy_approval = ?,
+         project_environment_id = ?,
+         desired_instances = ?, lb_policy = ?,
+         lb_health_check_path = ?, lb_sticky_sessions = ?,
          updated_at = ? WHERE id = ?",
     )
     .bind(name)
@@ -178,6 +237,7 @@ pub(super) async fn update_app(
     .bind(project_id)
     .bind(deploy_mode)
     .bind(server_id)
+    .bind(base_directory)
     .bind(disable_build_cache)
     .bind(git_submodules_enabled)
     .bind(git_lfs_enabled)
@@ -186,6 +246,21 @@ pub(super) async fn update_app(
     .bind(basic_auth_username)
     .bind(basic_auth_password_hash)
     .bind(pre_deploy_commands)
+    .bind(post_deploy_commands)
+    .bind(ssh_key_id)
+    .bind(ghost_mode_enabled)
+    .bind(ghost_mode_idle_minutes)
+    .bind(canary_enabled)
+    .bind(canary_config)
+    .bind(log_noise_patterns)
+    .bind(log_highlight_patterns)
+    .bind(tunnel_enabled)
+    .bind(require_deploy_approval)
+    .bind(project_environment_id)
+    .bind(desired_instances)
+    .bind(lb_policy)
+    .bind(lb_health_check_path)
+    .bind(lb_sticky_sessions)
     .bind(&now)
     .bind(id)
     .execute(pool)
@@ -262,6 +337,118 @@ pub(super) async fn delete_app(pool: &SqlitePool, id: &str) -> Result<(), DbErro
 
     if result.rows_affected() == 0 {
         return Err(DbError::NotFound(format!("app {id}")));
+    }
+    Ok(())
+}
+
+pub(super) async fn create_app_instance(
+    pool: &SqlitePool,
+    instance: &NewAppInstance,
+) -> Result<AppInstance, DbError> {
+    let id = new_id();
+    let now = now_iso8601();
+
+    sqlx::query(
+        "INSERT INTO app_instances (id, app_id, server_id, status, container_id, host_port, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(&instance.app_id)
+    .bind(&instance.server_id)
+    .bind(&instance.status)
+    .bind(&instance.container_id)
+    .bind(instance.host_port)
+    .bind(&now)
+    .bind(&now)
+    .execute(pool)
+    .await?;
+
+    get_app_instance(pool, &id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(id))
+}
+
+pub(super) async fn get_app_instance(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<Option<AppInstance>, DbError> {
+    Ok(
+        sqlx::query_as::<_, AppInstance>("SELECT * FROM app_instances WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+pub(super) async fn list_app_instances(
+    pool: &SqlitePool,
+    app_id: &str,
+) -> Result<Vec<AppInstance>, DbError> {
+    Ok(sqlx::query_as::<_, AppInstance>(
+        "SELECT * FROM app_instances WHERE app_id = ? ORDER BY created_at ASC",
+    )
+    .bind(app_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub(super) async fn list_app_instances_by_server(
+    pool: &SqlitePool,
+    server_id: &str,
+) -> Result<Vec<AppInstance>, DbError> {
+    Ok(sqlx::query_as::<_, AppInstance>(
+        "SELECT * FROM app_instances WHERE server_id = ? ORDER BY app_id, created_at ASC",
+    )
+    .bind(server_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub(super) async fn update_app_instance(
+    pool: &SqlitePool,
+    id: &str,
+    update: &UpdateAppInstance,
+) -> Result<AppInstance, DbError> {
+    let existing = get_app_instance(pool, id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(format!("app_instance {id}")))?;
+
+    let status = update.status.as_deref().unwrap_or(&existing.status);
+    let container_id = match &update.container_id {
+        Some(v) => v.as_deref(),
+        None => existing.container_id.as_deref(),
+    };
+    let host_port = match update.host_port {
+        Some(v) => v,
+        None => existing.host_port,
+    };
+    let now = now_iso8601();
+
+    sqlx::query(
+        "UPDATE app_instances SET status = ?, container_id = ?, host_port = ?, updated_at = ?
+         WHERE id = ?",
+    )
+    .bind(status)
+    .bind(container_id)
+    .bind(host_port)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    get_app_instance(pool, id)
+        .await?
+        .ok_or_else(|| DbError::NotFound(id.to_string()))
+}
+
+pub(super) async fn delete_app_instance(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
+    let result = sqlx::query("DELETE FROM app_instances WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(DbError::NotFound(format!("app_instance {id}")));
     }
     Ok(())
 }

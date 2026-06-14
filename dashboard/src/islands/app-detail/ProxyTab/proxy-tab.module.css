@@ -1,0 +1,3 @@
+.page { display: flex; flex-direction: column; gap: var(--space-4); }
+.loading { color: var(--color-text-muted); }
+.presets { display: flex; flex-direction: column; gap: var(--space-4); }

@@ -1,0 +1,98 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.forecastCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cardHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cardIcon {
+  color: var(--color-text-muted);
+}
+
+.currentValue {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+}
+
+.growth {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.growthUp {
+  color: var(--color-error);
+}
+
+.growthDown {
+  color: var(--color-success);
+}
+
+.daysUntilFull {
+  font-size: var(--text-sm);
+}
+
+.warning {
+  background: oklch(0.92 0.06 85);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: oklch(0.45 0.12 85);
+}
+
+:global([data-theme="dark"]) .warning {
+  background: oklch(0.25 0.04 85);
+  color: oklch(0.8 0.1 85);
+}
+
+.infoMessage {
+  background: var(--color-surface-alt);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}

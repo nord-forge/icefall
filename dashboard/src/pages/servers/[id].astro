@@ -2,7 +2,12 @@
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import ServerDetail from '@islands/servers/ServerDetail/ServerDetail';
 
-export const prerender = false;
+// Static shell. The ServerDetail island reads the server id from
+// window.location at runtime, so no server-side params are needed. The
+// Rust server SPA-falls-back any /servers/:id URL to this prerendered page.
+export function getStaticPaths() {
+  return [{ params: { id: '_' } }];
+}
 ---
 
 <DashboardLayout title="Server Detail">

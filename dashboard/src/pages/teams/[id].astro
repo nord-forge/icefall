@@ -1,0 +1,15 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import TeamDetail from '@islands/teams/TeamDetail/TeamDetail';
+
+// Static shell. The TeamDetail island reads the team id from
+// window.location at runtime, so no server-side params are needed. The
+// Rust server SPA-falls-back any /teams/:id URL to this prerendered page.
+export function getStaticPaths() {
+  return [{ params: { id: '_' } }];
+}
+---
+
+<DashboardLayout title="Team Detail">
+  <TeamDetail client:only="preact" />
+</DashboardLayout>

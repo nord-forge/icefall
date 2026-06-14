@@ -1,3 +1,5 @@
+import Input from '@islands/shared/Input/Input';
+import Textarea from '@islands/shared/Textarea/Textarea';
 import styles from '../app-create.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -49,41 +51,28 @@ export default function ComposeStep({
   const services = parseComposeServices(composeContent);
   return (
     <div class={formStyles.fieldGroup}>
+      <Input
+        label="Stack Name"
+        name="compose-name"
+        id="create-compose-name"
+        value={name}
+        onChange={(v) => onUpdate('name', v)}
+        placeholder="my-wordpress-stack"
+        error={validationErrors.name}
+      />
       <div>
-        <label htmlFor="create-compose-name" class={formStyles.label}>Stack Name</label>
-        <input
-          id="create-compose-name"
-          class={formStyles.input}
-          value={name}
-          onInput={(e) => onUpdate('name', (e.target as HTMLInputElement).value)}
-          placeholder="my-wordpress-stack"
-          aria-invalid={!!validationErrors.name}
-          aria-describedby={validationErrors.name ? 'err-name' : undefined}
-        />
-        {validationErrors.name && <p id="err-name" role="alert" class={styles.fieldError}>{validationErrors.name}</p>}
-      </div>
-      <div>
-        <label htmlFor="create-compose-content" class={formStyles.label}>
-          Compose File
-        </label>
-        <span class={formStyles.hint}>
-          Paste your docker-compose.yml content. Only pre-built images are supported (no build directive).
-        </span>
-        <textarea
+        <Textarea
+          label="Compose File"
+          name="compose-content"
           id="create-compose-content"
-          class={formStyles.textarea}
           value={composeContent}
-          onInput={(e) => onUpdate('compose_content', (e.target as HTMLTextAreaElement).value)}
+          onChange={(v) => onUpdate('compose_content', v)}
           placeholder={`services:\n  web:\n    image: nginx:latest\n    ports:\n      - "80:80"\n  db:\n    image: postgres:16\n    environment:\n      POSTGRES_PASSWORD: secret`}
           rows={14}
-          spellcheck={false}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}
-          aria-invalid={!!validationErrors.compose_content}
-          aria-describedby={validationErrors.compose_content ? 'err-compose' : undefined}
+          mono
+          helpText="Paste your docker-compose.yml content. Only pre-built images are supported (no build directive)."
+          error={validationErrors.compose_content}
         />
-        {validationErrors.compose_content && (
-          <p id="err-compose" role="alert" class={styles.fieldError}>{validationErrors.compose_content}</p>
-        )}
         {composeError && (
           <p role="alert" class={styles.composeError}>{composeError}</p>
         )}

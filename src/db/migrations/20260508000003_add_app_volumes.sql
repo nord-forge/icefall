@@ -1,1 +1,0 @@
-ALTER TABLE apps ADD COLUMN volumes TEXT;

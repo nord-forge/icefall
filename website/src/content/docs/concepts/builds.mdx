@@ -1,6 +1,73 @@
 ---
-title: "builds"
-description: "Icefall documentation"
+title: How builds work
+description: How Icefall turns a git repository into a running container.
 ---
 
-Documentation coming soon.
+When you deploy, Icefall's build engine turns your repository into a container
+image. You do not write a Dockerfile — Icefall detects your framework and
+generates one.
+
+## The build pipeline
+
+1. **Clone** — the repository is cloned at the configured branch. Private repos
+   use a connected GitHub App or an SSH key. Submodules, Git LFS, and shallow
+   clones are supported.
+2. **Detect** — the build engine inspects the repo (or the app's *base
+   directory*, if set) to identify the framework, the package manager, and the
+   language version.
+3. **Generate** — a multi-stage Dockerfile and a `.dockerignore` are generated
+   for the detected framework.
+4. **Build context** — the cloned repo plus the generated files are packaged
+   into a build context. Secrets are stripped from build logs.
+5. **Build** — the image is built through the container runtime's API. Build
+   output streams live to the dashboard.
+6. **Tag & record** — on success the image is tagged and the image reference is
+   saved to the deploy record; on failure the deploy is marked failed.
+
+## Framework detection
+
+Icefall recognizes Node.js (Astro, Next.js, Nuxt, React, Vue, plain Node),
+Python, Ruby, Go, Rust, Docker Compose projects, and plain static sites. See
+the [framework guides](/frameworks/astro/) for per-framework details.
+
+If your repository already contains a `Dockerfile`, Icefall uses it as-is — see
+[Deploy with a Dockerfile](/frameworks/dockerfile/).
+
+## Overriding the defaults
+
+Detection is a starting point, not a cage. You can override the build command,
+output directory, and port in the dashboard, or with a `.icefall.toml` in your
+repo:
+
+```toml
+[build]
+build_command = "bun run build"
+output_dir = "dist"
+port = 4321
+```
+
+You can also set a **base directory** so Icefall builds a subfolder of a
+monorepo instead of the repository root.
+
+## Build caching
+
+By default the container runtime's layer cache speeds up repeat builds. To force
+a clean build — useful when a cached layer is stale — deploy with `--no-cache`:
+
+```bash
+icefall deploy --no-cache
+```
+
+A long-running build can be cancelled from the dashboard or with
+`icefall` — the build stops as soon as the deploy record is marked cancelled.
+
+## Common issues
+
+**"Cannot find module"** — commit your lockfile (`bun.lock`, `package-lock.json`,
+`yarn.lock`). The build installs exactly what the lockfile pins.
+
+**Build times out** — large builds may exceed the default timeout. Raise
+`build_timeout_secs` in your [configuration](/cli/configuration/).
+
+**Wrong framework detected** — set the build command, output directory, and
+port explicitly to override detection.

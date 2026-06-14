@@ -26,6 +26,7 @@ pub(super) async fn add_domain(pool: &SqlitePool, domain: &NewDomain) -> Result<
         path: domain.path.clone(),
         verified: false,
         ssl_status: "pending".to_string(),
+        is_primary: false,
         ssl_issuer: None,
         ssl_expires_at: None,
         ssl_last_checked_at: None,

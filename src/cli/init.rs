@@ -62,6 +62,7 @@ pub async fn run() {
         health_check_interval_ms: crate::config::defaults::health_check_interval_ms(),
         deploy_stop_timeout_secs: crate::config::defaults::deploy_stop_timeout_secs(),
         ssl_check_interval_hours: crate::config::defaults::ssl_check_interval_hours(),
+        image_transfer_chunk_bytes: crate::config::defaults::image_transfer_chunk_bytes(),
     };
 
     let toml_str = toml::to_string_pretty(&config).expect("Failed to serialize config");

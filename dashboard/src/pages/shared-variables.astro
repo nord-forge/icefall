@@ -1,0 +1,8 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import SharedVariablesPage from '@islands/shared-variables/SharedVariablesPage/SharedVariablesPage';
+---
+
+<DashboardLayout title="Shared Variables">
+  <SharedVariablesPage client:only="preact" />
+</DashboardLayout>

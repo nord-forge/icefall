@@ -1,8 +1,55 @@
 ---
-title: "Deploy static"
-description: "How to deploy a static app on Icefall."
+title: Deploy a static site
+description: Deploy plain HTML, CSS, and JavaScript on Icefall.
 ---
 
-Guide coming soon. Icefall auto-detects static projects and generates an optimized Dockerfile.
+A site that is just HTML, CSS, and JavaScript files — no build step — is served
+directly by Caddy. This is the simplest thing to deploy on Icefall.
 
-See [Introduction](/docs/getting-started/introduction) for the general deployment workflow.
+## Auto-detection
+
+Icefall treats a project as a static site when it finds HTML files and no
+`package.json` or other build manifest. The files are served as-is.
+
+| Setting | Value |
+|---------|-------|
+| Build command | none |
+| Output directory | repository root (or `public/` if present) |
+| Port | 80 |
+| Served by | Caddy |
+
+## Deploying
+
+```bash
+icefall deploy
+```
+
+Icefall copies your files into a Caddy container and serves them. There is no
+build, so a deploy is essentially an upload — fast.
+
+## Static sites with a build step
+
+If your "static" site has a build (a static site generator, a bundler), it is
+not a plain static site — it has a `package.json` and a framework. Icefall
+detects that framework instead. See [Astro](/frameworks/astro/),
+[React](/frameworks/react/), or [Vue](/frameworks/vue/), or use a
+[Dockerfile](/frameworks/dockerfile/) for anything else.
+
+## Override the served directory
+
+If your files live in a subdirectory, point Icefall at it:
+
+```toml
+[build]
+output_dir = "public"
+```
+
+## Custom routing or headers
+
+Caddy serves the directory with sensible defaults. For custom redirects,
+headers, or single-page-app fallback, deploy with a
+[Dockerfile](/frameworks/dockerfile/) based on the Caddy image and supply your
+own `Caddyfile`.
+
+See [Introduction](/getting-started/introduction/) for the general deployment
+workflow.

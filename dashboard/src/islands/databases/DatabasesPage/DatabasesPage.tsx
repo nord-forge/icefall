@@ -3,12 +3,15 @@ import { useStore } from '@nanostores/preact';
 import { $databases, $databasesLoaded } from '@stores/databases';
 import type { ManagedDb } from '@stores/databases';
 import Button from '@islands/shared/Button/Button';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import Select from '@islands/shared/Select/Select';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import DatabaseBrowser from '@islands/databases/DatabaseBrowser/DatabaseBrowser';
 import { formatRelativeTime, formatBytes } from '@lib/format';
+import { api } from '@lib/api';
 import { Plus, Database, Trash2, Copy, Eye, EyeOff, RefreshCw, Download, RotateCcw } from 'lucide-preact';
 import { SkeletonCard } from '@islands/shared/Skeleton/Skeleton';
+import Input from '@islands/shared/Input/Input';
 import styles from './databases-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -56,11 +59,12 @@ export default function DatabasesPage() {
   const [showCredentials, setShowCredentials] = useState(false);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [newDb, setNewDb] = useState({ name: '', db_type: 'postgres', memory_mb: '' });
 
   useEffect(() => {
-    fetch('/api/v1/databases', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+    api.listDatabases().then(d => {
       const all = d.data || [];
       const unlinked = all.filter((db: ManagedDb) => !db.app_id);
       setDbs(unlinked);
@@ -72,42 +76,34 @@ export default function DatabasesPage() {
 
   useEffect(() => {
     if (selectedDb) {
-      fetch(`/api/v1/databases/${selectedDb.id}/backups`).then(r => r.json()).then(d => setBackups(d.data || [])).catch(() => {});
+      api.listDatabaseBackups(selectedDb.id).then(d => setBackups(d.data || [])).catch(() => {});
     }
   }, [selectedDb?.id]);
 
   async function handleCreate() {
     setCreating(true);
     try {
-      const res = await fetch('/api/v1/databases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newDb.name,
-          db_type: newDb.db_type,
-          memory_mb: newDb.memory_mb ? parseInt(newDb.memory_mb) : undefined,
-        }),
+      const { data } = await api.createDatabase({
+        name: newDb.name,
+        db_type: newDb.db_type,
+        memory_mb: newDb.memory_mb ? parseInt(newDb.memory_mb) : undefined,
       });
-      if (res.ok) {
-        const { data } = await res.json();
-        setDbs(prev => [...prev, data]);
-        setShowCreate(false);
-        setNewDb({ name: '', db_type: 'postgres', memory_mb: '' });
-      }
+      setDbs(prev => [...prev, data]);
+      setShowCreate(false);
+      setNewDb({ name: '', db_type: 'postgres', memory_mb: '' });
     } catch {}
     setCreating(false);
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/v1/databases/${id}`, { method: 'DELETE' });
+    await api.deleteDatabase(id);
     setDbs(prev => prev.filter(d => d.id !== id));
     if (selectedDb?.id === id) setSelectedDb(null);
   }
 
   async function handleBackup(id: string) {
-    await fetch(`/api/v1/databases/${id}/backup`, { method: 'POST' });
-    const res = await fetch(`/api/v1/databases/${id}/backups`);
-    const d = await res.json();
+    await api.createDatabaseBackup(id);
+    const d = await api.listDatabaseBackups(id);
     setBackups(d.data || []);
   }
 
@@ -212,7 +208,7 @@ export default function DatabasesPage() {
                               class={styles.iconButton}
                               onClick={() => {
                                 if (confirm(`Restore from ${b.filename}? This will overwrite the current database.`)) {
-                                  fetch(`/api/v1/databases/${selectedDb.id}/backups/${b.id}/restore`, { method: 'POST' })
+                                  api.restoreDatabaseBackup(selectedDb.id, b.id)
                                     .then(() => setSaveMessage('Restore started'))
                                     .catch(() => setSaveMessage('Restore failed'));
                                 }
@@ -227,7 +223,7 @@ export default function DatabasesPage() {
                           type="button"
                           class={styles.iconButton}
                           onClick={() => {
-                            fetch(`/api/v1/databases/${selectedDb.id}/backups/${b.id}`, { method: 'DELETE' })
+                            api.deleteDatabaseBackup(selectedDb.id, b.id)
                               .then(() => setBackups(prev => prev.filter(x => x.id !== b.id)))
                               .catch(() => {});
                           }}
@@ -253,20 +249,30 @@ export default function DatabasesPage() {
                 <p class={styles.dangerLabel}>Delete Database</p>
                 <p class={styles.dangerDescription}>This will permanently delete the database and all its data.</p>
               </div>
-              {confirmDelete ? (
-                <div class={styles.confirmActions}>
-                  <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-                  <Button variant="danger" onClick={() => handleDelete(selectedDb.id)}>
-                    <Trash2 size={14} /> Confirm Delete
-                  </Button>
-                </div>
-              ) : (
-                <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                  <Trash2 size={14} /> Delete
-                </Button>
-              )}
+              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                <Trash2 size={14} /> Delete
+              </Button>
             </div>
           </div>
+
+          <ConfirmDialog
+            open={confirmDelete}
+            title="Delete database?"
+            description={`This will permanently delete "${selectedDb.name}" and all its data, including backups. This action cannot be undone.`}
+            confirmLabel="Delete"
+            variant="danger"
+            loading={deleting}
+            onConfirm={async () => {
+              setDeleting(true);
+              try {
+                await handleDelete(selectedDb.id);
+              } finally {
+                setDeleting(false);
+                setConfirmDelete(false);
+              }
+            }}
+            onCancel={() => setConfirmDelete(false)}
+          />
         </div>
       </div>
     );
@@ -285,10 +291,14 @@ export default function DatabasesPage() {
         <div class={styles.createCard}>
           <h3 class={styles.createTitle}>Create Database</h3>
           <div class={formStyles.fieldRow}>
-            <div>
-              <label htmlFor="db-create-name" class={formStyles.label}>Name</label>
-              <input id="db-create-name" class={formStyles.input} value={newDb.name} onInput={(e) => setNewDb({ ...newDb, name: (e.target as HTMLInputElement).value })} placeholder="my-database" />
-            </div>
+            <Input
+              label="Name"
+              name="db-create-name"
+              id="db-create-name"
+              value={newDb.name}
+              onChange={(v) => setNewDb({ ...newDb, name: v })}
+              placeholder="my-database"
+            />
             <div>
               <label htmlFor="db-create-type" class={formStyles.label}>Type</label>
               <Select

@@ -19,6 +19,8 @@ pub enum DbError {
     Sqlx(#[from] sqlx::Error),
     #[error("migration error: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
 }
 
 #[async_trait]
@@ -38,6 +40,21 @@ pub trait Database: Send + Sync + 'static {
     async fn list_apps_by_project(&self, project_id: &str) -> Result<Vec<App>, DbError>;
     async fn update_app(&self, id: &str, update: &UpdateApp) -> Result<App, DbError>;
     async fn delete_app(&self, id: &str) -> Result<(), DbError>;
+
+    // App instances (multi-instance / load balancing)
+    async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError>;
+    async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError>;
+    async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError>;
+    async fn list_app_instances_by_server(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<AppInstance>, DbError>;
+    async fn update_app_instance(
+        &self,
+        id: &str,
+        update: &UpdateAppInstance,
+    ) -> Result<AppInstance, DbError>;
+    async fn delete_app_instance(&self, id: &str) -> Result<(), DbError>;
 
     // Environments
     async fn create_environment(&self, env: &NewEnvironment) -> Result<Environment, DbError>;
@@ -147,22 +164,6 @@ pub trait Database: Send + Sync + 'static {
         limit: i64,
     ) -> Result<Vec<ScheduledTaskExecution>, DbError>;
 
-    // Shared variables
-    async fn list_shared_variables(
-        &self,
-        scope: &str,
-        scope_id: &str,
-    ) -> Result<Vec<SharedVariable>, DbError>;
-    async fn create_shared_variable(
-        &self,
-        var: &NewSharedVariable,
-    ) -> Result<SharedVariable, DbError>;
-    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError>;
-    async fn resolve_shared_variables(
-        &self,
-        app_id: &str,
-    ) -> Result<Vec<(String, String, String)>, DbError>;
-
     // Container cleanup executions
     async fn create_cleanup_execution(
         &self,
@@ -227,8 +228,153 @@ pub trait Database: Send + Sync + 'static {
         expires_at: &str,
     ) -> Result<(), DbError>;
 
+    // SSH keys
+    async fn list_ssh_keys(&self, user_id: &str) -> Result<Vec<SshKey>, DbError>;
+    async fn create_ssh_key(&self, key: &NewSshKey) -> Result<SshKey, DbError>;
+    async fn delete_ssh_key(&self, id: &str) -> Result<(), DbError>;
+    async fn get_ssh_key(&self, id: &str) -> Result<Option<SshKey>, DbError>;
+
+    // Container registries
+    async fn list_registries(&self) -> Result<Vec<Registry>, DbError>;
+    async fn create_registry(&self, reg: &NewRegistry) -> Result<Registry, DbError>;
+    async fn delete_registry(&self, id: &str) -> Result<(), DbError>;
+
+    // Public ports
+    async fn allocate_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        port: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError>;
+    async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError>;
+    async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError>;
+
+    // GitHub installations
+    async fn create_github_installation(
+        &self,
+        installation_id: i64,
+        account_login: &str,
+        account_type: &str,
+    ) -> Result<GitHubInstallation, DbError>;
+    async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError>;
+    async fn delete_github_installation(&self, id: &str) -> Result<(), DbError>;
+
+    // GitHub Apps
+    async fn create_github_app(&self, app: &GitHubApp) -> Result<GitHubApp, DbError>;
+    async fn get_github_app(&self, id: &str) -> Result<Option<GitHubApp>, DbError>;
+    async fn list_github_apps(&self) -> Result<Vec<GitHubApp>, DbError>;
+    async fn delete_github_app(&self, id: &str) -> Result<(), DbError>;
+    async fn update_github_installation_app_id(
+        &self,
+        installation_id: i64,
+        github_app_id: &str,
+    ) -> Result<(), DbError>;
+    async fn get_github_app_for_installation(
+        &self,
+        installation_id: i64,
+    ) -> Result<Option<GitHubApp>, DbError>;
+
+    // Config history
+    async fn record_config_change(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        field: &str,
+        old_value: Option<&str>,
+        new_value: Option<&str>,
+        changed_by: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_config_history(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ConfigHistoryEntry>, DbError>;
+
+    // Deploy events
+    async fn record_deploy_event(
+        &self,
+        deploy_id: &str,
+        event_type: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), DbError>;
+    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError>;
+
+    // Deploy approvals
+    async fn create_deploy_approval(
+        &self,
+        deploy_id: &str,
+        action: &str,
+        user_id: &str,
+        comment: Option<&str>,
+    ) -> Result<DeployApproval, DbError>;
+    async fn get_deploy_approval(&self, deploy_id: &str)
+        -> Result<Option<DeployApproval>, DbError>;
+
+    // Canary results
+    #[allow(clippy::too_many_arguments)]
+    async fn store_canary_result(
+        &self,
+        deploy_id: &str,
+        p50: f64,
+        p95: f64,
+        p99: f64,
+        errors: i32,
+        total: i32,
+        verdict: &str,
+    ) -> Result<CanaryResult, DbError>;
+    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError>;
+
+    // Drift events
+    async fn record_drift_event(
+        &self,
+        app_id: &str,
+        drifted_fields: &str,
+        declared: Option<&str>,
+        actual: Option<&str>,
+    ) -> Result<DriftEvent, DbError>;
+    async fn list_drift_events(&self, app_id: &str, limit: i64)
+        -> Result<Vec<DriftEvent>, DbError>;
+    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError>;
+
+    // Resource forecasting
+    async fn get_server_metrics_for_forecast(
+        &self,
+        server_id: &str,
+        days: i64,
+    ) -> Result<Vec<(f64, f64, f64)>, DbError>;
+
+    // Incidents
+    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError>;
+    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError>;
+    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError>;
+    async fn add_incident_note(
+        &self,
+        incident_id: &str,
+        content: &str,
+        author_id: Option<&str>,
+    ) -> Result<IncidentNote, DbError>;
+
+    // Deploy analytics
+    async fn get_deploy_analytics(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<serde_json::Value, DbError>;
+
+    // Service templates
+    async fn list_service_templates(&self) -> Result<Vec<ServiceTemplate>, DbError>;
+
     // Users
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError>;
+    /// Atomically create the first admin account, with its personal team;
+    /// fails with `DbError::Duplicate` if any user already exists (audit H8).
+    async fn create_first_admin(&self, user: &NewUser) -> Result<User, DbError>;
+    /// Create a user together with their personal team, atomically. The
+    /// standard user-creation path under the always-a-team tenancy model.
+    async fn create_user_with_personal_team(&self, user: &NewUser)
+        -> Result<(User, Team), DbError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError>;
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, DbError>;
     async fn list_users(&self) -> Result<Vec<User>, DbError>;
@@ -288,6 +434,15 @@ pub trait Database: Send + Sync + 'static {
     // Health Checks
     async fn create_health_check(&self, hc: &NewHealthCheck) -> Result<HealthCheck, DbError>;
     async fn get_health_checks(&self, app_id: &str) -> Result<Vec<HealthCheck>, DbError>;
+    async fn update_health_check(
+        &self,
+        id: &str,
+        interval_secs: Option<i64>,
+        failure_threshold: Option<i64>,
+        auto_restart: Option<bool>,
+        config: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn delete_health_check(&self, id: &str) -> Result<(), DbError>;
     async fn record_health_event(&self, event: &NewHealthCheckEvent) -> Result<(), DbError>;
     async fn get_health_events(
         &self,
@@ -366,6 +521,7 @@ pub trait Database: Send + Sync + 'static {
         name: &str,
         token_hash: &str,
         expires_at: Option<&str>,
+        team_id: Option<&str>,
     ) -> Result<ApiToken, DbError>;
     async fn get_api_token_by_hash(&self, token_hash: &str) -> Result<Option<ApiToken>, DbError>;
     async fn list_api_tokens(&self, user_id: &str) -> Result<Vec<ApiToken>, DbError>;
@@ -532,6 +688,164 @@ pub trait Database: Send + Sync + 'static {
 
     // Backup
     async fn vacuum_into(&self, path: &str) -> Result<(), DbError>;
+
+    // Log drains
+    async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError>;
+    async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError>;
+    async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError>;
+    async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError>;
+    async fn delete_log_drain(&self, id: &str) -> Result<(), DbError>;
+    async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError>;
+
+    // Project environments
+    async fn create_project_environment(
+        &self,
+        env: &NewProjectEnvironment,
+    ) -> Result<ProjectEnvironment, DbError>;
+    async fn list_project_environments(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectEnvironment>, DbError>;
+    async fn update_project_environment(
+        &self,
+        id: &str,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<ProjectEnvironment, DbError>;
+    async fn delete_project_environment(&self, id: &str) -> Result<(), DbError>;
+    async fn get_project_environment(
+        &self,
+        id: &str,
+    ) -> Result<Option<ProjectEnvironment>, DbError>;
+
+    // Cleanup schedule
+    async fn get_cleanup_schedule(&self) -> Result<Option<CleanupSchedule>, DbError>;
+    async fn upsert_cleanup_schedule(
+        &self,
+        schedule: &CleanupSchedule,
+    ) -> Result<CleanupSchedule, DbError>;
+
+    // Cleanup runs
+    async fn create_cleanup_run(&self) -> Result<CleanupRun, DbError>;
+    async fn finish_cleanup_run(
+        &self,
+        id: &str,
+        status: &str,
+        freed_bytes: i64,
+        removed_items: i64,
+        error: Option<&str>,
+        details: Option<&str>,
+    ) -> Result<(), DbError>;
+    async fn list_cleanup_runs(&self, limit: i64) -> Result<Vec<CleanupRun>, DbError>;
+
+    // Shared variables
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError>;
+    async fn set_shared_variable(&self, var: &NewSharedVariable)
+        -> Result<SharedVariable, DbError>;
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError>;
+    async fn get_shared_variables_for_app(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError>;
+
+    // Team-scoped queries
+    async fn list_apps_by_team(&self, team_id: &str) -> Result<Vec<App>, DbError>;
+    async fn list_projects_by_team(&self, team_id: &str) -> Result<Vec<Project>, DbError>;
+    async fn list_managed_dbs_by_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<ManagedDatabase>, DbError>;
+    async fn list_ssh_keys_by_team(&self, team_id: &str) -> Result<Vec<SshKey>, DbError>;
+    async fn list_registries_by_team(&self, team_id: &str) -> Result<Vec<Registry>, DbError>;
+    async fn list_notification_channels_by_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<Notification>, DbError>;
+    async fn list_api_tokens_by_team(&self, team_id: &str) -> Result<Vec<ApiToken>, DbError>;
+    /// Fetch one app only if it belongs to `team_id`; `None` otherwise
+    /// (covers both "no such app" and "exists in another team").
+    async fn get_app_for_team(&self, team_id: &str, app_id: &str) -> Result<Option<App>, DbError>;
+    /// Fetch one managed database only if it belongs to `team_id`.
+    async fn get_managed_db_for_team(
+        &self,
+        team_id: &str,
+        db_id: &str,
+    ) -> Result<Option<ManagedDatabase>, DbError>;
+
+    // Set team_id on resources
+    async fn set_app_team(&self, app_id: &str, team_id: &str) -> Result<(), DbError>;
+    async fn set_project_team(&self, project_id: &str, team_id: &str) -> Result<(), DbError>;
+    async fn set_database_team(&self, db_id: &str, team_id: &str) -> Result<(), DbError>;
+
+    // Cross-team server sharing
+    async fn share_server_with_team(
+        &self,
+        server_id: &str,
+        team_id: &str,
+        access_level: &str,
+        granted_by: &str,
+    ) -> Result<ServerTeamAccess, DbError>;
+    async fn revoke_server_share(&self, server_id: &str, team_id: &str) -> Result<(), DbError>;
+    async fn list_server_shares(&self, server_id: &str) -> Result<Vec<ServerTeamAccess>, DbError>;
+    async fn list_servers_shared_with_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<(Server, String)>, DbError>;
+
+    // Teams
+    async fn create_team(&self, team: &NewTeam) -> Result<Team, DbError>;
+    async fn get_team(&self, id: &str) -> Result<Option<Team>, DbError>;
+    async fn get_team_by_slug(&self, slug: &str) -> Result<Option<Team>, DbError>;
+    async fn list_teams_for_user(&self, user_id: &str) -> Result<Vec<Team>, DbError>;
+    async fn update_team(&self, id: &str, update: &UpdateTeam) -> Result<Team, DbError>;
+    async fn delete_team(&self, id: &str) -> Result<(), DbError>;
+    async fn count_team_resources(&self, team_id: &str) -> Result<i64, DbError>;
+
+    // Team memberships
+    async fn add_team_member(
+        &self,
+        team_id: &str,
+        user_id: &str,
+        role: &str,
+        invited_by: Option<&str>,
+    ) -> Result<TeamMembership, DbError>;
+    async fn list_team_members(&self, team_id: &str) -> Result<Vec<TeamMember>, DbError>;
+    async fn get_team_membership(
+        &self,
+        team_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TeamMembership>, DbError>;
+    async fn update_team_member_role(
+        &self,
+        team_id: &str,
+        user_id: &str,
+        role: &str,
+    ) -> Result<(), DbError>;
+    async fn remove_team_member(&self, team_id: &str, user_id: &str) -> Result<(), DbError>;
+
+    // Team invitations
+    async fn create_team_invitation(
+        &self,
+        team_id: &str,
+        email: &str,
+        role: &str,
+        token: &str,
+        invited_by: &str,
+        expires_at: &str,
+    ) -> Result<TeamInvitation, DbError>;
+    async fn get_team_invitation_by_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<TeamInvitation>, DbError>;
+    async fn list_team_invitations(&self, team_id: &str) -> Result<Vec<TeamInvitation>, DbError>;
+    async fn delete_team_invitation(&self, id: &str) -> Result<(), DbError>;
+
+    // Session team context
+    async fn set_session_team(&self, session_id: &str, team_id: &str) -> Result<(), DbError>;
 
     // Migrations
     async fn run_migrations(&self) -> Result<(), DbError>;

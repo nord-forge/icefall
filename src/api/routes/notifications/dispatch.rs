@@ -9,18 +9,30 @@ pub async fn dispatch_notification(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     match channel_type {
-        "webhook" => dispatch_webhook(config, event, summary, details).await,
+        "webhook" => dispatch_webhook(config, event, summary, details, caddy_admin_url).await,
         "smtp" => dispatch_smtp(config, event, summary, details).await,
-        "plunk" => {
-            tracing::info!("Plunk notification: [{event}] {summary}");
-            Ok(())
-        }
-        "slack" => dispatch_slack(config, event, summary, details).await,
-        "discord" => dispatch_discord(config, event, summary, details).await,
+        "ntfy" => dispatch_ntfy(config, event, summary, details, caddy_admin_url).await,
+        "plunk" => dispatch_plunk(config, event, summary, details).await,
+        "slack" => dispatch_slack(config, event, summary, details, caddy_admin_url).await,
+        "discord" => dispatch_discord(config, event, summary, details, caddy_admin_url).await,
         _ => Err(format!("unknown channel type: {channel_type}")),
     }
+}
+
+/// Validate a user-supplied notification URL against SSRF and return a reqwest
+/// client pinned to the validated IP that refuses redirects.
+async fn guarded_client(url: &str, caddy_admin_url: &str) -> Result<reqwest::Client, String> {
+    let to_msg = |e: crate::api::error::ApiError| match e {
+        crate::api::error::ApiError::BadRequest(msg) => msg,
+        other => other.to_string(),
+    };
+    let target = crate::api::utils::url_guard::validate_outbound_url(url, caddy_admin_url)
+        .await
+        .map_err(to_msg)?;
+    crate::api::utils::url_guard::guarded_client(&target).map_err(to_msg)
 }
 
 async fn dispatch_webhook(
@@ -28,12 +40,14 @@ async fn dispatch_webhook(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let url = parsed
         .get("url")
         .and_then(|v| v.as_str())
         .ok_or("webhook config missing 'url'")?;
+    let client = guarded_client(url, caddy_admin_url).await?;
 
     let payload = serde_json::json!({
         "event": event,
@@ -42,7 +56,6 @@ async fn dispatch_webhook(
         "timestamp": crate::db::models::now_iso8601(),
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(url)
         .json(&payload)
@@ -63,12 +76,14 @@ async fn dispatch_slack(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let webhook_url = parsed
         .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("slack config missing 'webhook_url'")?;
+    let client = guarded_client(webhook_url, caddy_admin_url).await?;
 
     let color = event_color_hex(event);
     let timestamp = crate::db::models::now_iso8601();
@@ -99,7 +114,6 @@ async fn dispatch_slack(
         "attachments": [{ "color": color }]
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(webhook_url)
         .json(&payload)
@@ -120,12 +134,14 @@ async fn dispatch_discord(
     event: &str,
     summary: &str,
     details: &serde_json::Value,
+    caddy_admin_url: &str,
 ) -> Result<(), String> {
     let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
     let webhook_url = parsed
         .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("discord config missing 'webhook_url'")?;
+    let client = guarded_client(webhook_url, caddy_admin_url).await?;
 
     let color = event_color_discord(event);
     let timestamp = crate::db::models::now_iso8601();
@@ -146,7 +162,6 @@ async fn dispatch_discord(
         }]
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(webhook_url)
         .json(&payload)
@@ -160,6 +175,132 @@ async fn dispatch_discord(
     } else {
         Err(format!("discord webhook returned {}", resp.status()))
     }
+}
+
+async fn dispatch_plunk(
+    config: &str,
+    event: &str,
+    summary: &str,
+    details: &serde_json::Value,
+) -> Result<(), String> {
+    let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
+    let api_key = parsed
+        .get("api_key")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let to_email = parsed
+        .get("to_email")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+
+    if api_key.is_empty() || to_email.is_empty() {
+        return Err("Plunk: missing api_key or to_email".to_string());
+    }
+
+    let app_name = details
+        .get("app_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    let body = serde_json::json!({
+        "to": to_email,
+        "subject": format!("[Icefall] {event}: {summary}"),
+        "body": format!(
+            "Event: {event}\nSummary: {summary}\nApp: {app_name}\n\nDetails:\n{details_pretty}\n\nTimestamp: {ts}",
+            details_pretty = serde_json::to_string_pretty(details).unwrap_or_default(),
+            ts = crate::db::models::now_iso8601(),
+        ),
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.useplunk.com/v1/send")
+        .bearer_auth(api_key)
+        .json(&body)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("Plunk API error: {e}"))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Plunk returned error: {text}"));
+    }
+
+    tracing::info!("Plunk notification sent: [{event}] {summary}");
+    Ok(())
+}
+
+async fn dispatch_ntfy(
+    config: &str,
+    event: &str,
+    summary: &str,
+    details: &serde_json::Value,
+    caddy_admin_url: &str,
+) -> Result<(), String> {
+    let parsed: serde_json::Value = serde_json::from_str(config).map_err(|e| e.to_string())?;
+    let topic = parsed
+        .get("topic")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let server = parsed
+        .get("server")
+        .and_then(|v| v.as_str())
+        .unwrap_or("https://ntfy.sh");
+
+    if topic.is_empty() {
+        return Err("ntfy: topic is required".to_string());
+    }
+
+    let url = format!("{}/{}", server.trim_end_matches('/'), topic);
+    let client = guarded_client(&url, caddy_admin_url).await?;
+
+    let priority = match event {
+        "deploy.failed" | "health.down" | "backup.failure" => "high",
+        "deploy.success" | "health.recovered" | "backup.success" => "default",
+        _ => "default",
+    };
+
+    let tags = match event {
+        "deploy.success" => "white_check_mark",
+        "deploy.failed" => "x",
+        "health.down" => "warning",
+        "health.recovered" => "green_heart",
+        "backup.success" => "package",
+        "backup.failure" => "rotating_light",
+        _ => "bell",
+    };
+
+    let app_name = details
+        .get("app_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    let body = format!("{summary}\nApp: {app_name}");
+
+    let mut req = client
+        .post(&url)
+        .header("Title", format!("[Icefall] {event}"))
+        .header("Priority", priority)
+        .header("Tags", tags)
+        .body(body)
+        .timeout(std::time::Duration::from_secs(10));
+
+    if let Some(token) = parsed.get("token").and_then(|v| v.as_str()) {
+        if !token.is_empty() {
+            req = req.bearer_auth(token);
+        }
+    }
+
+    let resp = req.send().await.map_err(|e| format!("ntfy error: {e}"))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("ntfy returned error: {text}"));
+    }
+
+    tracing::info!("ntfy notification sent to {topic}: [{event}] {summary}");
+    Ok(())
 }
 
 fn event_color_hex(event: &str) -> &'static str {

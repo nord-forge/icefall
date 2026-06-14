@@ -21,7 +21,7 @@ pub(super) async fn list_tokens(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let tokens = state.db.list_api_tokens(&user.id).await?;
     let safe: Vec<serde_json::Value> = tokens.iter().map(|t| serde_json::json!({
@@ -36,9 +36,9 @@ pub(super) async fn create_token(
     headers: HeaderMap,
     Json(body): Json<CreateTokenRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let user = authenticate_from_headers(&state, &headers)
+    let auth = crate::api::routes::auth::authenticate_with_team(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let raw_token = format!("icefall_{}", generate_random_hex(48));
     let token_hash = sha256_hex(&raw_token);
@@ -46,10 +46,11 @@ pub(super) async fn create_token(
     let token = state
         .db
         .create_api_token(
-            &user.id,
+            &auth.user.id,
             &body.name,
             &token_hash,
             body.expires_at.as_deref(),
+            auth.team_id.as_deref(),
         )
         .await?;
 
@@ -64,9 +65,21 @@ pub(super) async fn revoke_token(
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let _user = authenticate_from_headers(&state, &headers)
+    let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+
+    // Verify the token belongs to the caller before deleting; a 404 (not 403)
+    // avoids confirming the id exists for another user.
+    let owns_token = state
+        .db
+        .list_api_tokens(&user.id)
+        .await?
+        .iter()
+        .any(|t| t.id == id);
+    if !owns_token {
+        return Err(ApiError::NotFound("token not found".into()));
+    }
 
     state.db.delete_api_token(&id).await?;
     Ok(Json(serde_json::json!({ "message": "token revoked" })))

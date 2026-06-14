@@ -1,9 +1,13 @@
 pub mod agent_ws;
+pub mod analytics;
 pub mod apps;
 pub mod audit;
 pub mod auth;
 pub mod backups;
+pub mod bundles;
+pub mod cleanup;
 pub mod clone;
+pub mod config_history;
 pub mod databases;
 pub mod db_browser;
 pub mod db_restore;
@@ -11,9 +15,15 @@ pub mod db_ssl;
 pub mod deploys;
 pub mod domains;
 pub mod env_vars;
+pub mod environments;
 pub mod events;
+pub mod forecast;
+pub mod git_sources;
+pub mod github;
 pub mod health;
+pub mod incidents;
 pub mod instance_backup;
+pub mod log_drains;
 pub mod logs;
 pub mod mcp;
 pub mod metrics;
@@ -29,8 +39,10 @@ pub mod server;
 pub mod servers;
 pub mod settings;
 pub mod shared_variables;
+pub mod teams;
 pub mod terminal;
 pub mod two_factor;
+pub mod two_factor_challenge;
 pub mod update;
 pub mod users;
 pub mod volumes;
@@ -66,6 +78,7 @@ pub fn api_routes() -> Router<AppState> {
         .merge(onboarding::routes())
         .merge(mcp::routes())
         .merge(instance_backup::routes())
+        .merge(incidents::routes())
         .merge(terminal::routes())
         .merge(two_factor::routes())
         .merge(oauth::routes())
@@ -73,9 +86,15 @@ pub fn api_routes() -> Router<AppState> {
         .merge(volumes::routes())
         .merge(update::routes())
         .merge(audit::routes())
+        .merge(environments::routes())
+        .merge(log_drains::routes())
+        .merge(git_sources::routes())
+        .merge(github::routes())
+        .merge(cleanup::routes())
+        .merge(teams::routes())
+        .merge(shared_variables::routes())
         .merge(openapi::routes())
         .merge(scheduled_tasks::routes())
-        .merge(shared_variables::routes())
         .route("/search", axum::routing::get(search::search))
         .route("/apps/{id}/clone", axum::routing::post(clone::clone_app))
         .route("/apps/{id}/move", axum::routing::post(clone::move_app))
@@ -100,6 +119,35 @@ pub fn api_routes() -> Router<AppState> {
             axum::routing::post(db_ssl::regenerate_certificate),
         )
         .route(
+            "/analytics/deploys",
+            axum::routing::get(analytics::deploy_analytics),
+        )
+        .route(
+            "/apps/{id}/config-history",
+            axum::routing::get(config_history::list_app_config_history),
+        )
+        .route(
+            "/deploys/{id}/events",
+            axum::routing::get(config_history::list_deploy_events),
+        )
+        .route(
+            "/deploys/{id}/approve",
+            axum::routing::post(config_history::approve_deploy),
+        )
+        .route(
+            "/servers/{id}/forecast",
+            axum::routing::get(forecast::server_forecast),
+        )
+        .route("/templates", axum::routing::get(list_templates))
+        .route(
+            "/apps/{id}/export",
+            axum::routing::get(bundles::export_bundle),
+        )
+        .route(
+            "/bundles/import",
+            axum::routing::post(bundles::import_bundle),
+        )
+        .route(
             "/notifications/webhooks",
             axum::routing::get(webhook_endpoints::list_endpoints)
                 .post(webhook_endpoints::create_endpoint),
@@ -116,4 +164,11 @@ pub fn api_routes() -> Router<AppState> {
             "/notifications/webhooks/{id}/test",
             axum::routing::post(webhook_endpoints::test_endpoint),
         )
+}
+
+async fn list_templates(
+    axum::extract::State(state): axum::extract::State<crate::api::AppState>,
+) -> Result<axum::Json<serde_json::Value>, crate::api::error::ApiError> {
+    let templates = state.db.list_service_templates().await?;
+    Ok(axum::Json(serde_json::json!({ "data": templates })))
 }

@@ -1,56 +1,82 @@
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 
+use crate::db::encryption::Encryptor;
 use crate::db::models::*;
 use crate::db::DbError;
 
 pub(super) async fn list_shared_variables(
     pool: &SqlitePool,
+    encryptor: &Encryptor,
     scope: &str,
     scope_id: &str,
 ) -> Result<Vec<SharedVariable>, DbError> {
-    let vars = sqlx::query_as::<_, SharedVariable>(
-        "SELECT * FROM shared_variables WHERE scope = ? AND scope_id = ? ORDER BY key",
+    let rows = sqlx::query(
+        "SELECT id, scope, scope_id, key, value_encrypted, is_sensitive, created_at, updated_at
+         FROM shared_variables WHERE scope = ? AND scope_id = ? ORDER BY key ASC",
     )
     .bind(scope)
     .bind(scope_id)
     .fetch_all(pool)
     .await?;
+
+    let mut vars = Vec::with_capacity(rows.len());
+    for row in rows {
+        let encrypted: Vec<u8> = row.get("value_encrypted");
+        let decrypted = encryptor.decrypt(&encrypted)?;
+        let value = String::from_utf8(decrypted).unwrap_or_default();
+
+        vars.push(SharedVariable {
+            id: row.get("id"),
+            scope: row.get("scope"),
+            scope_id: row.get("scope_id"),
+            key: row.get("key"),
+            value,
+            is_sensitive: row.get("is_sensitive"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        });
+    }
     Ok(vars)
 }
 
-pub(super) async fn create_shared_variable(
+pub(super) async fn set_shared_variable(
     pool: &SqlitePool,
+    encryptor: &Encryptor,
     var: &NewSharedVariable,
 ) -> Result<SharedVariable, DbError> {
     let id = new_id();
     let now = now_iso8601();
+    let encrypted_value = encryptor.encrypt(var.value.as_bytes())?;
 
     sqlx::query(
-        "INSERT INTO shared_variables (id, scope, scope_id, key, value, is_sensitive, created_at, updated_at)
+        "INSERT INTO shared_variables (id, scope, scope_id, key, value_encrypted, is_sensitive, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(scope, scope_id, key) DO UPDATE SET value = excluded.value, is_sensitive = excluded.is_sensitive, updated_at = excluded.updated_at",
+         ON CONFLICT(scope, scope_id, key) DO UPDATE SET
+             value_encrypted = excluded.value_encrypted,
+             is_sensitive = excluded.is_sensitive,
+             updated_at = excluded.updated_at",
     )
     .bind(&id)
     .bind(&var.scope)
     .bind(&var.scope_id)
     .bind(&var.key)
-    .bind(&var.value)
+    .bind(&encrypted_value)
     .bind(var.is_sensitive)
     .bind(&now)
     .bind(&now)
     .execute(pool)
     .await?;
 
-    let result = sqlx::query_as::<_, SharedVariable>(
-        "SELECT * FROM shared_variables WHERE scope = ? AND scope_id = ? AND key = ?",
-    )
-    .bind(&var.scope)
-    .bind(&var.scope_id)
-    .bind(&var.key)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(result)
+    Ok(SharedVariable {
+        id,
+        scope: var.scope.clone(),
+        scope_id: var.scope_id.clone(),
+        key: var.key.clone(),
+        value: var.value.clone(),
+        is_sensitive: var.is_sensitive,
+        created_at: now.clone(),
+        updated_at: now,
+    })
 }
 
 pub(super) async fn delete_shared_variable(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
@@ -61,52 +87,58 @@ pub(super) async fn delete_shared_variable(pool: &SqlitePool, id: &str) -> Resul
     Ok(())
 }
 
-/// Resolve shared variables for an app by walking the scope chain: server → project
-/// Returns (key, value, source) tuples
-pub(super) async fn resolve_shared_variables(
+pub(super) async fn get_shared_variables_for_app(
     pool: &SqlitePool,
+    encryptor: &Encryptor,
     app_id: &str,
-) -> Result<Vec<(String, String, String)>, DbError> {
-    let app = sqlx::query_as::<_, App>("SELECT * FROM apps WHERE id = ?")
+) -> Result<Vec<SharedVariable>, DbError> {
+    // First, fetch the app to get its project_id and server_id
+    let app = sqlx::query("SELECT project_id, server_id FROM apps WHERE id = ?")
         .bind(app_id)
         .fetch_optional(pool)
         .await?;
 
-    let Some(app) = app else {
+    let Some(app_row) = app else {
         return Ok(Vec::new());
     };
 
-    let mut result: std::collections::HashMap<String, (String, String)> =
-        std::collections::HashMap::new();
+    let project_id: Option<String> = app_row.get("project_id");
+    let server_id: Option<String> = app_row.get("server_id");
 
-    // Server-level variables (lowest priority)
-    if let Some(ref server_id) = app.server_id {
-        let server_vars = sqlx::query_as::<_, SharedVariable>(
-            "SELECT * FROM shared_variables WHERE scope = 'server' AND scope_id = ?",
-        )
-        .bind(server_id)
-        .fetch_all(pool)
-        .await?;
-        for v in server_vars {
-            result.insert(v.key, (v.value, format!("server:{server_id}")));
-        }
+    // Return empty if app has neither project nor server
+    let (pid, sid) = match (project_id, server_id) {
+        (None, None) => return Ok(Vec::new()),
+        (p, s) => (p.unwrap_or_default(), s.unwrap_or_default()),
+    };
+
+    let rows = sqlx::query(
+        "SELECT id, scope, scope_id, key, value_encrypted, is_sensitive, created_at, updated_at
+         FROM shared_variables
+         WHERE (scope = 'project' AND scope_id = ?)
+            OR (scope = 'server' AND scope_id = ?)
+         ORDER BY key ASC",
+    )
+    .bind(&pid)
+    .bind(&sid)
+    .fetch_all(pool)
+    .await?;
+
+    let mut vars = Vec::with_capacity(rows.len());
+    for row in rows {
+        let encrypted: Vec<u8> = row.get("value_encrypted");
+        let decrypted = encryptor.decrypt(&encrypted)?;
+        let value = String::from_utf8(decrypted).unwrap_or_default();
+
+        vars.push(SharedVariable {
+            id: row.get("id"),
+            scope: row.get("scope"),
+            scope_id: row.get("scope_id"),
+            key: row.get("key"),
+            value,
+            is_sensitive: row.get("is_sensitive"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        });
     }
-
-    // Project-level variables (higher priority, overrides server)
-    if let Some(ref project_id) = app.project_id {
-        let project_vars = sqlx::query_as::<_, SharedVariable>(
-            "SELECT * FROM shared_variables WHERE scope = 'project' AND scope_id = ?",
-        )
-        .bind(project_id)
-        .fetch_all(pool)
-        .await?;
-        for v in project_vars {
-            result.insert(v.key, (v.value, format!("project:{project_id}")));
-        }
-    }
-
-    Ok(result
-        .into_iter()
-        .map(|(key, (value, source))| (key, value, source))
-        .collect())
+    Ok(vars)
 }

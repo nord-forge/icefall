@@ -52,7 +52,7 @@ When you fix an a11y issue, add a one-line `a11y [<CRITERION>]: <why>` comment a
 
 Things Claude gets wrong without explicit instruction:
 
-- **Icons: Tabler Icons by default** (`@tabler/icons-preact`), individual imports only. User can override with a different icon set. No emojis in UI.
+- **Icons: Lucide (`lucide-preact`)**, individual imports only. User can override with a different icon set. No emojis in UI.
 - CSS custom properties for theming — never hardcode colors/spacing
 - OKLCH for color definitions — not HSL, not hex (hex for final output only)
 - Light + dark mode: design and validate both simultaneously

@@ -1,0 +1,8 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import TeamsPage from '@islands/teams/TeamsPage/TeamsPage';
+---
+
+<DashboardLayout title="Teams">
+  <TeamsPage client:only="preact" />
+</DashboardLayout>

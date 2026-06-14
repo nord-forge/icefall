@@ -1,20 +1,36 @@
 mod apps;
 mod audit;
 mod auth;
+mod canary;
 mod cleanup;
+mod cleanup_runs;
+mod cleanup_schedule;
+mod config_history;
 mod databases;
+mod deploy_approvals;
+mod deploy_events;
 mod deploys;
 mod domains;
+mod drift;
 mod env_vars;
 mod environments;
+mod github;
 mod health;
+mod incidents;
+mod log_drains;
 mod notifications;
+mod project_environments;
 mod projects;
+mod public_ports;
+mod registries;
 mod restore;
 mod scheduled_tasks;
 mod servers;
+mod service_templates;
 mod settings;
 mod shared_variables;
+mod ssh_keys;
+mod teams;
 mod updates;
 mod users;
 mod webhooks;
@@ -22,20 +38,36 @@ mod webhooks;
 pub use apps::*;
 pub use audit::*;
 pub use auth::*;
+pub use canary::*;
 pub use cleanup::*;
+pub use cleanup_runs::*;
+pub use cleanup_schedule::*;
+pub use config_history::*;
 pub use databases::*;
+pub use deploy_approvals::*;
+pub use deploy_events::*;
 pub use deploys::*;
 pub use domains::*;
+pub use drift::*;
 pub use env_vars::*;
 pub use environments::*;
+pub use github::*;
 pub use health::*;
+pub use incidents::*;
+pub use log_drains::*;
 pub use notifications::*;
+pub use project_environments::*;
 pub use projects::*;
+pub use public_ports::*;
+pub use registries::*;
 pub use restore::*;
 pub use scheduled_tasks::*;
 pub use servers::*;
+pub use service_templates::*;
 pub use settings::*;
 pub use shared_variables::*;
+pub use ssh_keys::*;
+pub use teams::*;
 pub use updates::*;
 pub use users::*;
 pub use webhooks::*;
@@ -47,10 +79,78 @@ pub fn now_iso8601() -> String {
 }
 
 pub fn new_id() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut rng = rand::rng();
     let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
     (0..20)
         .map(|_| chars[rng.random_range(0..chars.len())] as char)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_id_is_20_chars() {
+        let id = new_id();
+        assert_eq!(id.len(), 20);
+    }
+
+    #[test]
+    fn new_id_only_contains_lowercase_alphanumeric() {
+        let id = new_id();
+        assert!(id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn new_id_generates_unique_values() {
+        let ids: std::collections::HashSet<String> = (0..100).map(|_| new_id()).collect();
+        assert_eq!(ids.len(), 100);
+    }
+
+    #[test]
+    fn now_iso8601_is_valid_rfc3339() {
+        let ts = now_iso8601();
+        assert!(chrono::DateTime::parse_from_rfc3339(&ts).is_ok());
+    }
+
+    #[test]
+    fn now_iso8601_ends_with_z() {
+        let ts = now_iso8601();
+        assert!(ts.ends_with('Z'));
+    }
+
+    #[test]
+    fn now_iso8601_has_millisecond_precision() {
+        let ts = now_iso8601();
+        let dot_pos = ts.rfind('.').expect("should have decimal point");
+        let frac = &ts[dot_pos + 1..ts.len() - 1];
+        assert_eq!(frac.len(), 3);
+    }
+
+    #[test]
+    fn now_iso8601_is_recent() {
+        let ts = now_iso8601();
+        let parsed = chrono::DateTime::parse_from_rfc3339(&ts).unwrap();
+        let now = chrono::Utc::now();
+        let diff = now.signed_duration_since(parsed);
+        assert!(diff.num_seconds().abs() < 5);
+    }
+
+    #[test]
+    fn new_id_no_uppercase() {
+        for _ in 0..50 {
+            let id = new_id();
+            assert_eq!(id, id.to_lowercase());
+        }
+    }
+
+    #[test]
+    fn new_id_is_not_empty() {
+        let id = new_id();
+        assert!(!id.is_empty());
+    }
 }

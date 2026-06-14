@@ -17,8 +17,11 @@ pub struct App {
     pub image_ref: Option<String>,
     pub compose_content: Option<String>,
     pub project_id: Option<String>,
+    /// Owning team. NOT NULL in the schema — every app belongs to one team.
+    pub team_id: String,
     pub deploy_mode: String,
     pub server_id: Option<String>,
+    pub base_directory: Option<String>,
     pub disable_build_cache: bool,
     pub git_submodules_enabled: bool,
     pub git_lfs_enabled: bool,
@@ -27,12 +30,67 @@ pub struct App {
     pub basic_auth_username: Option<String>,
     pub basic_auth_password_hash: Option<String>,
     pub pre_deploy_commands: Option<String>,
+    pub post_deploy_commands: Option<String>,
+    pub ssh_key_id: Option<String>,
+    pub last_request_at: Option<String>,
+    pub exempt_from_inactivity: bool,
+    pub require_deploy_approval: bool,
+    pub canary_enabled: bool,
+    pub canary_config: Option<String>,
+    pub drift_monitoring_enabled: bool,
+    pub log_noise_patterns: Option<String>,
+    pub log_highlight_patterns: Option<String>,
+    pub ghost_mode_enabled: bool,
+    pub ghost_mode_idle_minutes: i32,
+    pub ghost_mode_status: String,
+    pub status_page_enabled: bool,
+    pub power_nap_priority: String,
+    pub power_nap_custom_schedule: Option<String>,
+    pub project_environment_id: Option<String>,
+    pub template_id: Option<String>,
+    pub template_version: Option<String>,
+    pub has_custom_proxy_config: bool,
+    pub proxy_presets: Option<String>,
+    pub tunnel_enabled: bool,
+    pub desired_instances: i64,
+    pub lb_policy: String,
+    pub lb_health_check_path: String,
+    pub lb_sticky_sessions: bool,
     pub created_at: String,
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AppInstance {
+    pub id: String,
+    pub app_id: String,
+    pub server_id: String,
+    pub status: String,
+    pub container_id: Option<String>,
+    pub host_port: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub struct NewAppInstance {
+    pub app_id: String,
+    pub server_id: String,
+    pub status: String,
+    pub container_id: Option<String>,
+    pub host_port: Option<i64>,
+}
+
+#[derive(Default)]
+pub struct UpdateAppInstance {
+    pub status: Option<String>,
+    pub container_id: Option<Option<String>>,
+    pub host_port: Option<Option<i64>>,
+}
+
 pub struct NewApp {
     pub name: String,
+    /// Owning team — required; every app is team-scoped.
+    pub team_id: String,
     pub git_repo: Option<String>,
     pub git_branch: String,
     pub framework: Option<String>,
@@ -59,6 +117,7 @@ pub struct UpdateApp {
     pub project_id: Option<Option<String>>,
     pub deploy_mode: Option<String>,
     pub server_id: Option<Option<String>>,
+    pub base_directory: Option<Option<String>>,
     pub disable_build_cache: Option<bool>,
     pub git_submodules_enabled: Option<bool>,
     pub git_lfs_enabled: Option<bool>,
@@ -67,4 +126,19 @@ pub struct UpdateApp {
     pub basic_auth_username: Option<Option<String>>,
     pub basic_auth_password_hash: Option<Option<String>>,
     pub pre_deploy_commands: Option<Option<String>>,
+    pub post_deploy_commands: Option<Option<String>>,
+    pub ssh_key_id: Option<Option<String>>,
+    pub ghost_mode_enabled: Option<bool>,
+    pub ghost_mode_idle_minutes: Option<i32>,
+    pub canary_enabled: Option<bool>,
+    pub canary_config: Option<Option<String>>,
+    pub log_noise_patterns: Option<Option<String>>,
+    pub log_highlight_patterns: Option<Option<String>>,
+    pub tunnel_enabled: Option<bool>,
+    pub require_deploy_approval: Option<bool>,
+    pub project_environment_id: Option<Option<String>>,
+    pub desired_instances: Option<i64>,
+    pub lb_policy: Option<String>,
+    pub lb_health_check_path: Option<String>,
+    pub lb_sticky_sessions: Option<bool>,
 }

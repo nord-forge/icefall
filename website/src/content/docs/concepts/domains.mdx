@@ -1,6 +1,69 @@
 ---
-title: "domains"
-description: "Icefall documentation"
+title: Domain routing
+description: How domains map to apps, and how Icefall provisions HTTPS automatically.
 ---
 
-Documentation coming soon.
+Icefall routes incoming HTTP traffic to your app containers through Caddy. You
+add a domain to an app; Icefall handles the routing and the TLS certificate.
+
+## Adding a domain
+
+Add a custom domain in the dashboard, or from the CLI:
+
+```bash
+icefall domains add myapp app.example.com
+icefall domains list myapp
+```
+
+Point the domain's DNS at your server's IP address (an `A` record, or `AAAA`
+for IPv6). Once DNS resolves to the server, Icefall marks the domain **verified**
+and starts routing traffic to it.
+
+## How routing works
+
+When a domain is verified, the daemon:
+
+1. Inspects the app's running container to find the host port it is published on.
+2. Calls the Caddy admin API to add a route: requests for that hostname are
+   reverse-proxied to the container.
+
+For a multi-instance (load-balanced) app, the route lists every instance as an
+upstream and Caddy distributes traffic across them — see the load balancing
+settings on the app.
+
+## Path-based routing
+
+A domain can include a path prefix, so several apps can share one hostname:
+
+```
+example.com/         → marketing site
+example.com/api      → API service
+example.com/blog     → blog
+```
+
+Add the prefix when you create the domain. Each app keeps its own container; the
+prefix only decides which requests Caddy sends where.
+
+## Automatic HTTPS
+
+Caddy obtains a Let's Encrypt certificate for every verified domain
+automatically — there is nothing to configure and no certificate files to
+manage. Certificates renew themselves before they expire, and Icefall's SSL
+checker watches expiry dates and can notify you if anything looks wrong.
+
+A domain's SSL status moves from `provisioning` to `active` once the certificate
+is issued. If it stays in `provisioning`, the usual cause is DNS: the domain must
+resolve to this server before Let's Encrypt will issue a certificate.
+
+## Wildcard subdomains and previews
+
+If you set a **base domain** for your instance, Icefall uses it to give each app
+a default subdomain (`myapp.your-base-domain.com`) and to host
+[preview environments](/concepts/environments/#preview-environments) on generated
+subdomains. Set `base_domain` in your [configuration](/cli/configuration/).
+
+## Troubleshooting
+
+If a domain will not verify or HTTPS will not provision, see
+[networking issues](/troubleshooting/networking/). The most common fixes are a
+missing DNS record and ports 80/443 not being open on the server.

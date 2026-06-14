@@ -1,0 +1,15 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import InvitationAcceptPage from '@islands/teams/InvitationAcceptPage/InvitationAcceptPage';
+
+// Static shell. The InvitationAcceptPage island reads the token from
+// window.location at runtime, so no server-side params are needed. The
+// Rust server SPA-falls-back any /invitations/:token URL to this page.
+export function getStaticPaths() {
+  return [{ params: { token: '_' } }];
+}
+---
+
+<DashboardLayout title="Team Invitation">
+  <InvitationAcceptPage client:only="preact" />
+</DashboardLayout>

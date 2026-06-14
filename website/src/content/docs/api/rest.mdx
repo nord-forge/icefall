@@ -1,6 +1,111 @@
 ---
-title: "rest"
-description: "Icefall documentation"
+title: REST API reference
+description: Complete API endpoint documentation
 ---
 
-Documentation coming soon.
+## Authentication
+
+All API requests require authentication via:
+- **Bearer token**: `Authorization: Bearer icefall_your_token`
+- **Session cookie**: `Cookie: session_id=your_session`
+
+Create API tokens at **Settings > API Tokens**.
+
+## Response format
+
+Success: `{ "data": ... }`
+Error: `{ "error": { "code": "...", "message": "..." } }`
+
+## Apps
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/apps` | List all apps |
+| POST | `/api/v1/apps` | Create an app |
+| GET | `/api/v1/apps/{id}` | Get app details |
+| PUT | `/api/v1/apps/{id}` | Update app settings |
+| DELETE | `/api/v1/apps/{id}` | Delete an app |
+| POST | `/api/v1/apps/{id}/start` | Start app |
+| POST | `/api/v1/apps/{id}/stop` | Stop app |
+| POST | `/api/v1/apps/{id}/restart` | Restart app |
+| GET | `/api/v1/apps/{id}/drift` | Check config drift |
+| GET | `/api/v1/apps/{id}/export` | Export as bundle |
+| POST | `/api/v1/apps/{id}/clone` | Clone app |
+
+## Deploys
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/apps/{id}/deploys` | List deploys |
+| POST | `/api/v1/apps/{id}/deploys` | Trigger deploy |
+| POST | `/api/v1/apps/{id}/deploys/{id}/rollback` | Rollback |
+| POST | `/api/v1/deploys/{id}/cancel` | Cancel deploy |
+| POST | `/api/v1/deploys/{id}/approve` | Approve deploy |
+| GET | `/api/v1/deploys/{id}/events` | Deploy events |
+
+## Databases
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/databases` | List databases |
+| POST | `/api/v1/databases` | Create database |
+| DELETE | `/api/v1/databases/{id}` | Delete database |
+| POST | `/api/v1/databases/{id}/restore` | Restore from backup |
+| PUT | `/api/v1/databases/{id}/ssl` | Configure SSL |
+
+## Domains
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/apps/{id}/domains` | List domains |
+| POST | `/api/v1/apps/{id}/domains` | Add domain |
+| DELETE | `/api/v1/domains/{id}` | Remove domain |
+
+## Servers
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/servers` | List servers |
+| POST | `/api/v1/servers` | Add server |
+| GET | `/api/v1/servers/{id}` | Server details |
+| GET | `/api/v1/servers/{id}/forecast` | Resource forecast |
+| GET | `/api/v1/servers/{id}/containers` | List containers |
+
+## Notifications
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/notifications/webhooks` | List webhook endpoints |
+| POST | `/api/v1/notifications/webhooks` | Create endpoint |
+| POST | `/api/v1/notifications/webhooks/{id}/test` | Test endpoint |
+
+## Incidents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/incidents` | List incidents |
+| POST | `/api/v1/incidents` | Create incident |
+| PUT | `/api/v1/incidents/{id}/status` | Update status |
+| POST | `/api/v1/incidents/{id}/notes` | Add note |
+
+## Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/analytics/deploys` | Deploy analytics |
+| GET | `/api/v1/search` | Global search |
+
+## MCP
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/mcp/tools` | List 27 MCP tools |
+| POST | `/api/v1/mcp/call` | Call a tool |
+| GET | `/api/v1/mcp/resources` | List resources |
+| POST | `/api/v1/mcp/resources/read` | Read a resource |
+| GET | `/api/v1/mcp/prompts` | List prompts |
+| POST | `/api/v1/mcp/prompts/get` | Get prompt |
+
+## OpenAPI
+
+The full OpenAPI 3.1 specification is available at `/api/v1/openapi.json`.

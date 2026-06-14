@@ -16,11 +16,15 @@ function parseRoute() {
 const TAB_LOADERS: Record<string, () => Promise<{ default: ComponentType<any> }>> = {
   overview: () => import('@islands/app-detail/OverviewTab/OverviewTab'),
   deploys: () => import('@islands/app-detail/DeploysTab/DeploysTab'),
+  instances: () => import('@islands/app-detail/InstancesTab/InstancesTab'),
   logs: () => import('@islands/logs/LogViewer/LogViewer'),
   env: () => import('@islands/env-vars/EnvVarEditor/EnvVarEditor'),
   databases: () => import('@islands/app-detail/DatabaseTab/DatabaseTab'),
   terminal: () => import('@islands/app-detail/TerminalTab/TerminalTab'),
   domains: () => import('@islands/app-detail/DomainsTab/DomainsTab'),
+  tasks: () => import('@islands/app-detail/TasksTab/TasksTab'),
+  proxy: () => import('@islands/app-detail/ProxyTab/ProxyTab'),
+  history: () => import('@islands/app-detail/HistoryTab/HistoryTab'),
   settings: () => import('@islands/app-detail/SettingsTab/SettingsTab'),
 };
 

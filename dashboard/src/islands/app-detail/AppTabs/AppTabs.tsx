@@ -10,22 +10,30 @@ type Props = {
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'deploys', label: 'Deploys' },
+  { key: 'instances', label: 'Instances' },
   { key: 'logs', label: 'Logs' },
   { key: 'env', label: 'Env Vars' },
   { key: 'databases', label: 'Databases' },
   { key: 'terminal', label: 'Terminal' },
   { key: 'domains', label: 'Domains' },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'proxy', label: 'Proxy' },
+  { key: 'history', label: 'History' },
   { key: 'settings', label: 'Settings' },
 ];
 
 const TAB_PRELOADERS: Record<string, () => void> = {
   overview: () => { import('@islands/app-detail/OverviewTab/OverviewTab'); },
   deploys: () => { import('@islands/app-detail/DeploysTab/DeploysTab'); },
+  instances: () => { import('@islands/app-detail/InstancesTab/InstancesTab'); },
   logs: () => { import('@islands/logs/LogViewer/LogViewer'); },
   env: () => { import('@islands/env-vars/EnvVarEditor/EnvVarEditor'); },
   databases: () => { import('@islands/app-detail/DatabaseTab/DatabaseTab'); },
   terminal: () => { import('@islands/app-detail/TerminalTab/TerminalTab'); },
   domains: () => { import('@islands/app-detail/DomainsTab/DomainsTab'); },
+  tasks: () => { import('@islands/app-detail/TasksTab/TasksTab'); },
+  proxy: () => { import('@islands/app-detail/ProxyTab/ProxyTab'); },
+  history: () => { import('@islands/app-detail/HistoryTab/HistoryTab'); },
   settings: () => { import('@islands/app-detail/SettingsTab/SettingsTab'); },
 };
 

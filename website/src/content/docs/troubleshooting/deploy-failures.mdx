@@ -1,0 +1,57 @@
+---
+title: Deploy failures
+description: Diagnose and fix common deployment issues
+---
+
+## Build fails
+
+### Missing dependencies
+
+**Symptom**: `npm ERR! missing: <package>` or `ModuleNotFoundError`
+
+**Fix**: Ensure `package.json` includes all dependencies. Run `npm install` locally to verify. Check if you're using `devDependencies` that aren't installed in production builds.
+
+### Wrong Node version
+
+**Symptom**: `SyntaxError: Unexpected token` or `engine` version mismatch
+
+**Fix**: Add an `engines` field to `package.json`:
+```json
+{ "engines": { "node": ">=20" } }
+```
+
+### Docker build timeout
+
+**Symptom**: Build times out after the configured limit
+
+**Fix**: Increase the build timeout in app settings. Optimize your Dockerfile with multi-stage builds and layer caching. Use `--no-cache` (Force Rebuild) to rule out stale cache.
+
+## Container won't start
+
+### Port mismatch
+
+**Symptom**: Container starts but health check fails. Logs show app listening on wrong port.
+
+**Fix**: Set the `PORT` environment variable to match your app's listen port. Check the detected port in app overview.
+
+### Missing environment variables
+
+**Symptom**: App crashes immediately with `undefined` or `KeyError` on startup.
+
+**Fix**: Check the **Env vars** tab. Ensure all required variables are set. Compare with your local `.env` file.
+
+## Health check timeout
+
+**Symptom**: Deploy completes but status shows "failed" — container is running but health check didn't pass.
+
+**Fix**: Verify your app responds to HTTP on the detected port. Check if the health check path exists. Increase health check interval and retries in settings.
+
+## Webhook not triggering
+
+**Symptom**: Push to git but no deploy starts.
+
+**Checklist**:
+1. Verify webhook URL is correct (copy from app settings)
+2. Check the webhook secret matches
+3. Verify the pushed branch matches the configured deploy branch
+4. Check GitHub/GitLab webhook delivery logs for errors

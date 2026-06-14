@@ -1,0 +1,39 @@
+---
+title: Your first database
+description: Create a database and connect it to your app
+---
+
+## Create a PostgreSQL database
+
+1. Navigate to **Databases** in the sidebar
+2. Click **Create database**
+3. Select **PostgreSQL** and enter a name
+4. Click **Create**
+
+Icefall provisions the database container, generates credentials, and creates a persistent volume.
+
+## Link to your app
+
+1. Open your app's detail page
+2. Go to the **Databases** tab
+3. Click **Link database** and select your PostgreSQL instance
+4. The connection string is automatically injected as `DATABASE_URL`
+
+## Verify the connection
+
+Open the **Database browser** from the database detail page and run:
+
+```sql
+SELECT version();
+```
+
+## Set up backups
+
+1. In database settings, enable **Scheduled backups**
+2. Default: daily at 03:00, keep 7 backups
+3. Optionally configure S3 backup storage in **Settings > Backup**
+
+## Next steps
+
+- [Backup and restore guide](/guides/backup-restore)
+- [Connect an external database](/guides/external-database)

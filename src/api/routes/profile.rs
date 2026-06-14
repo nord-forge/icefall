@@ -41,7 +41,7 @@ async fn change_password(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !verify_password(&body.current_password, &user.password_hash) {
         return Err(ApiError::BadRequest("Current password is incorrect".into()));
@@ -78,7 +78,7 @@ async fn change_email(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !verify_password(&body.password, &user.password_hash) {
         return Err(ApiError::BadRequest("Password is incorrect".into()));
@@ -103,7 +103,7 @@ async fn list_sessions(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let current_session_id = extract_session_id(&headers);
     let sessions = state.db.list_user_sessions(&user.id).await?;
@@ -132,7 +132,7 @@ async fn revoke_all_sessions(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     // Keep the current session active so the user doesn't get logged out
     if let Some(session_id) = extract_session_id(&headers) {
@@ -155,7 +155,7 @@ async fn get_preferences(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let preferences = state.db.get_user_preferences(&user.id).await?;
 
@@ -169,7 +169,7 @@ async fn update_preferences(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let user = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     if !body.is_object() {
         return Err(ApiError::BadRequest(

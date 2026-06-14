@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'preact/hooks';
 import { api } from '@lib/api';
+import { createVisibleInterval } from '@lib/visibility';
 import { createSSEClient } from '@lib/sse';
 import type { App, Server, ServerResources, ServerMetricsSnapshot } from '@lib/types';
 import { formatBytes, formatPercent, formatRelativeTime } from '@lib/format';
@@ -12,7 +13,10 @@ import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import Skeleton from '@islands/shared/Skeleton/Skeleton';
 import { Cpu, MemoryStick, HardDrive, Server as ServerIcon, Globe, Hash, Clock, Trash2, Unplug } from 'lucide-preact';
 import { addToast } from '@stores/toast';
-import formStyles from '@styles/form.module.css';
+import Input from '@islands/shared/Input/Input';
+import ForecastSection from './components/ForecastSection';
+import InstancesSection from './components/InstancesSection';
+import ServerCleanupCard from './components/ServerCleanupCard';
 import styles from './server-detail.module.css';
 
 function getServerIdFromUrl(): string {
@@ -111,7 +115,7 @@ export default function ServerDetail() {
       },
     });
 
-    const metricsInterval = setInterval(async () => {
+    const stopMetricsPolling = createVisibleInterval(async () => {
       try {
         const res = await api.getServer(serverId);
         if (active) setServer(res.data);
@@ -135,7 +139,7 @@ export default function ServerDetail() {
     return () => {
       active = false;
       sse.close();
-      clearInterval(metricsInterval);
+      stopMetricsPolling();
     };
   }, [serverId]);
 
@@ -353,6 +357,10 @@ export default function ServerDetail() {
               <dd class={styles.infoValue}>{new Date(server.created_at).toLocaleDateString()}</dd>
             </dl>
           </div>
+
+          <ForecastSection serverId={serverId} />
+
+          <InstancesSection serverId={serverId} />
         </div>
       )}
 
@@ -415,32 +423,31 @@ export default function ServerDetail() {
         <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" class={styles.tabPanel}>
           <div class={styles.settingsSection}>
             <h2 class={styles.sectionTitle}>General</h2>
-            <div class={formStyles.fieldGroup}>
-              <div>
-                <label htmlFor="edit-server-name" class={formStyles.label}>Server name</label>
-                <input
-                  id="edit-server-name"
-                  class={formStyles.input}
-                  value={editName}
-                  onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-server-labels" class={formStyles.label}>Labels</label>
-                <input
-                  id="edit-server-labels"
-                  class={formStyles.inputMono}
-                  value={editLabels}
-                  onInput={(e) => setEditLabels((e.target as HTMLInputElement).value)}
-                  placeholder="env=production, region=eu-west"
-                />
-                <span class={formStyles.hint}>Comma-separated key=value pairs</span>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <Input
+                label="Server name"
+                name="edit-server-name"
+                id="edit-server-name"
+                value={editName}
+                onChange={setEditName}
+              />
+              <Input
+                label="Labels"
+                name="edit-server-labels"
+                id="edit-server-labels"
+                mono
+                value={editLabels}
+                onChange={setEditLabels}
+                placeholder="env=production, region=eu-west"
+                helpText="Comma-separated key=value pairs"
+              />
             </div>
             <div class={styles.settingsActions}>
               <Button variant="primary" onClick={handleSaveSettings} loading={saving}>Save changes</Button>
             </div>
           </div>
+
+          <ServerCleanupCard serverId={serverId} />
 
           {!isControlPlane && (
             <div class={styles.dangerZone}>

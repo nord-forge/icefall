@@ -44,6 +44,8 @@ pub async fn dispatch(
 
         "image.pull" => docker::image_pull(ctx, params).await,
         "image.build" => docker::image_build(ctx, params).await,
+        "image.load.begin" => docker::image_load_begin(ctx, params).await,
+        "image.load.commit" => docker::image_load_commit(ctx, params).await,
 
         "volume.create" => docker::volume_create(ctx, params).await,
         "volume.remove" => docker::volume_remove(ctx, params).await,

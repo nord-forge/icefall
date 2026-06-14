@@ -1,4 +1,4 @@
-import type { App, Deploy, Domain, EnvVar, Project, Server, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult } from './types';
+import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -12,7 +12,7 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+export async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase();
 
   // Serve GET requests from cache when a fresh entry exists
@@ -21,10 +21,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (cached !== null) return cached;
   }
 
+  const headers: Record<string, string> = {
+    // CSRF defence: the server requires this header on mutating requests.
+    // A cross-site form/image cannot set custom headers; only same-origin
+    // fetch/XHR can. Sent on every request for simplicity.
+    'X-Icefall-Request': '1',
+  };
+  if (options?.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    // Spread our headers AFTER options so a caller-supplied `headers` is
+    // merged in, not silently dropped — and our defaults still apply.
+    headers: { ...headers, ...(options?.headers as Record<string, string>) },
   });
   if (!res.ok) {
     if ((res.status === 401 || res.status === 400) && !path.startsWith('/auth/')) {
@@ -54,7 +66,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   logout: async () => {
-    await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'same-origin' });
+    await request('/auth/logout', { method: 'POST' }).catch(() => {});
     window.location.href = '/login';
   },
 
@@ -119,6 +131,31 @@ export const api = {
       `/apps/${appId}/drift`
     ),
 
+  // --- Load balancing / scaling ---
+
+  listInstances: (appId: string) =>
+    request<{ data: AppInstance[] }>(`/apps/${appId}/instances`),
+
+  scaleApp: (appId: string, desiredInstances: number) =>
+    request<{ message: string; deploy_id?: string; desired_instances: number }>(
+      `/apps/${appId}/scale`,
+      { method: 'PUT', body: JSON.stringify({ desired_instances: desiredInstances }) }
+    ),
+
+  updateLbConfig: (
+    appId: string,
+    body: { policy?: LbPolicy; health_check_path?: string; sticky_sessions?: boolean }
+  ) =>
+    request<{ message: string }>(`/apps/${appId}/lb-config`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteInstance: (appId: string, instanceId: string) =>
+    request<{ message: string }>(`/apps/${appId}/instances/${instanceId}`, {
+      method: 'DELETE',
+    }),
+
   listEnvVars: (appId: string, reveal = false) =>
     request<{ data: EnvVar[] }>(`/apps/${appId}/env${reveal ? '?reveal=true' : ''}`),
 
@@ -148,11 +185,37 @@ export const api = {
 
   listDatabases: () => request<{ data: any[] }>('/databases'),
 
+  createDatabase: (body: { name: string; db_type: string; app_id?: string; memory_mb?: number; expose_port?: boolean }) =>
+    request<{ data: any }>('/databases', { method: 'POST', body: JSON.stringify(body) }),
+
   linkDatabase: (dbId: string, appId: string) =>
     request<{ message: string }>(`/databases/${dbId}/link/${appId}`, { method: 'POST' }),
 
   unlinkDatabase: (dbId: string, appId: string) =>
     request<{ message: string }>(`/databases/${dbId}/link/${appId}`, { method: 'DELETE' }),
+
+  deleteDatabase: (dbId: string) =>
+    request<{ message: string }>(`/databases/${dbId}`, { method: 'DELETE' }),
+
+  listDatabaseBackups: (dbId: string) =>
+    request<{
+      data: Array<{
+        id: string;
+        filename: string;
+        size_bytes: number;
+        created_at: string;
+        status: string;
+      }>;
+    }>(`/databases/${dbId}/backups`),
+
+  createDatabaseBackup: (dbId: string) =>
+    request<{ message: string }>(`/databases/${dbId}/backup`, { method: 'POST' }),
+
+  restoreDatabaseBackup: (dbId: string, backupId: string) =>
+    request<{ message: string }>(`/databases/${dbId}/backups/${backupId}/restore`, { method: 'POST' }),
+
+  deleteDatabaseBackup: (dbId: string, backupId: string) =>
+    request<{ message: string }>(`/databases/${dbId}/backups/${backupId}`, { method: 'DELETE' }),
 
   startDatabase: (dbId: string) =>
     request<{ message: string }>(`/databases/${dbId}/start`, { method: 'POST' }),
@@ -166,6 +229,11 @@ export const api = {
   getHealth: (appId: string) =>
     request<{ data: HealthCheckResult[] }>(`/apps/${appId}/health`),
 
+  getHealthEvents: (appId: string, limit?: number) =>
+    request<{ data: Array<{ recent_events?: Array<{ status: string; checked_at: string }> }> }>(
+      `/apps/${appId}/health${limit ? `?limit=${limit}` : ''}`
+    ),
+
   updateHealth: (appId: string, body: {
     check_type?: string;
     interval_secs?: number;
@@ -174,6 +242,18 @@ export const api = {
     config?: string;
   }) =>
     request<{ data: any }>(`/apps/${appId}/health`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  createHealthCheck: (appId: string, body: {
+    check_type: string;
+    interval_secs: number;
+    failure_threshold: number;
+    auto_restart: boolean;
+    config?: string;
+  }) =>
+    request<{ data: any }>(`/apps/${appId}/health`, { method: 'POST', body: JSON.stringify(body) }),
+
+  deleteHealthCheck: (appId: string, checkId: string) =>
+    request<{ message: string }>(`/health-checks/${checkId}`, { method: 'DELETE' }),
 
   getServerStatus: () => request<ServerStatus>('/server/status'),
 
@@ -298,6 +378,17 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ query }) },
     ),
 
+  // Structured MongoDB query — the server no longer accepts raw query
+  // strings for Mongo (they were eval'd as JavaScript = RCE).
+  queryMongo: (
+    dbId: string,
+    body: { collection: string; filter?: unknown; projection?: unknown; sort?: unknown; limit?: number },
+  ) =>
+    request<{ documents?: any[]; row_count: number }>(
+      `/databases/${dbId}/mongo-query`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   // Projects
   listProjects: () =>
     request<{ data: Project[] }>('/projects'),
@@ -316,7 +407,7 @@ export const api = {
 
   // 2FA
   setup2fa: () =>
-    request<{ data: { secret: string; qr_svg: string; otpauth_url: string } }>(
+    request<{ data: { secret: string; otpauth_url: string } }>(
       '/auth/2fa/setup',
       { method: 'POST' },
     ),
@@ -411,6 +502,12 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ path }) },
     ),
 
+  uploadVolumeFile: (appId: string, mountIndex: number, path: string, filename: string, data: ArrayBuffer) =>
+    request<{ message: string }>(
+      `/apps/${appId}/volumes/${mountIndex}/upload?path=${encodeURIComponent(path)}&filename=${encodeURIComponent(filename)}`,
+      { method: 'POST', body: data },
+    ),
+
   // Profile
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ message: string }>(
@@ -485,6 +582,9 @@ export const api = {
       method: 'POST',
     }),
 
+  listServerInstances: (serverId: string) =>
+    request<{ data: ServerAppInstance[] }>(`/servers/${serverId}/instances`),
+
   updateAgent: (id: string) =>
     request<{ data: { status: string; target_version?: string } }>(`/servers/${id}/update`, {
       method: 'POST',
@@ -507,6 +607,58 @@ export const api = {
         target_server_id: targetServerId,
         acknowledge_volume_loss: acknowledgeVolumeLoss,
       }),
+    }),
+
+  // General settings
+  getSettings: () =>
+    request<{ data: { base_domain: string | null; version: string } }>('/settings'),
+
+  updateBaseDomain: (baseDomain: string) =>
+    request<{ message: string }>('/settings/base-domain', {
+      method: 'POST',
+      body: JSON.stringify({ base_domain: baseDomain }),
+    }),
+
+  // Cloudflare tunnel
+  getTunnelSettings: () =>
+    request<{ data: { tunnel_id: string | null; status: string; has_token: boolean } }>(
+      '/settings/tunnel'
+    ),
+
+  updateTunnelSettings: (body: { tunnel_id: string; tunnel_token?: string }) =>
+    request<{ message: string }>('/settings/tunnel', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  // Notification channels
+  listNotificationChannels: () =>
+    request<{ data: Array<{ id: string; channel_type: string; config: Record<string, string>; created_at: string }> }>(
+      '/notifications/channels'
+    ),
+
+  createNotificationChannel: (body: { channel_type: string; config: Record<string, string> }) =>
+    request<{ message: string }>('/notifications/channels', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteNotificationChannel: (id: string) =>
+    request<{ message: string }>(`/notifications/channels/${id}`, { method: 'DELETE' }),
+
+  testNotificationChannel: (id: string) =>
+    request<{ message: string }>(`/notifications/channels/${id}/test`, { method: 'POST' }),
+
+  // Onboarding
+  getOnboardingStatus: () =>
+    request<{ current_step: string; completed_steps: string[]; is_complete: boolean }>(
+      '/onboarding/status'
+    ),
+
+  onboardingAction: <T = any>(path: string, body?: object) =>
+    request<T>(path, {
+      method: 'POST',
+      ...(body ? { body: JSON.stringify(body) } : {}),
     }),
 
   // Self-update
@@ -542,6 +694,195 @@ export const api = {
 
   rollbackUpdate: () =>
     request<{ message: string }>('/system/update/rollback', { method: 'POST' }),
+
+  // Wake (ghost mode)
+  wakeApp: (id: string) =>
+    request<{ message: string; containers: number }>(`/apps/${id}/wake`, { method: 'POST' }),
+
+  // Deploy approval
+  approveDeploy: (deployId: string, comment?: string) =>
+    request<{ data: DeployApproval }>(`/deploys/${deployId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve', comment }),
+    }),
+
+  rejectDeploy: (deployId: string, comment?: string) =>
+    request<{ data: DeployApproval }>(`/deploys/${deployId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reject', comment }),
+    }),
+
+  // Project environments
+  listProjectEnvironments: (projectId: string) =>
+    request<{ data: ProjectEnvironment[] }>(`/projects/${projectId}/environments`),
+
+  createProjectEnvironment: (projectId: string, body: { name: string; color?: string }) =>
+    request<{ data: ProjectEnvironment }>(`/projects/${projectId}/environments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateProjectEnvironment: (projectId: string, envId: string, body: { name: string; color?: string }) =>
+    request<{ data: ProjectEnvironment }>(`/projects/${projectId}/environments/${envId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteProjectEnvironment: (projectId: string, envId: string) =>
+    request<{ message: string }>(`/projects/${projectId}/environments/${envId}`, {
+      method: 'DELETE',
+    }),
+
+  // Environment variables
+  listEnvironmentVariables: (envId: string) =>
+    request<{ data: EnvironmentVariable[] }>(`/environments/${envId}/variables`),
+
+  setEnvironmentVariable: (envId: string, body: { key: string; value: string; is_secret?: boolean }) =>
+    request<{ data: EnvironmentVariable }>(`/environments/${envId}/variables`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteEnvironmentVariable: (envId: string, varId: string) =>
+    request<{ message: string }>(`/environments/${envId}/variables/${varId}`, {
+      method: 'DELETE',
+    }),
+
+  // Log drains
+  listLogDrains: (appId: string) =>
+    request<{ data: LogDrain[] }>(`/apps/${appId}/log-drains`),
+
+  listGlobalLogDrains: () =>
+    request<{ data: LogDrain[] }>('/log-drains'),
+
+  createLogDrain: (appId: string, body: { name: string; drain_type: string; config: Record<string, unknown>; enabled?: boolean }) =>
+    request<{ data: LogDrain }>(`/apps/${appId}/log-drains`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateLogDrain: (drainId: string, body: { name: string; drain_type: string; config: Record<string, unknown>; enabled?: boolean }) =>
+    request<{ data: LogDrain }>(`/log-drains/${drainId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteLogDrain: (drainId: string) =>
+    request<{ message: string }>(`/log-drains/${drainId}`, { method: 'DELETE' }),
+
+  testLogDrain: (drainId: string) =>
+    request<{ data: { success: boolean; message: string } }>(`/log-drains/${drainId}/test`, {
+      method: 'POST',
+    }),
+
+  // GitHub Apps
+  getGitHubSetup: () =>
+    request<{ manifest: Record<string, unknown>; form_action: string }>('/github/setup'),
+
+  listGitHubApps: () =>
+    request<{ data: Array<{ id: string; name: string; app_id: number; html_url: string; created_at: string }> }>('/github/apps'),
+
+  // Git sources
+  listGitSources: () =>
+    request<{ data: GitHubInstallation[] }>('/git-sources'),
+
+  deleteGitSource: (id: string) =>
+    request<{ message: string }>(`/git-sources/${id}`, { method: 'DELETE' }),
+
+  listGitSourceRepos: (id: string) =>
+    request<{ data: GitHubRepo[] }>(`/git-sources/${id}/repos`),
+
+  // Cleanup
+  getCleanupSchedule: () =>
+    request<{ data: CleanupSchedule }>('/cleanup-schedule'),
+
+  updateCleanupSchedule: (body: Partial<CleanupSchedule>) =>
+    request<{ data: CleanupSchedule; message: string }>('/cleanup-schedule', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  runCleanup: () =>
+    request<{ data: { status: string; message: string } }>('/cleanup-schedule/run', {
+      method: 'POST',
+    }),
+
+  listCleanupHistory: () =>
+    request<{ data: CleanupRun[] }>('/cleanup-schedule/history'),
+
+  // Server forecast
+  getServerForecast: (serverId: string) =>
+    request<{ data: ServerForecast }>(`/servers/${serverId}/forecast`),
+
+  // Bundles
+  exportBundle: (appId: string) =>
+    request<{ data: Record<string, unknown> }>(`/apps/${appId}/export`),
+
+  importBundle: (bundle: Record<string, unknown>) =>
+    request<{ data: App }>('/bundles/import', {
+      method: 'POST',
+      body: JSON.stringify(bundle),
+    }),
+
+  // Teams
+  listTeams: () =>
+    request<{ data: Team[] }>('/teams'),
+
+  createTeam: (name: string) =>
+    request<{ data: Team }>('/teams', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  getTeam: (id: string) =>
+    request<{ data: { team: Team; members: TeamMember[]; resource_count: number } }>(`/teams/${id}`),
+
+  updateTeam: (id: string, body: { name?: string; settings?: Record<string, unknown> }) =>
+    request<{ data: Team }>(`/teams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteTeam: (id: string) =>
+    request<{ message: string }>(`/teams/${id}`, { method: 'DELETE' }),
+
+  switchTeam: (id: string) =>
+    request<{ data: { team_id: string; role: string }; message: string }>(`/teams/${id}/switch`, {
+      method: 'POST',
+    }),
+
+  listTeamMembers: (teamId: string) =>
+    request<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
+
+  updateTeamMemberRole: (teamId: string, userId: string, role: string) =>
+    request<{ message: string }>(`/teams/${teamId}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeTeamMember: (teamId: string, userId: string) =>
+    request<{ message: string }>(`/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  inviteTeamMember: (teamId: string, email: string, role: string) =>
+    request<{ data: TeamInvitation }>(`/teams/${teamId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    }),
+
+  listTeamInvitations: (teamId: string) =>
+    request<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`),
+
+  acceptInvitation: (token: string) =>
+    request<{ data: { team: Team; role: string }; message: string }>(`/invitations/${token}/accept`, {
+      method: 'POST',
+    }),
+
+  declineInvitation: (token: string) =>
+    request<{ message: string }>(`/invitations/${token}`, {
+      method: 'DELETE',
+    }),
 };
 
 export { ApiError };

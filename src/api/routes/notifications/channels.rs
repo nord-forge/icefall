@@ -16,7 +16,7 @@ pub(super) async fn list_channels(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let _ = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let channels = state.db.list_notification_channels().await?;
     let safe: Vec<serde_json::Value> = channels
@@ -47,14 +47,16 @@ pub(super) async fn create_channel(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
 
-    if !["smtp", "webhook", "plunk", "slack", "discord"].contains(&body.channel_type.as_str()) {
+    if !["smtp", "webhook", "ntfy", "plunk", "slack", "discord"]
+        .contains(&body.channel_type.as_str())
+    {
         return Err(ApiError::BadRequest(
-            "channel_type must be smtp, webhook, plunk, slack, or discord".into(),
+            "channel_type must be smtp, webhook, ntfy, plunk, slack, or discord".into(),
         ));
     }
 
@@ -79,7 +81,7 @@ pub(super) async fn delete_channel(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let caller = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
     if caller.role != "admin" {
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
@@ -95,7 +97,7 @@ pub(super) async fn test_channel(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let _ = authenticate_from_headers(&state, &headers)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Not authenticated".into()))?;
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let channels = state.db.list_notification_channels().await?;
     let channel = channels
@@ -109,6 +111,7 @@ pub(super) async fn test_channel(
         "test",
         "Test notification from Icefall",
         &serde_json::json!({"message": "If you see this, notifications are working!"}),
+        &state.config.caddy_admin_url,
     )
     .await
     {

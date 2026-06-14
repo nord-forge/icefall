@@ -1,0 +1,111 @@
+---
+title: MCP Integration — Claude Code
+description: Connect Claude Code to your Icefall instance for AI-assisted deployment
+---
+
+## Setup
+
+1. Create an API token in Icefall: **Settings > API Tokens > Create Token** with deployer or admin role.
+
+2. Add the MCP server to your Claude Code config (`.mcp.json` in your project root):
+
+```json
+{
+  "mcpServers": {
+    "icefall": {
+      "url": "https://your-icefall-instance.com/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer icefall_your_token_here"
+      }
+    }
+  }
+}
+```
+
+3. Restart Claude Code. The Icefall tools should appear in the tool list.
+
+## Available Tools
+
+Icefall exposes **27 MCP tools** across five categories:
+
+### App Management
+- `list_apps` — List all apps with status
+- `get_app` — Get app details
+- `create_app` — Create a new app from a git repo
+- `deploy_app` — Trigger a deploy (supports `--no-cache` and `--tag`)
+- `restart_app` — Restart an app's containers
+
+### Diagnostics
+- `diagnose` — Pull logs, health, metrics, and deploys for structured analysis
+- `suggest_fix` — Get actionable fix recommendations
+- `get_logs` — Retrieve recent logs with search
+- `get_health_status` — Check health check results
+
+### Bulk Operations
+- `bulk_restart` — Restart apps by project or tag
+- `bulk_deploy` — Deploy all apps matching a filter
+
+### Server & Infrastructure
+- `get_server_status` — CPU, memory, disk overview
+- `list_servers` — All connected servers
+- `server_forecast` — Resource usage predictions
+
+### Utility
+- `search` — Search across all resources
+- `export_bundle` — Export an app as a portable bundle
+- `get_analytics` — Deploy frequency, success rate, build times
+
+## Example Workflows
+
+### Deploy from Terminal
+
+```
+> Deploy my-api to production
+
+I'll deploy my-api for you.
+[Calling deploy_app with app_id: "abc123"]
+Deploy triggered: deploy_id=xyz789, status=pending
+[Calling get_deploy_status with app_id: "abc123"]
+Deploy is building... (45s elapsed)
+Deploy succeeded! App is running.
+```
+
+### Troubleshoot a Failing App
+
+```
+> my-frontend is returning 502 errors
+
+Let me diagnose the issue.
+[Calling diagnose with app_id: "def456"]
+Latest deploy: failed (2 minutes ago)
+Health check: unhealthy
+Recent logs show: "Error: Cannot find module './dist/server.js'"
+
+[Calling suggest_fix]
+The build output is missing. This likely means the build command
+failed silently. Recommended actions:
+1. Check build logs for the failed deploy
+2. Rollback to the previous working version
+3. Fix the build and redeploy
+
+Want me to rollback to the last working version?
+```
+
+## Resources
+
+Icefall also exposes MCP resources for browsing data:
+
+- `icefall://apps` — All applications
+- `icefall://databases` — All managed databases
+- `icefall://servers` — Server health and metrics
+- `icefall://deploys/recent` — Recent deploy activity
+
+## Prompts
+
+Pre-built prompt templates for common workflows:
+
+- `deploy-app` — Guided deploy with monitoring
+- `troubleshoot` — Structured diagnostic flow
+- `create-app` — Step-by-step app creation
+- `security-audit` — Check for common security issues
+- `setup-monitoring` — Configure health checks and alerts

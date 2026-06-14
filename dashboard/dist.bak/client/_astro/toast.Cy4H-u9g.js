@@ -1,1 +1,0 @@
-import{a as e}from"./index.DZGU2aZK.js";const o=e([]),n={success:5e3,info:5e3,error:8e3,warning:8e3};let r=0;function u(t,s,i){const a={id:`toast-${++r}-${Date.now()}`,type:t,message:s,duration:n[t]};o.set([...o.get(),a])}function f(t){o.set(o.get().filter(s=>s.id!==t))}export{o as $,u as a,f as r};

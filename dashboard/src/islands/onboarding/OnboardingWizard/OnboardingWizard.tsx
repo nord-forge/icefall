@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
 import { User, Server, Globe, GitBranch, Rocket, Check, ArrowRight } from 'lucide-preact';
+import Input from '@islands/shared/Input/Input';
+import { api, ApiError } from '@lib/api';
 import styles from './onboarding.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -39,8 +41,7 @@ export default function OnboardingWizard() {
 
   async function fetchStatus() {
     try {
-      const res = await fetch('/api/v1/onboarding/status');
-      const data = await res.json();
+      const data = await api.getOnboardingStatus();
       if (data.is_complete) {
         window.location.href = '/';
         return;
@@ -57,21 +58,11 @@ export default function OnboardingWizard() {
     setSubmitting(true);
     setError('');
     try {
-      const res = await fetch(`/api/v1${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong');
-        setSubmitting(false);
-        return null;
-      }
+      const data = await api.onboardingAction(path, body);
       setSubmitting(false);
       return data;
     } catch (e) {
-      setError('Connection failed');
+      setError(e instanceof ApiError ? e.message : 'Connection failed');
       setSubmitting(false);
       return null;
     }
@@ -228,10 +219,15 @@ export default function OnboardingWizard() {
         {currentStep === 'base_domain' && (
           <div class={formStyles.fieldGroup}>
             <p class={styles.stepDescription}>Configure a domain for HTTPS and app subdomains.</p>
-            <div>
-              <label htmlFor="onboard-base-domain" class={formStyles.label}>Base Domain</label>
-              <input id="onboard-base-domain" class={formStyles.inputMono} value={baseDomain} onInput={(e) => setBaseDomain((e.target as HTMLInputElement).value)} placeholder="apps.example.com" />
-            </div>
+            <Input
+              label="Base Domain"
+              name="onboard-base-domain"
+              id="onboard-base-domain"
+              mono
+              value={baseDomain}
+              onChange={setBaseDomain}
+              placeholder="apps.example.com"
+            />
             <Button variant="primary" fullWidth onClick={handleDomainSave} loading={submitting}>
               {baseDomain.trim() ? 'Continue' : 'Skip, add domain later'}
             </Button>
@@ -283,14 +279,23 @@ export default function OnboardingWizard() {
         {currentStep === 'first_app' && !deploying && (
           <div class={formStyles.fieldGroup}>
             <p class={styles.stepDescription}>Deploy your first app, or skip and do it later from the dashboard.</p>
-            <div>
-              <label htmlFor="onboard-git-repo" class={formStyles.label}>Repository URL</label>
-              <input id="onboard-git-repo" class={formStyles.inputMono} value={gitRepo} onInput={(e) => setGitRepo((e.target as HTMLInputElement).value)} placeholder="https://github.com/user/repo" />
-            </div>
-            <div>
-              <label htmlFor="onboard-app-name" class={formStyles.label}>App Name</label>
-              <input id="onboard-app-name" class={formStyles.input} value={appName} onInput={(e) => setAppName((e.target as HTMLInputElement).value)} placeholder="my-awesome-app" />
-            </div>
+            <Input
+              label="Repository URL"
+              name="onboard-git-repo"
+              id="onboard-git-repo"
+              mono
+              value={gitRepo}
+              onChange={setGitRepo}
+              placeholder="https://github.com/user/repo"
+            />
+            <Input
+              label="App Name"
+              name="onboard-app-name"
+              id="onboard-app-name"
+              value={appName}
+              onChange={setAppName}
+              placeholder="my-awesome-app"
+            />
             <Button variant="primary" fullWidth onClick={handleCreateApp} loading={submitting} disabled={!appName.trim()}>
               <Rocket size={14} /> Deploy
             </Button>

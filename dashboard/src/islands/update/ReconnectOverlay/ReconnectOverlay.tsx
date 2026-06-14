@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/preact';
 import Button from '@islands/shared/Button/Button';
 import { $updateStatus } from '@stores/update';
 import { addToast } from '@stores/toast';
+import { request } from '@lib/api';
 import styles from './reconnect-overlay.module.css';
 
 const POLL_INTERVAL = 2000;
@@ -39,10 +40,9 @@ export default function ReconnectOverlay() {
       // Polling for reconnection
       pollRef.current = setInterval(async () => {
         try {
-          const res = await fetch('/api/v1/server/status', { credentials: 'same-origin' });
-          if (res.ok) {
-            handleReconnected();
-          }
+          // Cache-busting query keeps each poll a genuine reachability probe.
+          await request(`/server/status?t=${Date.now()}`);
+          handleReconnected();
         } catch {
           // Still down
         }
@@ -69,10 +69,8 @@ export default function ReconnectOverlay() {
   async function handleRetry() {
     setRetrying(true);
     try {
-      const res = await fetch('/api/v1/server/status', { credentials: 'same-origin' });
-      if (res.ok) {
-        handleReconnected();
-      }
+      await request(`/server/status?t=${Date.now()}`);
+      handleReconnected();
     } catch {
       // Still down
     }

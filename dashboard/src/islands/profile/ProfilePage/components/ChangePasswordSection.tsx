@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Lock } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import styles from '../profile-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -57,42 +58,32 @@ export default function ChangePasswordSection({ onChangePassword, onPasswordChan
       {msg && <p class={styles.feedbackSuccess} role="status">{msg}</p>}
 
       <div class={formStyles.fieldGroup}>
-        <div>
-          {/* a11y [1.3.1]: label associated with input */}
-          <label htmlFor="current-password" class={formStyles.label}>Current password</label>
-          <input
-            id="current-password"
-            class={formStyles.input}
-            type="password"
-            autoComplete="current-password"
-            value={currentPassword}
-            onInput={e => setCurrentPassword((e.target as HTMLInputElement).value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="new-password" class={formStyles.label}>New password</label>
-          <input
-            id="new-password"
-            class={formStyles.input}
-            type="password"
-            autoComplete="new-password"
-            value={newPassword}
-            onInput={e => setNewPassword((e.target as HTMLInputElement).value)}
-          />
-          <p class={formStyles.hint}>Minimum 12 characters</p>
-        </div>
-        <div>
-          <label htmlFor="confirm-password" class={formStyles.label}>Confirm new password</label>
-          <input
-            id="confirm-password"
-            class={formStyles.input}
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onInput={e => setConfirmPassword((e.target as HTMLInputElement).value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-          />
-        </div>
+        {/* a11y [1.3.1]: label associated with input */}
+        <Input
+          label="Current password"
+          name="current-password"
+          id="current-password"
+          type="password"
+          value={currentPassword}
+          onChange={setCurrentPassword}
+        />
+        <Input
+          label="New password"
+          name="new-password"
+          id="new-password"
+          type="password"
+          value={newPassword}
+          onChange={setNewPassword}
+          helpText="Minimum 12 characters"
+        />
+        <Input
+          label="Confirm new password"
+          name="confirm-password"
+          id="confirm-password"
+          type="password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+        />
       </div>
       <div class={styles.formActions}>
         <Button

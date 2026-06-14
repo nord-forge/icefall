@@ -1,1 +1,0 @@
-ALTER TABLE apps ADD COLUMN image_ref TEXT;

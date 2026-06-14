@@ -1,0 +1,43 @@
+.container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+}
+
+.title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.statusRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+}
+
+.statusLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.statusValue {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.feedbackText {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  min-height: 1.2em;
+  margin-top: var(--space-2);
+}

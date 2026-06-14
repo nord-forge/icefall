@@ -1,6 +1,51 @@
 ---
-title: "notifications"
-description: "Icefall documentation"
+title: Notifications
+description: Get notified when deploys, apps, or servers need your attention.
 ---
 
-Documentation coming soon.
+Icefall can tell you when something happens that you would want to know about —
+a deploy finished, an app went down, a server is low on disk — instead of you
+having to watch the dashboard.
+
+## What you can be notified about
+
+Notifications fire on events such as:
+
+- a deploy succeeding or failing,
+- an app going unhealthy or recovering — see
+  [health checks](/monitoring/health-checks/),
+- a server or app crossing a resource threshold — see
+  [metrics](/monitoring/metrics/),
+- a [backup](/databases/backups/) failing.
+
+## Channels
+
+Configure where notifications go in the dashboard settings:
+
+- **Email** — uses the SMTP settings from your
+  [configuration](/cli/configuration/). The same SMTP setup that sends account
+  email sends notifications.
+- **Webhook** — Icefall POSTs a JSON payload to a URL you provide, so you can
+  route events into a chat tool, an incident system, or your own handler.
+
+You can enable more than one channel; each event goes to every enabled channel.
+
+## Choosing what to send
+
+Not every event is worth a message. In settings you choose which event types
+notify you, so you can keep failures and outages loud while staying quiet about
+routine successful deploys.
+
+## Webhook payloads
+
+A webhook delivery is a JSON body describing the event — its type, the affected
+app or server, and a timestamp. Verify and process it like any other inbound
+webhook; do not act on its contents without checking it came from your Icefall
+server.
+
+## If a notification fails to send
+
+A failure to deliver a notification — an unreachable SMTP server, a webhook
+endpoint returning an error — does not affect the deploy or app it was about.
+Notifications are best-effort: check the channel configuration if you stop
+receiving them.

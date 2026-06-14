@@ -1,6 +1,85 @@
 ---
-title: "mcp"
-description: "Icefall documentation"
+title: MCP server
+description: Manage Icefall from an AI assistant over the Model Context Protocol.
 ---
 
-Documentation coming soon.
+Icefall ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/)
+server. It lets an MCP-capable assistant — Claude, an IDE agent, or your own
+client — inspect and operate your Icefall server through a structured tool
+interface, instead of you driving the dashboard or CLI by hand.
+
+## What it exposes
+
+The MCP server provides three kinds of capability:
+
+- **Tools** — actions and queries the assistant can call: list and inspect
+  apps, trigger deploys, read logs, manage environment variables and domains,
+  provision databases, check server status, and more.
+- **Resources** — readable context the assistant can pull in, such as the
+  current app list, server status, and configuration.
+- **Prompts** — ready-made prompt templates for common tasks, so an assistant
+  can walk through an operation without you spelling out every step.
+
+## Connecting
+
+The MCP server runs as part of the Icefall daemon and speaks MCP over
+HTTP/JSON. Point your MCP client at:
+
+```
+https://your-icefall-server/api/v1/mcp
+```
+
+## Authentication
+
+The MCP server uses the same authentication as the [REST API](/api/rest/): an
+[API token](/auth/tokens/) sent as a bearer token.
+
+```
+Authorization: Bearer icefall_xxxxxxxx
+```
+
+Create a token in the dashboard under **Settings → API Tokens**, then configure
+it in your MCP client. The token carries the role of the user who created it —
+the assistant can do exactly what that user can do, no more. To limit what an
+assistant can reach, give it a token from a user with a narrower
+[role](/auth/users/#roles).
+
+## Example client configuration
+
+Most MCP clients take a server URL and a header. The shape varies by client;
+the two values you always need are the URL above and the `Authorization`
+header:
+
+```json
+{
+  "mcpServers": {
+    "icefall": {
+      "url": "https://your-icefall-server/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer icefall_xxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+## Team-scoped access
+
+If your instance uses teams, a [team-scoped token](/auth/tokens/#team-scoped-tokens)
+makes the MCP server act within that team — the assistant sees and manages only
+that team's apps and databases.
+
+<aside type="caution">
+An MCP token lets an assistant take real actions — deploying apps, changing
+environment variables, provisioning databases. Treat it like any other
+credential: scope it to the least-privileged role that works, set an expiry,
+and revoke it the moment it is no longer needed.
+</aside>
+
+## When to use it
+
+The MCP server is for letting an assistant *operate* Icefall conversationally —
+"deploy the latest commit", "show me why the last build failed", "what's using
+the most memory". For scripts and CI, the [REST API](/api/rest/) and
+[CLI](/cli/commands/) are the better fit; they are the same capabilities
+without an assistant in the loop.

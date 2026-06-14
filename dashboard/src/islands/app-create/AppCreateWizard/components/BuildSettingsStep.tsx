@@ -1,3 +1,4 @@
+import Input from '@islands/shared/Input/Input';
 import formStyles from '@styles/form.module.css';
 
 type Props = {
@@ -17,22 +18,41 @@ export default function BuildSettingsStep({
 }: Props) {
   return (
     <div class={formStyles.fieldGroup}>
-      <div>
-        <label htmlFor="create-build-cmd" class={formStyles.label}>Build Command</label>
-        <input id="create-build-cmd" class={formStyles.inputMono} value={buildCommand} onInput={(e) => onUpdate('build_command', (e.target as HTMLInputElement).value)} placeholder="bun run build" />
-      </div>
-      <div>
-        <label htmlFor="create-output-dir" class={formStyles.label}>Output Directory</label>
-        <input id="create-output-dir" class={formStyles.inputMono} value={outputDir} onInput={(e) => onUpdate('output_dir', (e.target as HTMLInputElement).value)} placeholder="dist" />
-      </div>
-      <div>
-        <label htmlFor="create-start-cmd" class={formStyles.label}>Start Command</label>
-        <input id="create-start-cmd" class={formStyles.inputMono} value={startCommand} onInput={(e) => onUpdate('start_command', (e.target as HTMLInputElement).value)} placeholder="node server.js" />
-      </div>
-      <div>
-        <label htmlFor="create-port" class={formStyles.label}>Port</label>
-        <input id="create-port" class={formStyles.inputMono} value={port} onInput={(e) => onUpdate('port', (e.target as HTMLInputElement).value)} />
-      </div>
+      <Input
+        label="Build Command"
+        name="build-cmd"
+        id="create-build-cmd"
+        mono
+        value={buildCommand}
+        onChange={(v) => onUpdate('build_command', v)}
+        placeholder="bun run build"
+      />
+      <Input
+        label="Output Directory"
+        name="output-dir"
+        id="create-output-dir"
+        mono
+        value={outputDir}
+        onChange={(v) => onUpdate('output_dir', v)}
+        placeholder="dist"
+      />
+      <Input
+        label="Start Command"
+        name="start-cmd"
+        id="create-start-cmd"
+        mono
+        value={startCommand}
+        onChange={(v) => onUpdate('start_command', v)}
+        placeholder="node server.js"
+      />
+      <Input
+        label="Port"
+        name="port"
+        id="create-port"
+        mono
+        value={port}
+        onChange={(v) => onUpdate('port', v)}
+      />
     </div>
   );
 }

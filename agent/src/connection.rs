@@ -113,6 +113,9 @@ async fn run_session(
                     Some(Ok(Message::Text(text))) => {
                         handle_incoming(&text, &ctx, &outbound_tx);
                     }
+                    Some(Ok(Message::Binary(bytes))) => {
+                        handle_binary_chunk(&bytes, &ctx, &outbound_tx);
+                    }
                     Some(Ok(Message::Pong(_))) => {
                         waiting_pong = false;
                         pong_deadline = None;
@@ -187,6 +190,42 @@ fn handle_incoming(
             warn!("Failed to parse message: {e}");
         }
     }
+}
+
+/// Handle an inbound binary WebSocket frame: parse it as an image-transfer
+/// chunk, verify and store it, and emit a chunk ack/nack event so the control
+/// plane can retry a single failed chunk.
+fn handle_binary_chunk(
+    bytes: &[u8],
+    ctx: &HandlerContext,
+    outbound_tx: &mpsc::UnboundedSender<AgentMessage>,
+) {
+    use icefall_common::transfer::{hex_encode, ChunkFrame};
+
+    let Some(frame) = ChunkFrame::decode(bytes) else {
+        warn!("Received binary frame that is not a valid chunk frame");
+        return;
+    };
+
+    let ctx = ctx.clone();
+    let tx = outbound_tx.clone();
+    tokio::spawn(async move {
+        let transfer_hex = hex_encode(&frame.transfer_id);
+        let (ok, error) = match ctx.transfers.accept_chunk(&frame).await {
+            Ok(true) => (true, None),
+            Ok(false) => (false, Some("chunk checksum mismatch".to_string())),
+            Err(e) => (false, Some(e)),
+        };
+        let _ = tx.send(AgentMessage::Event {
+            event_type: "image.load.chunk_ack".to_string(),
+            data: serde_json::json!({
+                "transfer_id": transfer_hex,
+                "chunk_index": frame.chunk_index,
+                "ok": ok,
+                "error": error,
+            }),
+        });
+    });
 }
 
 fn jittered_delay(base: Duration) -> Duration {

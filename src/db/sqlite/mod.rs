@@ -1,23 +1,43 @@
+mod analytics;
 mod apps;
 mod audit;
 mod backups;
+mod canary;
 mod cleanup;
+mod cleanup_runs;
+mod cleanup_schedule;
+mod config_history;
 mod databases;
+mod deploy_approvals;
+mod deploy_events;
 mod deploys;
 mod domains;
+mod drift;
 mod environments;
+mod forecast;
+mod github;
 mod health;
+mod incidents;
+mod instance_lifecycle_tests;
+mod log_drains;
 mod maintenance;
 mod notifications;
 mod oauth;
 mod onboarding;
+mod project_environments;
 mod projects;
+mod public_ports;
+mod registries;
 mod restore;
 mod scheduled_tasks;
 mod search;
 mod servers;
 mod sessions;
 mod shared_variables;
+mod ssh_keys;
+mod team_isolation_tests;
+mod team_scoping;
+mod teams;
 mod updates;
 mod users;
 mod webhooks;
@@ -134,6 +154,37 @@ impl Database for SqliteDatabase {
 
     async fn delete_app(&self, id: &str) -> Result<(), DbError> {
         apps::delete_app(&self.pool, id).await
+    }
+
+    async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError> {
+        apps::create_app_instance(&self.pool, instance).await
+    }
+
+    async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError> {
+        apps::get_app_instance(&self.pool, id).await
+    }
+
+    async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError> {
+        apps::list_app_instances(&self.pool, app_id).await
+    }
+
+    async fn list_app_instances_by_server(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<AppInstance>, DbError> {
+        apps::list_app_instances_by_server(&self.pool, server_id).await
+    }
+
+    async fn update_app_instance(
+        &self,
+        id: &str,
+        update: &UpdateAppInstance,
+    ) -> Result<AppInstance, DbError> {
+        apps::update_app_instance(&self.pool, id, update).await
+    }
+
+    async fn delete_app_instance(&self, id: &str) -> Result<(), DbError> {
+        apps::delete_app_instance(&self.pool, id).await
     }
 
     // --- Environments ---
@@ -370,34 +421,6 @@ impl Database for SqliteDatabase {
         scheduled_tasks::list_task_executions(&self.pool, task_id, limit).await
     }
 
-    // --- Shared variables ---
-
-    async fn list_shared_variables(
-        &self,
-        scope: &str,
-        scope_id: &str,
-    ) -> Result<Vec<SharedVariable>, DbError> {
-        shared_variables::list_shared_variables(&self.pool, scope, scope_id).await
-    }
-
-    async fn create_shared_variable(
-        &self,
-        var: &NewSharedVariable,
-    ) -> Result<SharedVariable, DbError> {
-        shared_variables::create_shared_variable(&self.pool, var).await
-    }
-
-    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError> {
-        shared_variables::delete_shared_variable(&self.pool, id).await
-    }
-
-    async fn resolve_shared_variables(
-        &self,
-        app_id: &str,
-    ) -> Result<Vec<(String, String, String)>, DbError> {
-        shared_variables::resolve_shared_variables(&self.pool, app_id).await
-    }
-
     // --- Container cleanup ---
 
     async fn create_cleanup_execution(
@@ -505,10 +528,298 @@ impl Database for SqliteDatabase {
         databases::store_database_certs(&self.pool, id, ca_cert, cert, key, expires_at).await
     }
 
+    // --- SSH keys ---
+
+    async fn list_ssh_keys(&self, user_id: &str) -> Result<Vec<SshKey>, DbError> {
+        ssh_keys::list_ssh_keys(&self.pool, user_id).await
+    }
+
+    async fn create_ssh_key(&self, key: &NewSshKey) -> Result<SshKey, DbError> {
+        ssh_keys::create_ssh_key(&self.pool, key).await
+    }
+
+    async fn delete_ssh_key(&self, id: &str) -> Result<(), DbError> {
+        ssh_keys::delete_ssh_key(&self.pool, id).await
+    }
+
+    async fn get_ssh_key(&self, id: &str) -> Result<Option<SshKey>, DbError> {
+        ssh_keys::get_ssh_key(&self.pool, id).await
+    }
+
+    // --- Container registries ---
+
+    async fn list_registries(&self) -> Result<Vec<Registry>, DbError> {
+        registries::list_registries(&self.pool, &self.encryptor).await
+    }
+
+    async fn create_registry(&self, reg: &NewRegistry) -> Result<Registry, DbError> {
+        registries::create_registry(&self.pool, &self.encryptor, reg).await
+    }
+
+    async fn delete_registry(&self, id: &str) -> Result<(), DbError> {
+        registries::delete_registry(&self.pool, id).await
+    }
+
+    // --- Public ports ---
+
+    async fn allocate_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        port: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError> {
+        public_ports::allocate_public_port(
+            &self.pool,
+            resource_type,
+            resource_id,
+            port,
+            ip_whitelist,
+        )
+        .await
+    }
+
+    async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError> {
+        public_ports::release_public_port(&self.pool, resource_id).await
+    }
+
+    async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError> {
+        public_ports::get_public_port(&self.pool, resource_id).await
+    }
+
+    // --- GitHub installations ---
+
+    async fn create_github_installation(
+        &self,
+        installation_id: i64,
+        account_login: &str,
+        account_type: &str,
+    ) -> Result<GitHubInstallation, DbError> {
+        github::create_github_installation(&self.pool, installation_id, account_login, account_type)
+            .await
+    }
+
+    async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError> {
+        github::list_github_installations(&self.pool).await
+    }
+
+    async fn delete_github_installation(&self, id: &str) -> Result<(), DbError> {
+        github::delete_github_installation(&self.pool, id).await
+    }
+
+    // --- GitHub Apps ---
+
+    async fn create_github_app(&self, app: &GitHubApp) -> Result<GitHubApp, DbError> {
+        github::create_github_app(&self.pool, &self.encryptor, app).await
+    }
+
+    async fn get_github_app(&self, id: &str) -> Result<Option<GitHubApp>, DbError> {
+        github::get_github_app(&self.pool, &self.encryptor, id).await
+    }
+
+    async fn list_github_apps(&self) -> Result<Vec<GitHubApp>, DbError> {
+        github::list_github_apps(&self.pool, &self.encryptor).await
+    }
+
+    async fn delete_github_app(&self, id: &str) -> Result<(), DbError> {
+        github::delete_github_app(&self.pool, id).await
+    }
+
+    async fn update_github_installation_app_id(
+        &self,
+        installation_id: i64,
+        github_app_id: &str,
+    ) -> Result<(), DbError> {
+        github::update_github_installation_app_id(&self.pool, installation_id, github_app_id).await
+    }
+
+    async fn get_github_app_for_installation(
+        &self,
+        installation_id: i64,
+    ) -> Result<Option<GitHubApp>, DbError> {
+        github::get_github_app_for_installation(&self.pool, &self.encryptor, installation_id).await
+    }
+
+    // --- Config history ---
+
+    async fn record_config_change(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        field: &str,
+        old_value: Option<&str>,
+        new_value: Option<&str>,
+        changed_by: Option<&str>,
+    ) -> Result<(), DbError> {
+        config_history::record_config_change(
+            &self.pool,
+            resource_type,
+            resource_id,
+            field,
+            old_value,
+            new_value,
+            changed_by,
+        )
+        .await
+    }
+
+    async fn list_config_history(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ConfigHistoryEntry>, DbError> {
+        config_history::list_config_history(&self.pool, resource_type, resource_id, limit).await
+    }
+
+    // --- Deploy events ---
+
+    async fn record_deploy_event(
+        &self,
+        deploy_id: &str,
+        event_type: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), DbError> {
+        deploy_events::record_deploy_event(&self.pool, deploy_id, event_type, data).await
+    }
+
+    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError> {
+        deploy_events::list_deploy_events(&self.pool, deploy_id).await
+    }
+
+    // --- Deploy approvals ---
+
+    async fn create_deploy_approval(
+        &self,
+        deploy_id: &str,
+        action: &str,
+        user_id: &str,
+        comment: Option<&str>,
+    ) -> Result<DeployApproval, DbError> {
+        deploy_approvals::create_deploy_approval(&self.pool, deploy_id, action, user_id, comment)
+            .await
+    }
+
+    async fn get_deploy_approval(
+        &self,
+        deploy_id: &str,
+    ) -> Result<Option<DeployApproval>, DbError> {
+        deploy_approvals::get_deploy_approval(&self.pool, deploy_id).await
+    }
+
+    // --- Canary results ---
+
+    async fn store_canary_result(
+        &self,
+        deploy_id: &str,
+        p50: f64,
+        p95: f64,
+        p99: f64,
+        errors: i32,
+        total: i32,
+        verdict: &str,
+    ) -> Result<CanaryResult, DbError> {
+        canary::store_canary_result(&self.pool, deploy_id, p50, p95, p99, errors, total, verdict)
+            .await
+    }
+
+    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError> {
+        canary::get_canary_baseline(&self.pool, app_id).await
+    }
+
+    // --- Drift events ---
+
+    async fn record_drift_event(
+        &self,
+        app_id: &str,
+        drifted_fields: &str,
+        declared: Option<&str>,
+        actual: Option<&str>,
+    ) -> Result<DriftEvent, DbError> {
+        drift::record_drift_event(&self.pool, app_id, drifted_fields, declared, actual).await
+    }
+
+    async fn list_drift_events(
+        &self,
+        app_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DriftEvent>, DbError> {
+        drift::list_drift_events(&self.pool, app_id, limit).await
+    }
+
+    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError> {
+        drift::resolve_drift_event(&self.pool, id).await
+    }
+
+    // --- Resource forecasting ---
+
+    async fn get_server_metrics_for_forecast(
+        &self,
+        server_id: &str,
+        days: i64,
+    ) -> Result<Vec<(f64, f64, f64)>, DbError> {
+        forecast::get_server_metrics_for_forecast(&self.pool, server_id, days).await
+    }
+
+    // --- Incidents ---
+
+    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError> {
+        incidents::create_incident(&self.pool, incident).await
+    }
+
+    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError> {
+        incidents::list_incidents(&self.pool, limit).await
+    }
+
+    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError> {
+        incidents::update_incident_status(&self.pool, id, status).await
+    }
+
+    async fn add_incident_note(
+        &self,
+        incident_id: &str,
+        content: &str,
+        author_id: Option<&str>,
+    ) -> Result<IncidentNote, DbError> {
+        incidents::add_incident_note(&self.pool, incident_id, content, author_id).await
+    }
+
+    // --- Deploy analytics ---
+
+    async fn get_deploy_analytics(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<serde_json::Value, DbError> {
+        analytics::get_deploy_analytics(&self.pool, from, to).await
+    }
+
+    // --- Service templates ---
+
+    async fn list_service_templates(&self) -> Result<Vec<ServiceTemplate>, DbError> {
+        let templates = sqlx::query_as::<_, ServiceTemplate>(
+            "SELECT * FROM service_templates ORDER BY name ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(templates)
+    }
+
     // --- Users ---
 
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError> {
         users::create_user(&self.pool, user).await
+    }
+
+    async fn create_first_admin(&self, user: &NewUser) -> Result<User, DbError> {
+        users::create_first_admin(&self.pool, user).await
+    }
+
+    async fn create_user_with_personal_team(
+        &self,
+        user: &NewUser,
+    ) -> Result<(User, Team), DbError> {
+        users::create_user_with_personal_team(&self.pool, user).await
     }
 
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DbError> {
@@ -591,6 +902,29 @@ impl Database for SqliteDatabase {
 
     async fn get_health_checks(&self, app_id: &str) -> Result<Vec<HealthCheck>, DbError> {
         health::get_health_checks(&self.pool, app_id).await
+    }
+
+    async fn update_health_check(
+        &self,
+        id: &str,
+        interval_secs: Option<i64>,
+        failure_threshold: Option<i64>,
+        auto_restart: Option<bool>,
+        config: Option<&str>,
+    ) -> Result<(), DbError> {
+        health::update_health_check(
+            &self.pool,
+            id,
+            interval_secs,
+            failure_threshold,
+            auto_restart,
+            config,
+        )
+        .await
+    }
+
+    async fn delete_health_check(&self, id: &str) -> Result<(), DbError> {
+        health::delete_health_check(&self.pool, id).await
     }
 
     async fn record_health_event(&self, event: &NewHealthCheckEvent) -> Result<(), DbError> {
@@ -729,8 +1063,9 @@ impl Database for SqliteDatabase {
         name: &str,
         token_hash: &str,
         expires_at: Option<&str>,
+        team_id: Option<&str>,
     ) -> Result<ApiToken, DbError> {
-        sessions::create_api_token(&self.pool, user_id, name, token_hash, expires_at).await
+        sessions::create_api_token(&self.pool, user_id, name, token_hash, expires_at, team_id).await
     }
 
     async fn get_api_token_by_hash(&self, token_hash: &str) -> Result<Option<ApiToken>, DbError> {
@@ -1140,9 +1475,422 @@ impl Database for SqliteDatabase {
         maintenance::vacuum_into(&self.pool, path).await
     }
 
+    // --- Log Drains ---
+
+    async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
+        log_drains::create_log_drain(&self.pool, drain).await
+    }
+
+    async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError> {
+        log_drains::list_log_drains_for_app(&self.pool, app_id).await
+    }
+
+    async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError> {
+        log_drains::list_global_log_drains(&self.pool).await
+    }
+
+    async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
+        log_drains::update_log_drain(&self.pool, id, drain).await
+    }
+
+    async fn delete_log_drain(&self, id: &str) -> Result<(), DbError> {
+        log_drains::delete_log_drain(&self.pool, id).await
+    }
+
+    async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError> {
+        log_drains::get_log_drain(&self.pool, id).await
+    }
+
+    // --- Project Environments ---
+
+    async fn create_project_environment(
+        &self,
+        env: &NewProjectEnvironment,
+    ) -> Result<ProjectEnvironment, DbError> {
+        project_environments::create_project_environment(&self.pool, env).await
+    }
+
+    async fn list_project_environments(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectEnvironment>, DbError> {
+        project_environments::list_project_environments(&self.pool, project_id).await
+    }
+
+    async fn update_project_environment(
+        &self,
+        id: &str,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<ProjectEnvironment, DbError> {
+        project_environments::update_project_environment(&self.pool, id, name, color).await
+    }
+
+    async fn delete_project_environment(&self, id: &str) -> Result<(), DbError> {
+        project_environments::delete_project_environment(&self.pool, id).await
+    }
+
+    async fn get_project_environment(
+        &self,
+        id: &str,
+    ) -> Result<Option<ProjectEnvironment>, DbError> {
+        project_environments::get_project_environment(&self.pool, id).await
+    }
+
+    // --- Cleanup Schedule ---
+
+    async fn get_cleanup_schedule(&self) -> Result<Option<CleanupSchedule>, DbError> {
+        cleanup_schedule::get_cleanup_schedule(&self.pool).await
+    }
+
+    async fn upsert_cleanup_schedule(
+        &self,
+        schedule: &CleanupSchedule,
+    ) -> Result<CleanupSchedule, DbError> {
+        cleanup_schedule::upsert_cleanup_schedule(&self.pool, schedule).await
+    }
+
+    // --- Cleanup Runs ---
+
+    async fn create_cleanup_run(&self) -> Result<CleanupRun, DbError> {
+        cleanup_runs::create_cleanup_run(&self.pool).await
+    }
+
+    async fn finish_cleanup_run(
+        &self,
+        id: &str,
+        status: &str,
+        freed_bytes: i64,
+        removed_items: i64,
+        error: Option<&str>,
+        details: Option<&str>,
+    ) -> Result<(), DbError> {
+        cleanup_runs::finish_cleanup_run(
+            &self.pool,
+            id,
+            status,
+            freed_bytes,
+            removed_items,
+            error,
+            details,
+        )
+        .await
+    }
+
+    async fn list_cleanup_runs(&self, limit: i64) -> Result<Vec<CleanupRun>, DbError> {
+        cleanup_runs::list_cleanup_runs(&self.pool, limit).await
+    }
+
+    // --- Shared Variables ---
+
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::list_shared_variables(&self.pool, &self.encryptor, scope, scope_id).await
+    }
+
+    async fn set_shared_variable(
+        &self,
+        var: &NewSharedVariable,
+    ) -> Result<SharedVariable, DbError> {
+        shared_variables::set_shared_variable(&self.pool, &self.encryptor, var).await
+    }
+
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError> {
+        shared_variables::delete_shared_variable(&self.pool, id).await
+    }
+
+    async fn get_shared_variables_for_app(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::get_shared_variables_for_app(&self.pool, &self.encryptor, app_id).await
+    }
+
+    // --- Team-scoped queries ---
+
+    async fn list_apps_by_team(&self, team_id: &str) -> Result<Vec<App>, DbError> {
+        team_scoping::list_apps_by_team(&self.pool, team_id).await
+    }
+
+    async fn list_projects_by_team(&self, team_id: &str) -> Result<Vec<Project>, DbError> {
+        team_scoping::list_projects_by_team(&self.pool, team_id).await
+    }
+
+    async fn list_managed_dbs_by_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<ManagedDatabase>, DbError> {
+        team_scoping::list_managed_dbs_by_team(&self.pool, &self.encryptor, team_id).await
+    }
+
+    async fn list_ssh_keys_by_team(&self, team_id: &str) -> Result<Vec<SshKey>, DbError> {
+        team_scoping::list_ssh_keys_by_team(&self.pool, team_id).await
+    }
+
+    async fn list_registries_by_team(&self, team_id: &str) -> Result<Vec<Registry>, DbError> {
+        team_scoping::list_registries_by_team(&self.pool, &self.encryptor, team_id).await
+    }
+
+    async fn list_notification_channels_by_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<Notification>, DbError> {
+        team_scoping::list_notification_channels_by_team(&self.pool, &self.encryptor, team_id).await
+    }
+
+    async fn list_api_tokens_by_team(&self, team_id: &str) -> Result<Vec<ApiToken>, DbError> {
+        team_scoping::list_api_tokens_by_team(&self.pool, team_id).await
+    }
+
+    async fn get_app_for_team(&self, team_id: &str, app_id: &str) -> Result<Option<App>, DbError> {
+        team_scoping::get_app_for_team(&self.pool, team_id, app_id).await
+    }
+
+    async fn get_managed_db_for_team(
+        &self,
+        team_id: &str,
+        db_id: &str,
+    ) -> Result<Option<ManagedDatabase>, DbError> {
+        team_scoping::get_managed_db_for_team(&self.pool, &self.encryptor, team_id, db_id).await
+    }
+
+    async fn set_app_team(&self, app_id: &str, team_id: &str) -> Result<(), DbError> {
+        team_scoping::set_app_team(&self.pool, app_id, team_id).await
+    }
+
+    async fn set_project_team(&self, project_id: &str, team_id: &str) -> Result<(), DbError> {
+        team_scoping::set_project_team(&self.pool, project_id, team_id).await
+    }
+
+    async fn set_database_team(&self, db_id: &str, team_id: &str) -> Result<(), DbError> {
+        team_scoping::set_database_team(&self.pool, db_id, team_id).await
+    }
+
+    // --- Teams ---
+
+    async fn create_team(&self, team: &NewTeam) -> Result<Team, DbError> {
+        teams::create_team(&self.pool, team).await
+    }
+
+    async fn get_team(&self, id: &str) -> Result<Option<Team>, DbError> {
+        teams::get_team(&self.pool, id).await
+    }
+
+    async fn get_team_by_slug(&self, slug: &str) -> Result<Option<Team>, DbError> {
+        teams::get_team_by_slug(&self.pool, slug).await
+    }
+
+    async fn list_teams_for_user(&self, user_id: &str) -> Result<Vec<Team>, DbError> {
+        teams::list_teams_for_user(&self.pool, user_id).await
+    }
+
+    async fn update_team(&self, id: &str, update: &UpdateTeam) -> Result<Team, DbError> {
+        teams::update_team(&self.pool, id, update).await
+    }
+
+    async fn delete_team(&self, id: &str) -> Result<(), DbError> {
+        teams::delete_team(&self.pool, id).await
+    }
+
+    async fn count_team_resources(&self, team_id: &str) -> Result<i64, DbError> {
+        teams::count_team_resources(&self.pool, team_id).await
+    }
+
+    async fn add_team_member(
+        &self,
+        team_id: &str,
+        user_id: &str,
+        role: &str,
+        invited_by: Option<&str>,
+    ) -> Result<TeamMembership, DbError> {
+        teams::add_team_member(&self.pool, team_id, user_id, role, invited_by).await
+    }
+
+    async fn list_team_members(&self, team_id: &str) -> Result<Vec<TeamMember>, DbError> {
+        teams::list_team_members(&self.pool, team_id).await
+    }
+
+    async fn get_team_membership(
+        &self,
+        team_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TeamMembership>, DbError> {
+        teams::get_team_membership(&self.pool, team_id, user_id).await
+    }
+
+    async fn update_team_member_role(
+        &self,
+        team_id: &str,
+        user_id: &str,
+        role: &str,
+    ) -> Result<(), DbError> {
+        teams::update_team_member_role(&self.pool, team_id, user_id, role).await
+    }
+
+    async fn remove_team_member(&self, team_id: &str, user_id: &str) -> Result<(), DbError> {
+        teams::remove_team_member(&self.pool, team_id, user_id).await
+    }
+
+    async fn create_team_invitation(
+        &self,
+        team_id: &str,
+        email: &str,
+        role: &str,
+        token: &str,
+        invited_by: &str,
+        expires_at: &str,
+    ) -> Result<TeamInvitation, DbError> {
+        teams::create_team_invitation(
+            &self.pool, team_id, email, role, token, invited_by, expires_at,
+        )
+        .await
+    }
+
+    async fn get_team_invitation_by_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<TeamInvitation>, DbError> {
+        teams::get_team_invitation_by_token(&self.pool, token).await
+    }
+
+    async fn list_team_invitations(&self, team_id: &str) -> Result<Vec<TeamInvitation>, DbError> {
+        teams::list_team_invitations(&self.pool, team_id).await
+    }
+
+    async fn delete_team_invitation(&self, id: &str) -> Result<(), DbError> {
+        teams::delete_team_invitation(&self.pool, id).await
+    }
+
+    async fn set_session_team(&self, session_id: &str, team_id: &str) -> Result<(), DbError> {
+        teams::set_session_team(&self.pool, session_id, team_id).await
+    }
+
+    // --- Cross-team server sharing ---
+
+    async fn share_server_with_team(
+        &self,
+        server_id: &str,
+        team_id: &str,
+        access_level: &str,
+        granted_by: &str,
+    ) -> Result<ServerTeamAccess, DbError> {
+        teams::share_server_with_team(&self.pool, server_id, team_id, access_level, granted_by)
+            .await
+    }
+
+    async fn revoke_server_share(&self, server_id: &str, team_id: &str) -> Result<(), DbError> {
+        teams::revoke_server_share(&self.pool, server_id, team_id).await
+    }
+
+    async fn list_server_shares(&self, server_id: &str) -> Result<Vec<ServerTeamAccess>, DbError> {
+        teams::list_server_shares(&self.pool, server_id).await
+    }
+
+    async fn list_servers_shared_with_team(
+        &self,
+        team_id: &str,
+    ) -> Result<Vec<(Server, String)>, DbError> {
+        teams::list_servers_shared_with_team(&self.pool, team_id).await
+    }
+
     // --- Migrations ---
 
     async fn run_migrations(&self) -> Result<(), DbError> {
         maintenance::run_migrations(&self.pool).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_strips_https() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/user/repo"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_strips_http() {
+        assert_eq!(
+            normalize_repo_url("http://github.com/user/repo"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_strips_git_suffix() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/user/repo.git"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_strips_trailing_slash() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/user/repo/"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_converts_ssh_to_path() {
+        assert_eq!(
+            normalize_repo_url("git@github.com:user/repo.git"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_lowercases() {
+        assert_eq!(
+            normalize_repo_url("https://GitHub.COM/User/Repo"),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_trims_whitespace() {
+        assert_eq!(
+            normalize_repo_url("  https://github.com/user/repo  "),
+            "github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn normalize_handles_combined() {
+        assert_eq!(
+            normalize_repo_url("git@gitlab.com:org/project.git/"),
+            "gitlab.com/org/project"
+        );
+    }
+
+    #[test]
+    fn normalize_ssh_and_https_produce_same_result() {
+        let https = normalize_repo_url("https://github.com/org/repo.git");
+        let ssh = normalize_repo_url("git@github.com:org/repo.git");
+        assert_eq!(https, ssh);
+    }
+
+    #[test]
+    fn normalize_self_hosted_gitlab_url() {
+        assert_eq!(
+            normalize_repo_url("https://git.example.com/team/project"),
+            "git.example.com/team/project"
+        );
+    }
+
+    #[test]
+    fn normalize_deeply_nested_repo_path() {
+        assert_eq!(
+            normalize_repo_url("https://github.com/org/sub-group/repo.git"),
+            "github.com/org/sub-group/repo"
+        );
     }
 }

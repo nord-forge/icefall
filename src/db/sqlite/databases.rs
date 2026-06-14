@@ -14,14 +14,15 @@ pub(super) async fn create_managed_db(
     let empty_creds = encryptor.encrypt(b"{}")?;
 
     sqlx::query(
-        "INSERT INTO databases (id, name, db_type, credentials_encrypted, app_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO databases (id, name, db_type, credentials_encrypted, app_id, team_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&db.name)
     .bind(&db.db_type)
     .bind(&empty_creds)
     .bind(&db.app_id)
+    .bind(&db.team_id)
     .bind(&now)
     .execute(pool)
     .await?;
@@ -41,6 +42,8 @@ pub(super) async fn create_managed_db(
         ssl_cert: None,
         ssl_key: None,
         ssl_expires_at: None,
+        team_id: db.team_id.clone(),
+        backup_retention_count: 7,
         created_at: now,
     })
 }
@@ -68,7 +71,8 @@ pub(super) async fn list_managed_dbs(
 ) -> Result<Vec<ManagedDatabase>, DbError> {
     let rows = sqlx::query(
         "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id,
-                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at, created_at
+                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at,
+                team_id, backup_retention_count, created_at
          FROM databases ORDER BY created_at DESC",
     )
     .fetch_all(pool)
@@ -95,6 +99,8 @@ pub(super) async fn list_managed_dbs(
             ssl_cert: row.get("ssl_cert"),
             ssl_key: row.get("ssl_key"),
             ssl_expires_at: row.get("ssl_expires_at"),
+            team_id: row.get("team_id"),
+            backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
         });
     }
@@ -108,7 +114,8 @@ pub(super) async fn list_managed_dbs_by_project(
 ) -> Result<Vec<ManagedDatabase>, DbError> {
     let rows = sqlx::query(
         "SELECT id, name, db_type, container_id, credentials_encrypted, backup_schedule, app_id, project_id,
-                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at, created_at
+                ssl_enabled, ssl_mode, ssl_ca_cert, ssl_cert, ssl_key, ssl_expires_at,
+                team_id, backup_retention_count, created_at
          FROM databases WHERE project_id = ? ORDER BY created_at DESC",
     )
     .bind(project_id)
@@ -136,6 +143,8 @@ pub(super) async fn list_managed_dbs_by_project(
             ssl_cert: row.get("ssl_cert"),
             ssl_key: row.get("ssl_key"),
             ssl_expires_at: row.get("ssl_expires_at"),
+            team_id: row.get("team_id"),
+            backup_retention_count: row.get("backup_retention_count"),
             created_at: row.get("created_at"),
         });
     }

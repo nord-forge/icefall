@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import QRCode from 'qrcode';
 import { api } from '@lib/api';
 import Button from '@islands/shared/Button/Button';
 import { Shield, Copy } from 'lucide-preact';
@@ -15,8 +16,9 @@ export default function TwoFactorSection() {
 
   // Setup flow state
   const [setupStep, setSetupStep] = useState<SetupStep>('idle');
-  const [qrSvg, setQrSvg] = useState('');
+  const [otpauthUrl, setOtpauthUrl] = useState('');
   const [secret, setSecret] = useState('');
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const [setupCode, setSetupCode] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [backupsSaved, setBackupsSaved] = useState(false);
@@ -41,12 +43,20 @@ export default function TwoFactorSection() {
     return () => clearTimeout(successTimeoutRef.current);
   }, []);
 
+  // Render the QR client-side from the otpauth URL onto a canvas — avoids
+  // injecting server-supplied SVG markup via dangerouslySetInnerHTML.
+  useEffect(() => {
+    if (setupStep !== 'qr' || !otpauthUrl || !qrCanvasRef.current) return;
+    QRCode.toCanvas(qrCanvasRef.current, otpauthUrl, { width: 200, margin: 1 })
+      .catch(() => setError('Failed to render QR code; use the manual key below.'));
+  }, [setupStep, otpauthUrl]);
+
   async function startSetup() {
     setError('');
     setSubmitting(true);
     try {
       const { data } = await api.setup2fa();
-      setQrSvg(data.qr_svg);
+      setOtpauthUrl(data.otpauth_url);
       setSecret(data.secret);
       setSetupStep('qr');
     } catch (e: any) {
@@ -75,7 +85,7 @@ export default function TwoFactorSection() {
 
   function finishSetup() {
     setSetupStep('done');
-    setQrSvg('');
+    setOtpauthUrl('');
     setSecret('');
     setSetupCode('');
     setBackupsSaved(false);
@@ -178,12 +188,12 @@ export default function TwoFactorSection() {
           </p>
 
           <div class={styles.qrWrapper}>
-            {/* a11y [1.1.1]: QR code has alt text explaining purpose */}
-            <div
+            {/* a11y [WCAG 1.1.1 + 4.1.2]: canvas is opaque to AT — role=img + aria-label give it a name and a text alternative */}
+            <canvas
+              ref={qrCanvasRef}
               class={styles.qrSvg}
               role="img"
               aria-label="QR code for setting up two-factor authentication. Scan with your authenticator app."
-              dangerouslySetInnerHTML={{ __html: qrSvg }}
             />
             <span class={styles.secretLabel}>Or enter this key manually:</span>
             <code class={styles.secretKey}>{secret}</code>

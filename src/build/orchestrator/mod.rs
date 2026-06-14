@@ -48,7 +48,6 @@ impl BuildOrchestrator {
             .update_deploy_status(deploy_id, "building", None)
             .await?;
 
-        // Collect secrets for redaction
         let secrets = self.collect_secrets(deploy_id).await;
 
         // Step 1: Clone
@@ -60,12 +59,15 @@ impl BuildOrchestrator {
             .as_deref()
             .ok_or_else(|| BuildError::GitClone("app has no git_repo configured".to_string()))?;
 
+        // Obtain a GitHub installation access token for cloning private repos
+        let github_token = self.resolve_github_token(git_repo).await;
+
         let clone_opts = GitCloneOptions {
             repo_url: git_repo.to_string(),
             branch: Some(app.git_branch.clone()),
             sha: None,
             ssh_key_path: None,
-            token: None,
+            token: github_token,
             submodules: app.git_submodules_enabled,
             lfs: app.git_lfs_enabled,
             shallow: app.git_shallow_clone,
@@ -94,6 +96,21 @@ impl BuildOrchestrator {
         }
         steps.push(step);
 
+        let effective_dir = if let Some(ref base_dir) = app.base_directory {
+            let sub = work_dir.join(base_dir);
+            if !sub.exists() {
+                let msg = format!("Base directory '{base_dir}' not found in repository");
+                all_output.push(msg);
+                self.fail_deploy(deploy_id, &all_output).await;
+                return Err(BuildError::GitClone(format!(
+                    "base directory '{base_dir}' not found"
+                )));
+            }
+            all_output.push(format!("Using base directory: {base_dir}"));
+            sub
+        } else {
+            work_dir.clone()
+        };
         if self.is_cancelled(deploy_id).await {
             let _ = tokio::fs::remove_dir_all(&work_dir).await;
             return Err(BuildError::Cancelled);
@@ -101,7 +118,7 @@ impl BuildOrchestrator {
 
         // Step 2: Detect
         let mut step = new_step("Detecting framework");
-        let detection = match detect(&work_dir, build_config.as_ref()) {
+        let detection = match detect(&effective_dir, build_config.as_ref()) {
             Ok(det) => {
                 let msg = format!(
                     "Detected {} with {} (node {})",
@@ -139,7 +156,8 @@ impl BuildOrchestrator {
                     let dockerignore = generate_dockerignore(&detection);
 
                     if let Err(e) =
-                        tokio::fs::write(work_dir.join("Dockerfile"), &dockerfile_content).await
+                        tokio::fs::write(effective_dir.join("Dockerfile"), &dockerfile_content)
+                            .await
                     {
                         let msg = format!("Failed to write Dockerfile: {e}");
                         step.output.push(msg.clone());
@@ -149,7 +167,8 @@ impl BuildOrchestrator {
                         self.fail_deploy(deploy_id, &all_output).await;
                         return Err(BuildError::Io(e));
                     }
-                    let _ = tokio::fs::write(work_dir.join(".dockerignore"), &dockerignore).await;
+                    let _ =
+                        tokio::fs::write(effective_dir.join(".dockerignore"), &dockerignore).await;
 
                     let msg = format!("Generated Dockerfile for {}", detection.framework);
                     step.output.push(msg.clone());
@@ -182,7 +201,7 @@ impl BuildOrchestrator {
         let mut step = new_step("Building container image");
         let image_tag = format!("icefall/{}:{}", app.name, deploy_id);
 
-        let context = match create_build_context(&work_dir) {
+        let context = match create_build_context(&effective_dir) {
             Ok(ctx) => ctx,
             Err(e) => {
                 let msg = format!("Failed to create build context: {e}");
@@ -360,6 +379,59 @@ impl BuildOrchestrator {
             .db
             .update_deploy_status(deploy_id, "failed", Some(&log))
             .await;
+    }
+
+    /// Resolve a GitHub installation access token for the given repo URL.
+    /// Returns None if no matching installation is found or token generation fails.
+    async fn resolve_github_token(&self, repo_url: &str) -> Option<String> {
+        if !repo_url.contains("github.com") {
+            return None;
+        }
+
+        let installations = self.db.list_github_installations().await.ok()?;
+
+        for installation in &installations {
+            let app = match self
+                .db
+                .get_github_app_for_installation(installation.installation_id)
+                .await
+            {
+                Ok(Some(app)) => app,
+                _ => continue,
+            };
+
+            let jwt = match crate::github::auth::generate_jwt(app.app_id, &app.private_key) {
+                Ok(jwt) => jwt,
+                Err(e) => {
+                    tracing::warn!("Failed to generate JWT for GitHub App {}: {e}", app.app_id);
+                    continue;
+                }
+            };
+
+            let client = crate::github::client::GitHubClient::new(&app.api_url);
+            match client
+                .get_installation_token(&jwt, installation.installation_id)
+                .await
+            {
+                Ok(token) => {
+                    tracing::info!(
+                        installation_id = installation.installation_id,
+                        app_name = %app.name,
+                        "Using GitHub App installation token for git clone"
+                    );
+                    return Some(token.token);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get installation token for installation {}: {e}",
+                        installation.installation_id
+                    );
+                    continue;
+                }
+            }
+        }
+
+        None
     }
 
     async fn collect_secrets(&self, deploy_id: &str) -> Vec<String> {

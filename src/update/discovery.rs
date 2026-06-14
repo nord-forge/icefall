@@ -52,9 +52,8 @@ impl UpdateChecker {
         }
     }
 
-    /// Check GitHub Releases for a newer version.
-    ///
-    /// Returns `Some((manifest, info))` if an update is available, `None` if current.
+    /// Check GitHub Releases for a newer version. Returns `Some((manifest, info))`
+    /// if an update is available, `None` if current.
     pub async fn check_for_update(
         &self,
         current_version: &str,
@@ -166,11 +165,8 @@ impl UpdateChecker {
         Ok(releases)
     }
 
-    /// Find the first release matching the channel criteria.
-    ///
-    /// - `stable` channel: non-prerelease only
-    /// - `beta` channel: prerelease or stable
-    /// - `nightly` channel: any release
+    /// Find the first release matching the channel: `stable` is non-prerelease
+    /// only; `beta` and `nightly` accept any release.
     fn find_matching_release<'a>(
         releases: &'a [GitHubRelease],
         channel: &str,

@@ -2,6 +2,7 @@ use axum::extract::{Path, State};
 use axum::Json;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::NewEnvVar;
 
@@ -9,13 +10,24 @@ use super::config::db_configs;
 
 pub(super) async fn link_to_app(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((id, app_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let dbs = state.db.list_managed_dbs().await?;
-    let db = dbs
-        .iter()
-        .find(|d| d.id == id)
+    // Both the database and the target app must belong to the caller's
+    // team, with at least member role to mutate.
+    let db = state
+        .db
+        .get_managed_db_for_team(&ctx.team_id, &id)
+        .await?
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
+    ctx.verify_team_access(&db.team_id, TeamRole::Member)?;
+
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let configs = db_configs();
     let type_config = configs
@@ -48,8 +60,25 @@ pub(super) async fn link_to_app(
 
 pub(super) async fn unlink_from_app(
     State(state): State<AppState>,
-    Path((_id, app_id)): Path<(String, String)>,
+    ctx: TeamCtx,
+    Path((id, app_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Both the database and the target app must belong to the caller's
+    // team, with at least member role to mutate.
+    let db = state
+        .db
+        .get_managed_db_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
+    ctx.verify_team_access(&db.team_id, TeamRole::Member)?;
+
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("App '{app_id}' not found")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
     let envs = state.db.list_environments(&app_id).await?;
     if let Some(env) = envs.first() {
         let vars = state.db.get_env_vars(&env.id).await?;

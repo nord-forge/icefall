@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $serverStatus, $serverMetricsHistory } from '@stores/server';
 import { api } from '@lib/api';
+import { createVisibleInterval } from '@lib/visibility';
 import type { ServerStatus, ServerMetricsSnapshot } from '@lib/types';
 import { formatBytes, formatPercent } from '@lib/format';
 import ProgressBar from '@islands/shared/ProgressBar/ProgressBar';
@@ -52,7 +53,7 @@ export default function ServerPage() {
     }
 
     load();
-    const interval = setInterval(async () => {
+    const stopPolling = createVisibleInterval(async () => {
       try {
         const [statusRes, historyRes] = await Promise.all([
           api.getServerStatus(),
@@ -65,7 +66,7 @@ export default function ServerPage() {
       } catch {}
     }, 5_000);
 
-    return () => { active = false; clearInterval(interval); };
+    return () => { active = false; stopPolling(); };
   }, [historyLimit]);
 
   const cpuHistory = status ? history.map(s => ({ timestamp: s.timestamp, value: s.cpu_percent })) : [];

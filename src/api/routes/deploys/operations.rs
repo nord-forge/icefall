@@ -3,6 +3,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::build::orchestrator::BuildOrchestrator;
 use crate::build::BuildConfig;
@@ -18,14 +19,17 @@ pub(super) struct CreateDeployRequest {
 
 pub(super) async fn create_deploy(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(id): Path<String>,
     body: Option<Json<CreateDeployRequest>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team, member role to deploy.
     let app = state
         .db
-        .get_app(&id)
+        .get_app_for_team(&ctx.team_id, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let is_compose_deploy = app.compose_content.is_some();
     let is_image_deploy = app.image_ref.is_some();
@@ -51,6 +55,7 @@ pub(super) async fn create_deploy(
             environment_id: env.id.clone(),
             git_sha: None,
             server_id: None,
+            tag: None,
             no_cache,
         })
         .await?;
@@ -115,6 +120,10 @@ pub(super) async fn create_deploy(
                 .await
             {
                 tracing::error!("Image deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
             }
         });
     } else if app.deploy_mode == "native" {
@@ -144,6 +153,10 @@ pub(super) async fn create_deploy(
                 .await
             {
                 tracing::error!("Native deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
             }
         });
     } else {
@@ -161,7 +174,15 @@ pub(super) async fn create_deploy(
             if is_auto_mode {
                 let work_dir = state.config.data_dir.join("builds").join(&deploy_id);
                 let Some(git_repo) = app_clone.git_repo.as_deref() else {
-                    tracing::error!("Auto-mode deploy failed: no git_repo");
+                    tracing::error!("Auto-mode deploy failed: no git_repo for {deploy_id}");
+                    let _ = state
+                        .db
+                        .update_deploy_status(
+                            &deploy_id,
+                            "failed",
+                            Some("No git repository configured"),
+                        )
+                        .await;
                     return;
                 };
 
@@ -204,6 +225,15 @@ pub(super) async fn create_deploy(
                     );
 
                     let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                        tracing::error!("Failed to re-fetch deploy {deploy_id} for native deploy");
+                        let _ = state
+                            .db
+                            .update_deploy_status(
+                                &deploy_id,
+                                "failed",
+                                Some("Internal error: deploy record not found"),
+                            )
+                            .await;
                         return;
                     };
 
@@ -217,6 +247,10 @@ pub(super) async fn create_deploy(
                         .await
                     {
                         tracing::error!("Native deploy failed for {deploy_id}: {e}");
+                        let _ = state
+                            .db
+                            .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                            .await;
                     }
                     return;
                 }
@@ -248,7 +282,15 @@ pub(super) async fn create_deploy(
                     };
 
                     let Some(git_repo) = app_clone.git_repo.as_deref() else {
-                        tracing::error!("Remote deploy failed: no git_repo");
+                        tracing::error!("Remote deploy failed: no git_repo for {deploy_id}");
+                        let _ = state
+                            .db
+                            .update_deploy_status(
+                                &deploy_id,
+                                "failed",
+                                Some("No git repository configured"),
+                            )
+                            .await;
                         return;
                     };
 
@@ -300,6 +342,10 @@ pub(super) async fn create_deploy(
                         Ok(result) => result.image_ref,
                         Err(e) => {
                             tracing::error!("Build failed for deploy {deploy_id}: {e}");
+                            let _ = state
+                                .db
+                                .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                                .await;
                             return;
                         }
                     }
@@ -307,6 +353,15 @@ pub(super) async fn create_deploy(
             };
 
             let Ok(Some(updated_deploy)) = state.db.get_deploy(&deploy_id).await else {
+                tracing::error!("Failed to re-fetch deploy {deploy_id} after build");
+                let _ = state
+                    .db
+                    .update_deploy_status(
+                        &deploy_id,
+                        "failed",
+                        Some("Internal error: deploy record not found after build"),
+                    )
+                    .await;
                 return;
             };
 
@@ -315,6 +370,10 @@ pub(super) async fn create_deploy(
                 .await
             {
                 tracing::error!("Deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
             }
         });
     }
@@ -324,19 +383,27 @@ pub(super) async fn create_deploy(
 
 pub(super) async fn rollback_deploy(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path((app_id, deploy_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team, member role to roll back.
     let app = state
         .db
-        .get_app(&app_id)
+        .get_app_for_team(&ctx.team_id, &app_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("app {app_id}")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     let target_deploy = state
         .db
         .get_deploy(&deploy_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    // IDOR: the deploy must belong to the app named in the path.
+    if target_deploy.app_id != app_id {
+        return Err(ApiError::NotFound(format!("deploy {deploy_id}")));
+    }
 
     let image_ref = target_deploy
         .image_ref
@@ -358,6 +425,7 @@ pub(super) async fn rollback_deploy(
             environment_id: env.id.clone(),
             git_sha: target_deploy.git_sha.clone(),
             server_id: None,
+            tag: None,
             no_cache: false,
         })
         .await?;
@@ -389,6 +457,10 @@ pub(super) async fn rollback_deploy(
             .await
         {
             tracing::error!("Rollback deploy failed for {rollback_id}: {e}");
+            let _ = state
+                .db
+                .update_deploy_status(&rollback_id, "failed", Some(&e.to_string()))
+                .await;
         }
     });
 
@@ -397,6 +469,7 @@ pub(super) async fn rollback_deploy(
 
 pub(super) async fn cancel_deploy(
     State(state): State<AppState>,
+    ctx: TeamCtx,
     Path(deploy_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let deploy = state
@@ -404,6 +477,15 @@ pub(super) async fn cancel_deploy(
         .get_deploy(&deploy_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    // Resolve the deploy's app and confirm it belongs to the caller's
+    // team (member role); 404 if not, so cross-team deploys stay hidden.
+    let app = state
+        .db
+        .get_app_for_team(&ctx.team_id, &deploy.app_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+    ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     match deploy.status.as_str() {
         "pending" | "building" | "deploying" => {}

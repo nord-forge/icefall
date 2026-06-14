@@ -1,4 +1,5 @@
 import type { Project } from '@lib/types';
+import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { FolderOpen } from 'lucide-preact';
 import styles from '../settings-tab.module.css';
@@ -35,22 +36,38 @@ export default function GeneralSettingsCard({
     <div class={styles.card}>
       <h2 class={styles.sectionTitle}>General Settings</h2>
       <div class={formStyles.fieldRow}>
-        <div>
-          <label htmlFor="settings-app-name" class={formStyles.label}>App Name</label>
-          <input id="settings-app-name" class={formStyles.input} value={name} onInput={(e) => onNameChange((e.target as HTMLInputElement).value)} />
-        </div>
-        <div>
-          <label htmlFor="settings-git-repo" class={formStyles.label}>Git Repository</label>
-          <input id="settings-git-repo" class={formStyles.inputMono} value={gitRepo} onInput={(e) => onGitRepoChange((e.target as HTMLInputElement).value)} />
-        </div>
-        <div>
-          <label htmlFor="settings-branch" class={formStyles.label}>Branch</label>
-          <input id="settings-branch" class={formStyles.inputMono} value={gitBranch} onInput={(e) => onGitBranchChange((e.target as HTMLInputElement).value)} />
-        </div>
-        <div>
-          <label htmlFor="settings-build-cmd" class={formStyles.label}>Build Command</label>
-          <input id="settings-build-cmd" class={formStyles.inputMono} value={buildCommand} onInput={(e) => onBuildCommandChange((e.target as HTMLInputElement).value)} placeholder="bun run build" />
-        </div>
+        <Input
+          label="App Name"
+          name="app-name"
+          id="settings-app-name"
+          value={name}
+          onChange={onNameChange}
+        />
+        <Input
+          label="Git Repository"
+          name="git-repo"
+          id="settings-git-repo"
+          mono
+          value={gitRepo}
+          onChange={onGitRepoChange}
+        />
+        <Input
+          label="Branch"
+          name="branch"
+          id="settings-branch"
+          mono
+          value={gitBranch}
+          onChange={onGitBranchChange}
+        />
+        <Input
+          label="Build Command"
+          name="build-cmd"
+          id="settings-build-cmd"
+          mono
+          value={buildCommand}
+          onChange={onBuildCommandChange}
+          placeholder="bun run build"
+        />
         <div>
           <label htmlFor="settings-project" class={formStyles.label}>
             <FolderOpen size={14} style={{ verticalAlign: 'text-bottom', marginRight: '4px' }} />

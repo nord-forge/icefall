@@ -15,11 +15,11 @@
 - **OpenAPI:** utoipa 5 + utoipa-swagger-ui 9
 - **Config format:** TOML
 
-## Frontend (Dashboard) — not yet implemented
+## Frontend (Dashboard)
 - **Framework:** Astro + Preact
 - **Styling:** CSS Modules
-- **UI Components:** Ark UI
-- **Icons:** Tabler Icons
+- **State:** Preact Signals + Nanostores
+- **Icons:** Lucide (`lucide-preact`)
 
 ## Infrastructure
 - **Process management:** systemd

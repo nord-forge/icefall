@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { AlertTriangle } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
+import Input from '@islands/shared/Input/Input';
 import styles from '../profile-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -46,20 +47,14 @@ export default function DangerZoneSection({ onDeleteAccount }: Props) {
             Enter your password to confirm account deletion. All your sessions, tokens, and data will be permanently removed.
           </p>
           <div class={formStyles.fieldGroup}>
-            <div>
-              <label htmlFor="delete-password" class={formStyles.label}>Password</label>
-              <input
-                id="delete-password"
-                class={formStyles.input}
-                type="password"
-                autoComplete="current-password"
-                value={deletePassword}
-                onInput={e => setDeletePassword((e.target as HTMLInputElement).value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && deletePassword) handleDeleteAccount();
-                }}
-              />
-            </div>
+            <Input
+              label="Password"
+              name="delete-password"
+              id="delete-password"
+              type="password"
+              value={deletePassword}
+              onChange={setDeletePassword}
+            />
           </div>
           <div class={styles.formActions}>
             <Button variant="ghost" onClick={() => { setDeleteConfirm(false); setDeletePassword(''); setErr(''); }}>

@@ -276,7 +276,7 @@
 | Ticket | Title | Completed | Notes |
 |--------|-------|-----------|-------|
 | [IF-147](tickets/phase-22-expansion/IF-147-environments-per-project.md) | Environments per project | — | Production/staging/dev per project, 3-level variable cascade |
-| [IF-148](tickets/phase-22-expansion/IF-148-one-click-service-templates.md) | One-click service templates | — | 20 templates (Ghost, Plausible, etc.), Compose-based deploy, template browser UI |
+| [IF-148](tickets/phase-22-expansion/IF-148-one-click-service-templates.md) | One-click service templates | — | 50 templates across 11 categories, Compose-based deploy, template browser UI |
 | [IF-149](tickets/phase-22-expansion/IF-149-reverse-proxy-management-ui.md) | Reverse proxy management UI | — | Read-only Caddy viewer, middleware presets, advanced edit mode |
 | [IF-150](tickets/phase-22-expansion/IF-150-log-drains.md) | Log drains | — | Grafana Loki, Axiom, generic HTTP; batched shipping, per-app + global |
 | [IF-151](tickets/phase-22-expansion/IF-151-cloudflare-tunnel-integration.md) | Cloudflare Tunnel integration | — | Managed cloudflared container, per-domain tunnel routing |

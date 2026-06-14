@@ -1,6 +1,67 @@
 ---
-title: "oauth"
-description: "Icefall documentation"
+title: OAuth sign-in
+description: Let users sign in to Icefall with GitHub or Google.
 ---
 
-Documentation coming soon.
+Icefall can let users sign in with an external identity provider instead of (or
+alongside) an email and password. Two providers are supported: **GitHub** and
+**Google**.
+
+## How it works
+
+OAuth sign-in links an external account to an Icefall user:
+
+- The first time someone signs in with a provider, Icefall creates an Icefall
+  user and links it to that provider identity.
+- On later sign-ins, Icefall finds the existing user by the linked identity and
+  starts a session.
+
+An existing password-based user can also link a provider to their account, so
+they can use either method.
+
+## Enabling a provider
+
+OAuth providers are configured by an administrator in the dashboard settings.
+For each provider you enable, you supply an OAuth **client ID** and **client
+secret** from that provider. The client secret is stored encrypted.
+
+### GitHub
+
+1. Create an OAuth App in GitHub (**Settings → Developer settings → OAuth Apps**).
+2. Set the authorization callback URL to:
+   `https://your-icefall-server/api/v1/auth/oauth/github/callback`
+3. Copy the client ID and client secret into Icefall's settings and enable
+   GitHub.
+
+### Google
+
+1. Create an OAuth 2.0 Client ID in the
+   [Google Cloud Console](https://console.cloud.google.com/) (**APIs & Services
+   → Credentials**).
+2. Set the authorized redirect URI to:
+   `https://your-icefall-server/api/v1/auth/oauth/google/callback`
+3. Copy the client ID and client secret into Icefall's settings and enable
+   Google.
+
+## The sign-in flow
+
+1. The user clicks "Sign in with GitHub/Google".
+2. Icefall redirects them to the provider to authorize (the exchange uses PKCE).
+3. The provider redirects back to Icefall's callback URL.
+4. Icefall exchanges the code for a token, reads the user's profile and verified
+   email, and either links a new identity or signs in the existing user.
+
+For GitHub, Icefall reads the account's primary verified email; for Google it
+reads the profile email.
+
+## Unlinking
+
+A user can unlink a provider from their account in the dashboard. Make sure the
+account still has a password or another linked provider first — otherwise there
+would be no way left to sign in.
+
+## Roles still apply
+
+OAuth only handles *authentication* — who someone is. Their Icefall
+[role](/auth/users/#roles) still decides what they can do. A user created
+through OAuth gets the default role; an admin can change it.

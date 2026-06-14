@@ -17,8 +17,47 @@ export type App = {
   server_id: string | null;
   deploy_mode: string;
   disable_build_cache: boolean;
+  ghost_mode_enabled: boolean;
+  ghost_mode_idle_minutes: number;
+  ghost_mode_status: string;
+  canary_enabled: boolean;
+  canary_config: string | null;
+  tunnel_enabled: boolean;
+  require_deploy_approval: boolean;
+  log_noise_patterns: string | null;
+  log_highlight_patterns: string | null;
+  project_environment_id: string | null;
+  desired_instances: number;
+  lb_policy: LbPolicy;
+  lb_health_check_path: string;
+  lb_sticky_sessions: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type LbPolicy = 'round_robin' | 'least_conn' | 'ip_hash' | 'random';
+
+export type AppInstanceStatus =
+  | 'deploying'
+  | 'running'
+  | 'unhealthy'
+  | 'stopped'
+  | 'failed';
+
+export type AppInstance = {
+  id: string;
+  app_id: string;
+  server_id: string;
+  status: AppInstanceStatus;
+  container_id: string | null;
+  host_port: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An app instance annotated with its app name (server-scoped listing). */
+export type ServerAppInstance = AppInstance & {
+  app_name: string;
 }
 
 export type DeployMode = 'auto' | 'native' | 'container';
@@ -101,6 +140,7 @@ export type Server = {
   created_at: string;
   updated_at: string;
   app_count?: number;
+  instance_count?: number;
   recommendation_score?: number;
   recommended?: boolean;
 }
@@ -182,4 +222,135 @@ export type HealthCheckResult = {
   current_status: string;
   uptime_percent: number;
   recent_events: HealthCheckEvent[];
+}
+
+export type ProjectEnvironment = {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string | null;
+  created_at: string;
+}
+
+export type EnvironmentVariable = {
+  id: string;
+  key: string;
+  value: string;
+  is_secret: boolean;
+}
+
+export type LogDrain = {
+  id: string;
+  app_id: string | null;
+  name: string;
+  drain_type: 'loki' | 'axiom' | 'http';
+  config: string;
+  enabled: boolean;
+  last_sent_at: string | null;
+  created_at: string;
+}
+
+export type GitHubInstallation = {
+  id: string;
+  account_name: string;
+  account_type: 'user' | 'organization';
+  repo_count: number;
+  status: 'active' | 'suspended';
+  created_at: string;
+}
+
+export type GitHubRepo = {
+  id: string;
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+}
+
+export type CleanupSchedule = {
+  cron: string;
+  disk_threshold_percent: number;
+  dangling_images: boolean;
+  unused_images: boolean;
+  stopped_containers: boolean;
+  stopped_container_age_hours: number;
+  volumes: boolean;
+  networks: boolean;
+  enabled: boolean;
+}
+
+export type CleanupRun = {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'running' | 'completed' | 'failed';
+  freed_bytes: number;
+  removed_items: number;
+  error: string | null;
+}
+
+export type ServerForecast = {
+  disk: {
+    current_ratio: number;
+    daily_growth: number;
+    days_until_full: number | null;
+  };
+  memory: {
+    current_ratio: number;
+    daily_growth: number;
+    days_until_full: number | null;
+  };
+  cpu: {
+    current_percent: number;
+    daily_trend: number;
+  };
+  data_points: number;
+}
+
+export type DeployApproval = {
+  id: string;
+  deploy_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewer: string | null;
+  comment: string | null;
+  decided_at: string | null;
+}
+
+export type CanaryResult = {
+  deploy_id: string;
+  status: 'running' | 'passed' | 'failed';
+  p50_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+  error_rate: number;
+  request_count: number;
+}
+
+export type Team = {
+  id: string;
+  name: string;
+  slug: string;
+  owner_id: string;
+  settings: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TeamMember = {
+  id: string;
+  user_id: string;
+  email: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export type TeamInvitation = {
+  id: string;
+  team_id: string;
+  email: string;
+  role: string;
+  token: string;
+  invited_by: string;
+  expires_at: string;
+  created_at: string;
 }
