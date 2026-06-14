@@ -1,11 +1,14 @@
+import { useState } from 'preact/hooks';
 import type { Project } from '@lib/types';
+import { api } from '@lib/api';
 import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
-import { FolderOpen } from 'lucide-preact';
+import { FolderOpen, GitBranch } from 'lucide-preact';
 import styles from '../settings-tab.module.css';
 import formStyles from '@styles/form.module.css';
 
 type Props = {
+  appId: string;
   name: string;
   gitRepo: string;
   gitBranch: string;
@@ -20,6 +23,7 @@ type Props = {
 };
 
 export default function GeneralSettingsCard({
+  appId,
   name,
   gitRepo,
   gitBranch,
@@ -32,6 +36,22 @@ export default function GeneralSettingsCard({
   onBuildCommandChange,
   onProjectChange,
 }: Props) {
+  // IF-166: load remote branches on demand to populate the branch datalist.
+  const [branches, setBranches] = useState<string[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchError, setBranchError] = useState('');
+
+  async function loadBranches() {
+    setLoadingBranches(true);
+    setBranchError('');
+    try {
+      const { data } = await api.listBranches(appId);
+      setBranches(data);
+    } catch (e) {
+      setBranchError(e instanceof Error ? e.message : 'Could not load branches');
+    }
+    setLoadingBranches(false);
+  }
   return (
     <div class={styles.card}>
       <h2 class={styles.sectionTitle}>General Settings</h2>
@@ -51,14 +71,42 @@ export default function GeneralSettingsCard({
           value={gitRepo}
           onChange={onGitRepoChange}
         />
-        <Input
-          label="Branch"
-          name="branch"
-          id="settings-branch"
-          mono
-          value={gitBranch}
-          onChange={onGitBranchChange}
-        />
+        {/* a11y [1.3.1]: label associated with the branch input via htmlFor/id */}
+        <div class={formStyles.fieldGroup}>
+          <label htmlFor="settings-branch" class={formStyles.label}>Branch</label>
+          <div class={styles.copyRow}>
+            <input
+              id="settings-branch"
+              name="branch"
+              class={formStyles.inputMono}
+              list="settings-branch-options"
+              value={gitBranch}
+              onInput={(e) => onGitBranchChange((e.target as HTMLInputElement).value)}
+            />
+            <button
+              type="button"
+              class={styles.copyButton}
+              onClick={loadBranches}
+              disabled={loadingBranches}
+              aria-label="Load branches from repository"
+              title="Load branches from repository"
+            >
+              <GitBranch size={14} />
+            </button>
+          </div>
+          <datalist id="settings-branch-options">
+            {branches.map((b) => <option key={b} value={b} />)}
+          </datalist>
+          <span class={styles.fieldHint}>
+            {branchError
+              ? branchError
+              : loadingBranches
+                ? 'Loading branches…'
+                : branches.length > 0
+                  ? `${branches.length} branches loaded — type to filter`
+                  : 'Click the icon to fetch branches from the repository.'}
+          </span>
+        </div>
         <Input
           label="Build Command"
           name="build-cmd"
