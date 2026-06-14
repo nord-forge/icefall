@@ -12,9 +12,9 @@ pub struct TrustedKey {
 
 pub static TRUSTED_RELEASE_KEYS: &[TrustedKey] = &[
     TrustedKey {
-        id: "icefall-release-2026",
-        fingerprint: "sha256:cd5a5845d0ccce1f",
-        public_key_pem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAfCkP0lt7L+lHtICXaxkTNb9FAhYXBDampBTNpf0giNM=\n-----END PUBLIC KEY-----",
+        id: "icefall-release-2026-r2",
+        fingerprint: "sha256:81ccb1eb308387d3",
+        public_key_pem: "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAO8JVuwYQ3q5YCPvXLHYRj3qaukr3/RzY6lfFVjJoRg8=\n-----END PUBLIC KEY-----",
         not_before: "2026-01-01T00:00:00Z",
         not_after: None,
     },
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn release_key_is_present() {
         assert!(!TRUSTED_RELEASE_KEYS.is_empty());
-        assert_eq!(TRUSTED_RELEASE_KEYS[0].id, "icefall-release-2026");
+        assert_eq!(TRUSTED_RELEASE_KEYS[0].id, "icefall-release-2026-r2");
     }
 
     #[test]

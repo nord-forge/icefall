@@ -486,9 +486,9 @@ install_icefall() {
 
     local download_url
     if [ "$ICEFALL_VERSION" = "latest" ]; then
-        download_url="https://github.com/nickbevers/icefall/releases/latest/download/icefall-${ARCH}-unknown-linux-gnu"
+        download_url="https://github.com/nord-forge/icefall/releases/latest/download/icefall-${ARCH}-unknown-linux-gnu"
     else
-        download_url="https://github.com/nickbevers/icefall/releases/download/${ICEFALL_VERSION}/icefall-${ARCH}-unknown-linux-gnu"
+        download_url="https://github.com/nord-forge/icefall/releases/download/${ICEFALL_VERSION}/icefall-${ARCH}-unknown-linux-gnu"
     fi
 
     if command -v curl &>/dev/null; then
