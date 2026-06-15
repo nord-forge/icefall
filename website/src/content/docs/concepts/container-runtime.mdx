@@ -1,31 +1,118 @@
 ---
 title: Container runtime
-description: Docker and Podman support
+description: Docker vs Podman, and how to choose for small or large servers
 ---
 
-## Supported runtimes
+Icefall runs your apps as containers and works with either **Docker** or
+**Podman**. Both are accessed through the same socket API (the `bollard`
+library), so everything in Icefall — deploys, terminals, metrics, public ports —
+works the same on either. The choice is mostly about **resource footprint**,
+which matters a lot on a small server and barely at all on a large one.
 
-Icefall supports both Docker and Podman as container runtimes. Both are accessed through the same API (bollard library) via the container socket.
+## TL;DR — which should I pick?
+
+| Your server | Recommendation |
+|---|---|
+| **Small** (1 vCPU / 1 GB, e.g. the cheapest droplet) | **Podman** (rootful) |
+| **Larger** (2 GB+ / multiple vCPU) | **Docker** (default) — or Podman, your call |
+
+On a 1 GB box the difference is decisive; on a 4 GB box it's a preference. The
+installer follows exactly this: it **recommends and defaults to Podman on a
+small server, Docker otherwise — and always lets you make the final choice.**
+
+## Why it matters on small servers
+
+The single biggest difference is the **daemon**:
+
+- **Docker** runs an always-on daemon (`dockerd` + `containerd`) that idles at
+  **~60–100 MB of RAM**, whether or not you have any apps running. That's a
+  fixed floor.
+- **Podman is daemonless.** There is no always-on process; it forks per command
+  and the API socket is a tiny systemd-activated service. Idle cost is
+  **~0 MB**; the runtime cost scales with the number of *running* containers
+  (one small `conmon` supervisor each), not a fixed baseline.
+
+Combined with Icefall's [low-memory mode](#low-memory-mode), the platform
+overhead on a 1 GB box looks like this:
+
+| Layer | Docker + defaults | Podman + low-memory |
+|---|---|---|
+| Icefall daemon | ~85 MB | ~50 MB |
+| Container runtime (idle) | ~80 MB | ~5 MB |
+| Caddy | ~30 MB | ~30 MB |
+| **Platform overhead** | **~195 MB** | **~85 MB** |
+| **Free for your apps** (of 1 GB) | ~800 MB | **~915 MB** |
+
+That ~110 MB swing is roughly one extra small app container on a 1 GB server.
+
+## Trade-offs
+
+| | Docker | Podman (rootful) |
+|---|---|---|
+| Idle RAM | ~60–100 MB (daemon) | ~0 MB (daemonless) |
+| Compatibility | Widest — the default most images/tooling assume | Drop-in Docker-compatible API; a few third-party tools expect the Docker socket path |
+| Resource limits | Always enforced | Enforced (rootful) |
+| Privileged ports (`<1024`) | Yes | Yes (rootful) |
+| Compose (Raw Compose mode) | `docker compose` | `podman compose` — the installer adds `podman-compose` for you |
+| Networking | Bridge + built-in DNS | Netavark + aardvark-dns (Podman ≥ 4) |
+
+**Pick Docker** if you want the most battle-tested path and have RAM to spare, or
+if you rely on Docker-specific third-party tooling. **Pick Podman** if you're on
+a small server, or you simply prefer a daemonless runtime.
+
+## Rootful vs rootless Podman
+
+Icefall installs and uses **rootful Podman** by default, and we recommend it:
+
+- **Resource limits are enforced.** Rootless Podman can only enforce container
+  memory/CPU limits when the host has **cgroups-v2 controller delegation** set
+  up. Rootful needs no such setup.
+- **Privileged ports work.** Rootless Podman cannot publish ports below 1024;
+  rootful can.
+
+**Rootless is fully supported** — point `ICEFALL_CONTAINER_SOCKET` at your
+per-user socket (e.g. `/run/user/1000/podman/podman.sock`). When you do, the
+installer sets up cgroups-v2 delegation so resource limits still work, and
+Icefall automatically binds published ports to loopback (Caddy, co-located,
+proxies to them). The only hard rootless limitation is ports below 1024, which
+Icefall doesn't need because Caddy fronts everything.
+
+:::tip[Best of both on a tiny server]
+**Rootful Podman** gives you the daemonless RAM win *and* enforced limits — the
+sweet spot for a 1 vCPU / 1 GB box. That's what the installer sets up when it
+detects a small server.
+:::
+
+## Low-memory mode
+
+On a server with **≤ 1.5 GB RAM**, the installer enables `low_memory = true` in
+`config.toml`. It shrinks Icefall's own footprint (daemon ~85 MB → ~50 MB) by:
+
+- reducing the SQLite page cache (~62 MB → ~16 MB),
+- trimming a couple of in-memory buffers.
+
+It also adds a `MemoryMax` to the systemd unit so a runaway can't OOM the box.
+You can force it on or off:
+
+```toml
+low_memory = true            # or false
+# sqlite_cache_kib = 16000   # tune the SQLite page cache directly (KiB)
+```
+
+…or via environment variables: `ICEFALL_LOW_MEMORY=true`,
+`ICEFALL_SQLITE_CACHE_KIB=16000`.
 
 ## Configuration
 
 Set the runtime in `config.toml`:
 
 ```toml
-runtime = "docker"           # or "podman"
-container_socket = "/var/run/docker.sock"  # auto-detected
+runtime = "docker"                          # or "podman"
+container_socket = "/var/run/docker.sock"   # auto-detected; Podman uses /run/podman/podman.sock
 ```
-
-## Differences
-
-| Feature | Docker | Podman |
-|---------|--------|--------|
-| Daemon | dockerd (always running) | Socket-activated (on-demand) |
-| Networking | Bridge (automatic DNS) | Netavark (needs named network for DNS) |
-| Building | BuildKit | Buildah |
-| Rootless | Requires configuration | Default mode |
-| Compose | docker compose | podman compose |
 
 ## Switching runtimes
 
-See the [Podman reference](/reference/podman) for migration steps.
+Re-running the installer keeps your existing runtime unless you pass
+`--runtime=` explicitly. See the [Podman reference](/reference/podman) for
+migration steps.

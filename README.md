@@ -54,6 +54,12 @@ Icefall as a service. See the [installation docs](https://icefall.dev/getting-st
 for flags — including `--runtime=docker|podman|auto` to choose your container
 runtime, and `--yes` for unattended installs.
 
+**Runs on small *and* large servers.** On a 1 vCPU / 1 GB droplet the installer
+recommends **Podman** (daemonless, ~80 MB lighter at idle than Docker) and turns
+on low-memory mode — but always lets you pick. On bigger boxes it defaults to
+Docker. See [Container runtime](https://icefall.dev/concepts/container-runtime/)
+for the trade-offs and the rootful-vs-rootless guidance.
+
 **Requirements:** Linux (Ubuntu 20.04+, Debian 11+, RHEL/Rocky/Alma 9+, Fedora 38+, Alpine 3.16+),
 Docker or Podman ≥ 4.0, 1 vCPU / 1 GB RAM minimum (2 GB recommended).
 
