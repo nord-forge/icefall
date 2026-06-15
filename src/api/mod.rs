@@ -106,8 +106,16 @@ async fn dashboard_fallback(uri: axum::http::Uri) -> axum::response::Response {
 pub fn build_router(state: AppState) -> Router {
     let api_routes = routes::api_routes();
 
+    // Serve build-time precompressed variants directly (IF-254): when the client
+    // accepts br/gzip, ServeDir hands over the matching `.br`/`.gz` file with the
+    // right `Content-Encoding` and zero per-request compression. Falls back to the
+    // identity file otherwise. The router's CompressionLayer (IF-252) skips any
+    // response that already carries Content-Encoding, so there's no double work —
+    // it only kicks in for assets with no precompressed variant and for API JSON.
     let serve_dir = ServeDir::new(DASHBOARD_DIST)
         .append_index_html_on_directories(true)
+        .precompressed_br()
+        .precompressed_gzip()
         .fallback(axum::routing::get(dashboard_fallback));
 
     let router = Router::new()
