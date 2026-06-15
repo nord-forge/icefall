@@ -387,6 +387,15 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-204](tickets/phase-28-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | ✅ | coolify/dokku/caprover/heroku/docker-compose present |
 | [IF-207](tickets/phase-28-comprehensive-docs/IF-207-docs-podman-reference.md) | Podman reference docs | ✅ | Added `reference/podman-config` + `reference/podman-differences` + podman how-to guides (2026-06-14) |
 
+### Proxy follow-ups — backlog (unscheduled)
+Spun out of IF-149's out-of-scope list. Load-balancer config is already Phase 31 (shipped).
+| Ticket | Title | Status | Notes |
+|--------|-------|--------|-------|
+| [IF-248](tickets/proxy-follow-ups/IF-248-caddy-ratelimit-plugin-install.md) | Bundle caddy-ratelimit module | ⬜ | Upgrades IF-149's 429 fallback to real enforcement |
+| [IF-249](tickets/proxy-follow-ups/IF-249-per-path-middleware.md) | Per-path middleware | ⬜ | IF-149 is per-app only; depends on IF-069 |
+| [IF-250](tickets/proxy-follow-ups/IF-250-pluggable-proxy-engine.md) | Pluggable proxy engine | ⬜ | Speculative — decide intent before scheduling |
+| [IF-251](tickets/proxy-follow-ups/IF-251-caddyfile-format-support.md) | Caddyfile format support | ⬜ | Likely won't-do — JSON-only by design |
+
 ---
 
 ## Summary
