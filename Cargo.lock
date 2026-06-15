@@ -1427,6 +1427,7 @@ dependencies = [
  "lettre",
  "listenfd",
  "nix",
+ "percent-encoding",
  "qrcode",
  "rand 0.10.1",
  "rcgen",

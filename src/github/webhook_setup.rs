@@ -22,25 +22,6 @@ fn instance_base_url(state: &AppState) -> String {
     }
 }
 
-/// Parse "owner/name" from an app's git_repo URL (https or ssh form).
-fn owner_repo_from_url(git_repo: &str) -> Option<(String, String)> {
-    let trimmed = git_repo
-        .trim()
-        .trim_end_matches('/')
-        .trim_end_matches(".git");
-    // Take the last two path segments — works for https://host/owner/repo and
-    // git@host:owner/repo alike.
-    let normalized = trimmed.replace(':', "/");
-    let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
-    if parts.len() >= 2 {
-        let owner = parts[parts.len() - 2].to_string();
-        let repo = parts[parts.len() - 1].to_string();
-        Some((owner, repo))
-    } else {
-        None
-    }
-}
-
 /// Create the GitHub webhook for `app` via its linked installation. Generates and
 /// stores a fresh webhook secret on the app. Best-effort: returns an error string
 /// the caller can log/surface, but callers treat failure as non-fatal (the app is
@@ -56,8 +37,17 @@ pub async fn provision_webhook(state: &AppState, app: &App) -> Result<i64, Strin
         .as_deref()
         .ok_or_else(|| "app has no git_repo".to_string())?;
 
-    let (owner, repo) = owner_repo_from_url(git_repo)
+    let (owner, repo) = crate::github::owner_repo(git_repo)
         .ok_or_else(|| format!("cannot parse repo from {git_repo}"))?;
+
+    // GitHub must be able to reach the webhook target. Without a public
+    // base_domain the URL is localhost — unreachable — so skip rather than
+    // create a webhook that can never deliver (S3).
+    if state.config.base_domain.is_none() {
+        return Err(
+            "no base_domain configured; GitHub cannot reach a localhost webhook URL".to_string(),
+        );
+    }
 
     let resolved = get_valid_installation_token(&state.db, installation_id).await?;
 
@@ -80,38 +70,4 @@ pub async fn provision_webhook(state: &AppState, app: &App) -> Result<i64, Strin
     client
         .create_webhook(&resolved.token, &owner, &repo, &target, &secret)
         .await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::owner_repo_from_url;
-
-    #[test]
-    fn parses_https_url() {
-        assert_eq!(
-            owner_repo_from_url("https://github.com/acme/widget"),
-            Some(("acme".into(), "widget".into()))
-        );
-    }
-
-    #[test]
-    fn parses_https_url_with_git_suffix() {
-        assert_eq!(
-            owner_repo_from_url("https://github.com/acme/widget.git"),
-            Some(("acme".into(), "widget".into()))
-        );
-    }
-
-    #[test]
-    fn parses_ssh_url() {
-        assert_eq!(
-            owner_repo_from_url("git@github.com:acme/widget.git"),
-            Some(("acme".into(), "widget".into()))
-        );
-    }
-
-    #[test]
-    fn rejects_bare_string() {
-        assert_eq!(owner_repo_from_url("not-a-url"), None);
-    }
 }

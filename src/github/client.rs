@@ -1,6 +1,17 @@
 use reqwest::Client;
 use serde::Deserialize;
 
+/// Percent-encode a single URL path segment so a repo/owner/branch containing
+/// reserved characters can't break out of its segment or inject query params.
+fn enc(segment: &str) -> String {
+    const ENCODE: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+        .remove(b'-')
+        .remove(b'_')
+        .remove(b'.')
+        .remove(b'~');
+    percent_encoding::utf8_percent_encode(segment, ENCODE).to_string()
+}
+
 pub struct GitHubClient {
     http: Client,
     api_url: String,
@@ -155,12 +166,15 @@ impl GitHubClient {
         let mut page = 1u32;
         loop {
             let url = format!(
-                "{}/repos/{}/{}/branches?per_page=100&page={}",
-                self.api_url, owner, repo, page
+                "{}/repos/{}/{}/branches",
+                self.api_url,
+                enc(owner),
+                enc(repo)
             );
             let resp = self
                 .http
                 .get(&url)
+                .query(&[("per_page", "100"), ("page", &page.to_string())])
                 .header("Authorization", format!("Bearer {token}"))
                 .header("Accept", "application/vnd.github+json")
                 .header("User-Agent", "Icefall-PaaS")
@@ -193,7 +207,7 @@ impl GitHubClient {
         url: &str,
         secret: &str,
     ) -> Result<i64, String> {
-        let api = format!("{}/repos/{}/{}/hooks", self.api_url, owner, repo);
+        let api = format!("{}/repos/{}/{}/hooks", self.api_url, enc(owner), enc(repo));
         let payload = serde_json::json!({
             "name": "web",
             "active": true,
@@ -238,7 +252,13 @@ impl GitHubClient {
         context: &str,
         target_url: Option<&str>,
     ) -> Result<(), String> {
-        let api = format!("{}/repos/{}/{}/statuses/{}", self.api_url, owner, repo, sha);
+        let api = format!(
+            "{}/repos/{}/{}/statuses/{}",
+            self.api_url,
+            enc(owner),
+            enc(repo),
+            enc(sha)
+        );
         let mut payload = serde_json::json!({
             "state": state,
             // GitHub truncates descriptions at 140 chars.
@@ -278,7 +298,10 @@ impl GitHubClient {
     ) -> Result<i64, String> {
         let api = format!(
             "{}/repos/{}/{}/issues/{}/comments",
-            self.api_url, owner, repo, issue_number
+            self.api_url,
+            enc(owner),
+            enc(repo),
+            issue_number
         );
         let resp = self
             .http
@@ -310,7 +333,10 @@ impl GitHubClient {
     ) -> Result<(), String> {
         let api = format!(
             "{}/repos/{}/{}/issues/comments/{}",
-            self.api_url, owner, repo, comment_id
+            self.api_url,
+            enc(owner),
+            enc(repo),
+            comment_id
         );
         let resp = self
             .http
@@ -330,8 +356,9 @@ impl GitHubClient {
         Ok(())
     }
 
-    /// Find the open PR number for a branch, if any. Uses the pulls list filtered
-    /// by `head` (which expects `owner:branch`).
+    /// Find the open PR number for a branch, if any. Filters the pulls list by
+    /// `head` (`owner:branch`). Note: only matches PRs from the same repo, not
+    /// forks (a fork's head owner differs).
     pub async fn find_pr_for_branch(
         &self,
         token: &str,
@@ -339,13 +366,17 @@ impl GitHubClient {
         repo: &str,
         branch: &str,
     ) -> Result<Option<i64>, String> {
-        let api = format!(
-            "{}/repos/{}/{}/pulls?state=open&head={}:{}&per_page=1",
-            self.api_url, owner, repo, owner, branch
-        );
+        let api = format!("{}/repos/{}/{}/pulls", self.api_url, enc(owner), enc(repo));
+        // Pass query params through reqwest so `head`/`branch` are encoded and
+        // can't inject extra parameters.
         let resp = self
             .http
             .get(&api)
+            .query(&[
+                ("state", "open"),
+                ("head", &format!("{owner}:{branch}")),
+                ("per_page", "1"),
+            ])
             .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "Icefall-PaaS")
@@ -390,6 +421,17 @@ mod tests {
     fn new_trims_trailing_slash() {
         let client = GitHubClient::new("https://api.github.com/");
         assert_eq!(client.api_url, "https://api.github.com");
+    }
+
+    #[test]
+    fn enc_escapes_path_breaking_chars() {
+        // Reserved/query chars must be percent-encoded so they can't break the
+        // URL path or inject query parameters.
+        assert_eq!(enc("a/b"), "a%2Fb");
+        assert_eq!(enc("x?y=1&z=2"), "x%3Fy%3D1%26z%3D2");
+        assert_eq!(enc("with space"), "with%20space");
+        // Unreserved chars pass through unchanged.
+        assert_eq!(enc("Owner-Repo_1.0~"), "Owner-Repo_1.0~");
     }
 
     #[test]

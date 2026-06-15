@@ -125,6 +125,13 @@ pub(crate) async fn trigger_deploy(
     deploy_id: String,
     no_cache: bool,
 ) {
+    // IF-174: report GitHub commit status across all deploy paths (manual API,
+    // scheduled, native/image/compose). The watcher tracks the deploy's terminal
+    // DB state, so it doesn't need to hook each spawn branch. Best-effort.
+    if let Ok(Some(d)) = state.db.get_deploy(&deploy_id).await {
+        crate::github::status::watch_deploy(&state, &app, &deploy_id, d.git_sha.as_deref());
+    }
+
     let is_compose_deploy = app.compose_content.is_some();
     let is_image_deploy = app.image_ref.is_some();
 
@@ -503,6 +510,14 @@ pub(super) async fn rollback_deploy(
 
     let rollback_id = rollback_deploy.id.clone();
     let env_clone = env.clone();
+
+    // IF-174: GitHub commit status for the rollback deploy (best-effort).
+    crate::github::status::watch_deploy(
+        &state,
+        &app,
+        &rollback_id,
+        rollback_deploy.git_sha.as_deref(),
+    );
 
     tokio::spawn(async move {
         let manager = DeployManager::new(

@@ -240,20 +240,13 @@ async fn trigger_deploy(
     let env_clone = env.clone();
     let state = state.clone();
 
-    let commit_sha = sha.to_string();
+    // IF-174: report deploy progress to GitHub as a commit status. The watcher
+    // polls the deploy's terminal state, so it works regardless of which spawn
+    // branch runs and reports build failures too (best-effort, no-op if unlinked).
+    crate::github::status::watch_deploy(&state, &app, &deploy.id, Some(sha));
 
     tokio::spawn(async move {
         let _guard = lock.lock().await;
-
-        // IF-174: report deploy progress as a GitHub commit status (best-effort).
-        crate::github::status::report_deploy_status(
-            &state,
-            &app,
-            &commit_sha,
-            "pending",
-            "Build started",
-        )
-        .await;
 
         let orchestrator =
             BuildOrchestrator::new(state.docker.clone(), state.db.clone(), state.config.clone());
@@ -289,42 +282,16 @@ async fn trigger_deploy(
                         .db
                         .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
                         .await;
-                    crate::github::status::report_deploy_status(
-                        &state,
-                        &app,
-                        &commit_sha,
-                        "failure",
-                        &format!("Deploy failed: {e}"),
-                    )
-                    .await;
-                } else {
-                    crate::github::status::report_deploy_status(
-                        &state,
-                        &app,
-                        &commit_sha,
-                        "success",
-                        "Deployed successfully",
-                    )
-                    .await;
+                } else if env_clone.env_type == "preview" {
                     // IF-174: update the preview PR comment for non-production envs.
-                    if env_clone.env_type == "preview" {
-                        crate::github::pr_comment::post_preview_comment(
-                            &state, &app, &env_clone, "success",
-                        )
-                        .await;
-                    }
+                    crate::github::pr_comment::post_preview_comment(
+                        &state, &app, &env_clone, "success",
+                    )
+                    .await;
                 }
             }
             Err(e) => {
                 tracing::error!("Build failed for {deploy_id}: {e}");
-                crate::github::status::report_deploy_status(
-                    &state,
-                    &app,
-                    &commit_sha,
-                    "failure",
-                    &format!("Build failed: {e}"),
-                )
-                .await;
             }
         }
     });

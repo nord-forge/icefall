@@ -28,7 +28,7 @@ pub async fn report_deploy_status(
     let Some(git_repo) = app.git_repo.as_deref() else {
         return;
     };
-    let Some((owner, repo)) = owner_repo(git_repo) else {
+    let Some((owner, repo)) = crate::github::owner_repo(git_repo) else {
         tracing::debug!(app_id = %app.id, "cannot parse owner/repo for commit status");
         return;
     };
@@ -60,21 +60,54 @@ pub async fn report_deploy_status(
     }
 }
 
-fn owner_repo(git_repo: &str) -> Option<(String, String)> {
-    let trimmed = git_repo
-        .trim()
-        .trim_end_matches('/')
-        .trim_end_matches(".git");
-    let normalized = trimmed.replace(':', "/");
-    let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
-    if parts.len() >= 2 {
-        Some((
-            parts[parts.len() - 2].to_string(),
-            parts[parts.len() - 1].to_string(),
-        ))
-    } else {
-        None
-    }
+/// Report `pending`, then spawn a watcher that polls the deploy until it reaches
+/// a terminal state and reports `success`/`failure`. This covers every deploy
+/// path (manual API, scheduled, native, image, compose) without threading status
+/// calls through each spawn branch — they all converge on the deploy's DB status.
+///
+/// No-op when the app isn't GitHub-linked or the deploy has no commit SHA.
+pub fn watch_deploy(state: &AppState, app: &App, deploy_id: &str, sha: Option<&str>) {
+    // Manual deploys may have no SHA; without one there's nothing to report on.
+    let (Some(_), Some(sha)) = (app.github_installation_id.as_deref(), sha) else {
+        return;
+    };
+    let state = state.clone();
+    let app = app.clone();
+    let deploy_id = deploy_id.to_string();
+    let sha = sha.to_string();
+
+    tokio::spawn(async move {
+        report_deploy_status(&state, &app, &sha, "pending", "Deploy started").await;
+
+        // Poll until terminal (≤ ~20 min), then report once.
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(10));
+        for _ in 0..120 {
+            ticker.tick().await;
+            let Ok(Some(deploy)) = state.db.get_deploy(&deploy_id).await else {
+                continue;
+            };
+            match deploy.status.as_str() {
+                "running" => {
+                    report_deploy_status(&state, &app, &sha, "success", "Deployed successfully")
+                        .await;
+                    return;
+                }
+                "failed" => {
+                    report_deploy_status(&state, &app, &sha, "failure", "Deploy failed").await;
+                    return;
+                }
+                "cancelled" => {
+                    report_deploy_status(&state, &app, &sha, "error", "Deploy cancelled").await;
+                    return;
+                }
+                _ => {} // still building/deploying — keep waiting
+            }
+        }
+        tracing::warn!(
+            deploy_id,
+            "deploy status watcher timed out before terminal state"
+        );
+    });
 }
 
 /// Link back to the app's deploys view, if a public domain is configured.
@@ -84,26 +117,4 @@ fn app_deploy_url(state: &AppState, app_id: &str) -> Option<String> {
         .base_domain
         .as_ref()
         .map(|domain| format!("https://{domain}/apps/{app_id}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::owner_repo;
-
-    #[test]
-    fn parses_https_and_ssh() {
-        assert_eq!(
-            owner_repo("https://github.com/acme/widget.git"),
-            Some(("acme".into(), "widget".into()))
-        );
-        assert_eq!(
-            owner_repo("git@github.com:acme/widget"),
-            Some(("acme".into(), "widget".into()))
-        );
-    }
-
-    #[test]
-    fn rejects_unparseable() {
-        assert_eq!(owner_repo("widget"), None);
-    }
 }

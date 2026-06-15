@@ -24,7 +24,7 @@ pub async fn post_preview_comment(state: &AppState, app: &App, env: &Environment
     let Some(branch) = env.branch.as_deref() else {
         return;
     };
-    let Some((owner, repo)) = owner_repo(git_repo) else {
+    let Some((owner, repo)) = crate::github::owner_repo(git_repo) else {
         return;
     };
 
@@ -80,7 +80,7 @@ pub async fn post_preview_comment(state: &AppState, app: &App, env: &Environment
                         .db
                         .upsert_github_pr_comment(
                             &app.id,
-                            resolved_installation_numeric(state, installation_id).await,
+                            resolved.installation_id,
                             &format!("{owner}/{repo}"),
                             pr_number,
                             comment_id,
@@ -114,33 +114,4 @@ fn comment_body(state: &AppState, app: &App, branch: &str, status: &str) -> Stri
     format!(
         "**Icefall preview environment** — {status}\n\n{url_line}\n\nBranch: `{branch}`\n\n_Updated automatically by Icefall on each push._"
     )
-}
-
-/// The numeric installation id for the (DB) installation id, for comment tracking.
-async fn resolved_installation_numeric(state: &AppState, installation_db_id: &str) -> i64 {
-    state
-        .db
-        .get_github_installation(installation_db_id)
-        .await
-        .ok()
-        .flatten()
-        .map(|i| i.installation_id)
-        .unwrap_or_default()
-}
-
-fn owner_repo(git_repo: &str) -> Option<(String, String)> {
-    let trimmed = git_repo
-        .trim()
-        .trim_end_matches('/')
-        .trim_end_matches(".git");
-    let normalized = trimmed.replace(':', "/");
-    let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
-    if parts.len() >= 2 {
-        Some((
-            parts[parts.len() - 2].to_string(),
-            parts[parts.len() - 1].to_string(),
-        ))
-    } else {
-        None
-    }
 }

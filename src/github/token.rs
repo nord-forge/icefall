@@ -16,6 +16,8 @@ pub struct ResolvedToken {
     pub token: String,
     pub api_url: String,
     pub account_login: String,
+    /// GitHub's numeric installation id (for comment/webhook tracking rows).
+    pub installation_id: i64,
 }
 
 /// Return a usable installation token for `installation_db_id` (the DB id, not
@@ -48,6 +50,7 @@ pub async fn get_valid_installation_token(
                     token: token.clone(),
                     api_url: app.api_url.clone(),
                     account_login: installation.account_login.clone(),
+                    installation_id: installation.installation_id,
                 });
             }
         }
@@ -72,5 +75,6 @@ pub async fn get_valid_installation_token(
         token: minted.token,
         api_url: app.api_url,
         account_login: installation.account_login,
+        installation_id: installation.installation_id,
     })
 }

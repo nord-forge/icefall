@@ -100,7 +100,12 @@ export default function GitRepoStep({
         id="create-repo-url"
         mono
         value={gitRepo}
-        onChange={(v) => onUpdate('git_repo', v)}
+        onChange={(v) => {
+          onUpdate('git_repo', v);
+          // Manual edits invalidate the browser-derived branch list + link.
+          if (branches.length > 0) setBranches([]);
+          onUpdate('github_installation_id', '');
+        }}
         placeholder="https://github.com/user/repo"
       />
       {branches.length > 0 ? (
