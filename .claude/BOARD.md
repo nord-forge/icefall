@@ -11,13 +11,13 @@
 Code-verified remaining work. Everything else previously marked "backlog" in
 phases 22/25/26/27 is already implemented (see status columns below).
 
-**Missing — no real implementation (6):**
+**Missing — no real implementation (5):**
 1. IF-151 — Cloudflare Tunnel integration (only a `tunnel_enabled` flag exists)
 2. IF-165 — Database terminal access (app/server terminals exist; DB does not)
-3. IF-173 — Raw Compose mode
-4. IF-180 — App dependency graph
-5. IF-181 — Built-in API playground
-6. IF-191 — Smart Resource Packer
+3. IF-180 — App dependency graph
+4. IF-181 — Built-in API playground
+5. IF-191 — Smart Resource Packer
+   (IF-173 Raw Compose mode — ✅ done 2026-06-15)
 
 **Partial — schema/columns exist, enforcement/UI/orchestration missing (20):**
 - ~~Security-relevant first: IF-168 (token ability scoping)~~ — ✅ done (enforced + UI on both token surfaces)
@@ -340,7 +340,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-170](tickets/phase-25-parity-gaps/IF-170-docker-registry-credentials.md) | Container registry credentials | ✅ | `registries` table, encrypted creds, dockerhub/ghcr/gitlab/custom |
 | [IF-171](tickets/phase-25-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | ✅ | `{app}.icefall.internal` generated in deploy + DB hostnames |
 | [IF-172](tickets/phase-25-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | ✅ | Caddy L4 client (module probe, set/remove TCP proxy, IP-whitelist `remote_ip` match); lowest-free port allocation in admin-configurable range (`proxy_settings`); enable/disable/status API with loopback-only container recreate (Caddy-fronted, never direct internet); connection-string display + warning; settings UI + DatabasePublicAccess island |
-| [IF-173](tickets/phase-25-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | ⬜ | No raw-compose field/logic |
+| [IF-173](tickets/phase-25-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | ✅ | `RawComposeDeployer` shells out to `{runtime} compose` (CLI preflight, per-app workdir + `--env-file`, streamed output → deploy log); `deploy_mode='raw-compose'` dispatch; raw lifecycle (stop/restart/down) + `compose down` on delete; create/update skip the managed parser for raw YAML; create-wizard mode selector + warning (2026-06-15) |
 | [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | ✅ | Installation token storage+refresh (30-min background task), app↔installation link, auto webhook creation on repo link, commit status checks (pending/success/failure), PR preview comments (edit-in-place + teardown), repo branch listing + browser wiring; reqwest client extended |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 

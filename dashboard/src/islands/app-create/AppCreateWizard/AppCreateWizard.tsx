@@ -38,6 +38,7 @@ export default function AppCreateWizard() {
     envContent: '',
     image_ref: '',
     compose_content: '',
+    deploy_mode: 'auto',
     github_installation_id: '',
   });
 
@@ -158,6 +159,10 @@ export default function AppCreateWizard() {
 
       if (isCompose) {
         createBody.compose_content = form.compose_content;
+        // IF-173: raw mode hands the file to the compose CLI verbatim.
+        if (form.deploy_mode === 'raw-compose') {
+          createBody.deploy_mode = 'raw-compose';
+        }
       } else if (isImage) {
         createBody.image_ref = form.image_ref;
         createBody.port = parseInt(form.port, 10) || 3000;
@@ -286,6 +291,7 @@ export default function AppCreateWizard() {
           <ComposeStep
             name={form.name}
             composeContent={form.compose_content}
+            deployMode={form.deploy_mode}
             composeError={composeError}
             validationErrors={validationErrors}
             onUpdate={update}

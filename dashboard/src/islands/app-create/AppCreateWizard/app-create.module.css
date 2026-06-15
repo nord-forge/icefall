@@ -113,6 +113,44 @@
   margin-top: var(--space-2);
 }
 
+/* IF-173: managed vs raw compose mode selector */
+.modeFieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.modeLegend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  padding: 0 var(--space-2);
+}
+
+.modeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.modeOption strong {
+  display: block;
+  color: var(--color-text);
+}
+
+.modeHint {
+  display: block;
+  font-size: var(--text-xs);
+  /* a11y [WCAG 1.4.3]: text-secondary clears 4.5:1 in both themes; muted is at the AA edge in dark */
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
 /* a11y [WCAG 3.3.1]: inline validation error */
 .fieldError {
   color: var(--color-error);

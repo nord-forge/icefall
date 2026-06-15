@@ -13,6 +13,22 @@ pub(super) struct ListAppsQuery {
     project_id: Option<String>,
 }
 
+/// Recognised app deploy modes. `auto` lets Icefall pick (managed); `compose`
+/// is the managed per-service pipeline; `raw-compose` (IF-173) hands the file to
+/// the compose CLI. An unset value defaults to `auto` server-side.
+const VALID_DEPLOY_MODES: &[&str] = &["auto", "compose", "raw-compose"];
+
+fn validate_deploy_mode(mode: Option<&str>) -> Result<(), ApiError> {
+    match mode {
+        None => Ok(()),
+        Some(m) if VALID_DEPLOY_MODES.contains(&m) => Ok(()),
+        Some(m) => Err(ApiError::BadRequest(format!(
+            "Invalid deploy_mode '{m}'. Valid: {}",
+            VALID_DEPLOY_MODES.join(", ")
+        ))),
+    }
+}
+
 #[derive(Deserialize)]
 pub(super) struct CreateAppRequest {
     name: String,
@@ -108,8 +124,19 @@ pub(super) async fn create_app(
         ));
     }
 
+    validate_deploy_mode(body.deploy_mode.as_deref())?;
+
     if let Some(ref yaml) = body.compose_content {
-        if crate::deploy::compose::ComposeDeployer::parse(yaml).is_err() {
+        // Raw Compose (IF-173) hands the file straight to the compose CLI, so we
+        // must NOT reject files that use features Icefall's managed parser can't
+        // model (build, profiles, extends). Only sanity-check that it's YAML;
+        // the CLI surfaces any real schema errors at deploy time.
+        let is_raw = body.deploy_mode.as_deref() == Some("raw-compose");
+        if is_raw {
+            if serde_yaml::from_str::<serde_yaml::Value>(yaml).is_err() {
+                return Err(ApiError::BadRequest("Invalid YAML".to_string()));
+            }
+        } else if crate::deploy::compose::ComposeDeployer::parse(yaml).is_err() {
             return Err(ApiError::BadRequest(
                 "Invalid Docker Compose YAML".to_string(),
             ));
@@ -211,6 +238,8 @@ pub(super) async fn update_app(
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
+    validate_deploy_mode(body.deploy_mode.as_deref())?;
+
     let app = state
         .db
         .update_app(
@@ -301,6 +330,34 @@ pub(super) async fn delete_app(
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Admin)?;
 
+    // Raw compose stacks aren't labelled `icefall.app`, so label-based container
+    // cleanup won't catch them. Tear the stack down via `compose down` first
+    // (best-effort) so deleting the app doesn't orphan its containers/networks.
+    if app.deploy_mode == "raw-compose" {
+        let deployer = crate::deploy::raw_compose::RawComposeDeployer::new(
+            state.db.clone(),
+            state.event_bus.clone(),
+            state.config.clone(),
+        );
+        if let Err(e) = deployer.down(&app).await {
+            tracing::warn!("raw compose down failed during delete of {id}: {e}");
+        }
+    }
+
     state.db.delete_app(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deploy_mode_validation() {
+        assert!(validate_deploy_mode(None).is_ok());
+        assert!(validate_deploy_mode(Some("auto")).is_ok());
+        assert!(validate_deploy_mode(Some("compose")).is_ok());
+        assert!(validate_deploy_mode(Some("raw-compose")).is_ok());
+        assert!(validate_deploy_mode(Some("bogus")).is_err());
+    }
 }

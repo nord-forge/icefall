@@ -4,7 +4,21 @@ use axum::Json;
 use crate::api::error::ApiError;
 use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
-use crate::db::models::UpdateApp;
+use crate::db::models::{App, UpdateApp};
+use crate::deploy::raw_compose::RawComposeDeployer;
+
+/// Build a raw-compose deployer for an app, or `None` when the app isn't in raw
+/// compose mode. Raw stacks are owned by the `docker compose` CLI, so their
+/// lifecycle goes through compose commands rather than per-container ops.
+fn raw_compose(state: &AppState, app: &App) -> Option<RawComposeDeployer> {
+    (app.deploy_mode == "raw-compose").then(|| {
+        RawComposeDeployer::new(
+            state.db.clone(),
+            state.event_bus.clone(),
+            state.config.clone(),
+        )
+    })
+}
 
 pub(super) async fn start_app(
     State(state): State<AppState>,
@@ -18,6 +32,13 @@ pub(super) async fn start_app(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
+    // Raw compose: `compose restart` is the closest "bring it back up" — there is
+    // no compose "start" that recreates removed containers reliably across CLIs.
+    if let Some(deployer) = raw_compose(&state, &app) {
+        deployer.restart(&app).await.map_err(ApiError::internal)?;
+        return Ok(Json(serde_json::json!({ "message": "started" })));
+    }
 
     let label = format!("icefall.app={id}");
     let containers = state.docker.list_containers(Some(&label)).await?;
@@ -48,6 +69,11 @@ pub(super) async fn stop_app(
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
+    if let Some(deployer) = raw_compose(&state, &app) {
+        deployer.stop(&app).await.map_err(ApiError::internal)?;
+        return Ok(Json(serde_json::json!({ "message": "stopped" })));
+    }
+
     let label = format!("icefall.app={id}");
     let containers = state.docker.list_containers(Some(&label)).await?;
 
@@ -76,6 +102,11 @@ pub(super) async fn restart_app(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
+
+    if let Some(deployer) = raw_compose(&state, &app) {
+        deployer.restart(&app).await.map_err(ApiError::internal)?;
+        return Ok(Json(serde_json::json!({ "message": "restarted" })));
+    }
 
     let label = format!("icefall.app={id}");
     let containers = state.docker.list_containers(Some(&label)).await?;
