@@ -65,6 +65,14 @@ impl MetricsStore {
     }
 }
 
+/// Live metrics are emitted every 10s. Persisting at that rate would write
+/// ~8.6k rows/container/day; once per minute (every 6th tick) is plenty of
+/// resolution for the 7-day right-sizing analysis (IF-191) at 1/6th the rows.
+const PERSIST_EVERY_N_TICKS: u64 = 6;
+/// Drop persisted samples older than this. The analysis window (7 days) is
+/// shorter, so this keeps a little extra history without unbounded growth.
+const METRICS_RETENTION_DAYS: i64 = 14;
+
 pub fn spawn_metrics_collector(
     docker: Arc<DockerClient>,
     db: Arc<dyn Database>,
@@ -72,8 +80,11 @@ pub fn spawn_metrics_collector(
     metrics_store: Arc<MetricsStore>,
 ) {
     tokio::spawn(async move {
+        let mut tick: u64 = 0;
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
+            tick = tick.wrapping_add(1);
+            let persist = tick % PERSIST_EVERY_N_TICKS == 0;
 
             let Ok(apps) = db.list_apps().await else {
                 continue;
@@ -95,6 +106,20 @@ pub fn spawn_metrics_collector(
 
                     metrics_store.record(&app.id, stats.clone()).await;
 
+                    // Persist a coarse sample for the resource packer (IF-191).
+                    if persist {
+                        let _ = db
+                            .record_container_metrics(
+                                &crate::db::models::NewContainerMetricsRecord {
+                                    app_id: app.id.clone(),
+                                    cpu_percent: stats.cpu_percent,
+                                    memory_usage_bytes: stats.memory_usage_bytes as i64,
+                                    memory_limit_bytes: stats.memory_limit_bytes as i64,
+                                },
+                            )
+                            .await;
+                    }
+
                     event_bus.emit(
                         EventType::HealthStatus,
                         Some(&app.id),
@@ -109,6 +134,12 @@ pub fn spawn_metrics_collector(
                         }),
                     );
                 }
+            }
+
+            // Prune occasionally — piggyback on the persist tick so it runs
+            // about once a minute, cheap given the indexed delete.
+            if persist {
+                let _ = db.prune_container_metrics(METRICS_RETENTION_DAYS).await;
             }
         }
     });

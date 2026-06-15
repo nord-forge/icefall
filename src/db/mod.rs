@@ -500,6 +500,15 @@ pub trait Database: Send + Sync + 'static {
     ) -> Result<Vec<ServerMetricsRecord>, DbError>;
     async fn prune_server_metrics_history(&self, older_than: &str) -> Result<u64, DbError>;
 
+    // Container Metrics History (IF-191 — per-container usage for right-sizing)
+    async fn record_container_metrics(
+        &self,
+        record: &NewContainerMetricsRecord,
+    ) -> Result<(), DbError>;
+    /// Aggregated per-app usage (avg/peak cpu+mem) over the last `days`.
+    async fn container_usage_stats(&self, days: i64) -> Result<Vec<ContainerUsageStats>, DbError>;
+    async fn prune_container_metrics(&self, keep_days: i64) -> Result<u64, DbError>;
+
     // Health Checks
     async fn create_health_check(&self, hc: &NewHealthCheck) -> Result<HealthCheck, DbError>;
     async fn get_health_checks(&self, app_id: &str) -> Result<Vec<HealthCheck>, DbError>;

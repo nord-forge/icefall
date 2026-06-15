@@ -181,6 +181,9 @@ impl DaemonRunner {
         );
         spawn_instance_backup_scheduler(db.clone(), instance_backup_handle.clone());
 
+        // IF-191: weekly right-sizing digest notification.
+        crate::optimize::spawn_optimization_digest(db.clone(), config.caddy_admin_url.clone());
+
         // Keep GitHub App installation tokens warm (IF-174).
         crate::github::refresh::spawn_token_refresher(db.clone());
 

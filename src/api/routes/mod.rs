@@ -31,6 +31,7 @@ pub mod notifications;
 pub mod oauth;
 pub mod onboarding;
 pub mod openapi;
+pub mod optimizations;
 pub mod profile;
 pub mod projects;
 pub mod scheduled_tasks;
@@ -137,6 +138,16 @@ pub fn api_routes() -> Router<AppState> {
         .route(
             "/servers/{id}/forecast",
             axum::routing::get(forecast::server_forecast),
+        )
+        // IF-191: Smart Resource Packer
+        .route(
+            "/servers/{id}/optimizations",
+            axum::routing::get(optimizations::get_optimizations)
+                .post(optimizations::apply_optimization),
+        )
+        .route(
+            "/servers/{id}/optimizations/apply-all",
+            axum::routing::post(optimizations::apply_all_optimizations),
         )
         .route("/templates", axum::routing::get(list_templates))
         .route(

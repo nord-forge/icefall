@@ -7,6 +7,9 @@ mod cleanup;
 mod cleanup_runs;
 mod cleanup_schedule;
 mod config_history;
+mod container_metrics;
+#[cfg(test)]
+mod container_metrics_tests;
 mod databases;
 mod deploy_approvals;
 mod deploy_events;
@@ -1617,6 +1620,26 @@ impl Database for SqliteDatabase {
 
     async fn prune_server_metrics_history(&self, older_than: &str) -> Result<u64, DbError> {
         maintenance::prune_server_metrics_history(&self.pool, older_than).await
+    }
+
+    // --- Container Metrics History (IF-191) ---
+
+    async fn record_container_metrics(
+        &self,
+        record: &crate::db::models::NewContainerMetricsRecord,
+    ) -> Result<(), DbError> {
+        container_metrics::record_container_metrics(&self.pool, record).await
+    }
+
+    async fn container_usage_stats(
+        &self,
+        days: i64,
+    ) -> Result<Vec<crate::db::models::ContainerUsageStats>, DbError> {
+        container_metrics::container_usage_stats(&self.pool, days).await
+    }
+
+    async fn prune_container_metrics(&self, keep_days: i64) -> Result<u64, DbError> {
+        container_metrics::prune_container_metrics(&self.pool, keep_days).await
     }
 
     // --- Cleanup / Pruning ---
