@@ -21,7 +21,7 @@ pub enum TeamRole {
 impl TeamRole {
     /// Parse the role string stored in `team_memberships.role`. An
     /// unrecognized value is treated as the least-privileged role.
-    fn parse(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "owner" => TeamRole::Owner,
             "admin" => TeamRole::Admin,

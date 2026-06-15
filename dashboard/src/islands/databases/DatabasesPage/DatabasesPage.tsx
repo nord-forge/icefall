@@ -8,9 +8,10 @@ import Select from '@islands/shared/Select/Select';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import DatabaseBrowser from '@islands/databases/DatabaseBrowser/DatabaseBrowser';
 import DatabasePublicAccess from '@islands/databases/DatabasePublicAccess/DatabasePublicAccess';
+import DatabaseTerminal from '@islands/databases/DatabaseTerminal/DatabaseTerminal';
 import { formatRelativeTime, formatBytes } from '@lib/format';
 import { api } from '@lib/api';
-import { Plus, Database, Trash2, Copy, Eye, EyeOff, RefreshCw, Download, RotateCcw } from 'lucide-preact';
+import { Plus, Database, Trash2, Copy, Eye, EyeOff, RefreshCw, Download, RotateCcw, TerminalSquare } from 'lucide-preact';
 import { SkeletonCard } from '@islands/shared/Skeleton/Skeleton';
 import Input from '@islands/shared/Input/Input';
 import styles from './databases-page.module.css';
@@ -58,6 +59,7 @@ export default function DatabasesPage() {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -135,7 +137,7 @@ export default function DatabasesPage() {
     const connStr = getConnectionString(selectedDb);
     return (
       <div>
-        <button onClick={() => setSelectedDb(null)} class={styles.backButton}>
+        <button onClick={() => { setShowTerminal(false); setSelectedDb(null); }} class={styles.backButton}>
           ← Back to databases
         </button>
 
@@ -245,6 +247,24 @@ export default function DatabasesPage() {
           </div>
 
           <div class={styles.card}>
+            <div class={styles.backupHeader}>
+              <h3 class={styles.cardTitle}>Terminal</h3>
+              {!showTerminal && (
+                <Button variant="secondary" size="sm" onClick={() => setShowTerminal(true)}>
+                  <TerminalSquare size={12} aria-hidden="true" /> Open terminal
+                </Button>
+              )}
+            </div>
+            {showTerminal ? (
+              <DatabaseTerminal dbId={selectedDb.id} />
+            ) : (
+              <p class={styles.noBackups}>
+                Open a {selectedDb.db_type} client session inside the database container.
+              </p>
+            )}
+          </div>
+
+          <div class={styles.card}>
             <DatabaseBrowser dbId={selectedDb.id} dbType={selectedDb.db_type} />
           </div>
 
@@ -341,7 +361,7 @@ export default function DatabasesPage() {
             <button
               key={db.id}
               type="button"
-              onClick={() => setSelectedDb(db)}
+              onClick={() => { setShowTerminal(false); setSelectedDb(db); }}
               class={styles.dbCard}
             >
               <div class={styles.dbCardHeader}>

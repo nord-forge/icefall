@@ -22,6 +22,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/apps/{id}/terminal", get(terminal_ws))
         .route("/servers/{id}/terminal", get(server_terminal_ws))
+        .route("/databases/{id}/terminal", get(database_terminal_ws))
 }
 
 #[derive(Deserialize)]
@@ -67,7 +68,119 @@ async fn terminal_ws(
     let container_id = container.id.clone();
     let docker = state.docker.clone();
 
-    Ok(ws.on_upgrade(move |socket| handle_terminal(socket, docker, container_id)))
+    Ok(ws.on_upgrade(move |socket| {
+        handle_terminal(socket, docker, container_id, vec!["/bin/sh".to_string()])
+    }))
+}
+
+/// Open a terminal into a managed database container (IF-165). Reuses the same
+/// exec/WebSocket machinery as the app terminal, but resolves the database
+/// container and launches the engine's native client instead of a plain shell.
+async fn database_terminal_ws(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<TerminalQuery>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ApiError> {
+    let user_id = if let Some(ref token) = params.token {
+        resolve_user(&state, token).await?
+    } else if let Some(session_id) = extract_session_id(&headers) {
+        resolve_user(&state, &session_id).await?
+    } else {
+        None
+    };
+    let user_id = user_id.ok_or_else(|| ApiError::Forbidden("Authentication required".into()))?;
+
+    // The database must belong to the caller's team.
+    let team_id = resolve_user_team(&state, &user_id).await?;
+    let db = state
+        .db
+        .get_managed_db_for_team(&team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
+
+    // Role enforcement: a live database shell can run destructive statements, so
+    // viewers are denied — only member-or-above may connect.
+    let role = state
+        .db
+        .get_team_membership(&db.team_id, &user_id)
+        .await?
+        .map(|m| crate::api::team_auth::TeamRole::parse(&m.role))
+        .unwrap_or(crate::api::team_auth::TeamRole::Viewer);
+    if role < crate::api::team_auth::TeamRole::Member {
+        return Err(ApiError::Forbidden(
+            "Database terminal requires at least member role".into(),
+        ));
+    }
+
+    // Resolve the container (by stored id, falling back to the conventional name)
+    // and build the engine's client command from the stored credentials.
+    let creds: serde_json::Value = serde_json::from_str(&db.credentials).unwrap_or_default();
+    let container_ref = db
+        .container_id
+        .clone()
+        .filter(|c| !c.is_empty())
+        .unwrap_or_else(|| format!("icefall-db-{}", db.name.to_lowercase()));
+
+    // Verify it's actually running before upgrading the socket.
+    let label = "icefall.managed-db=true";
+    let running = state
+        .docker
+        .list_containers(Some(label))
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .any(|c| {
+            (c.id == container_ref || c.name.trim_start_matches('/') == container_ref)
+                && c.state == "running"
+        });
+    if !running {
+        return Err(ApiError::BadRequest(
+            "Database container is not running".into(),
+        ));
+    }
+
+    let cmd = db_terminal_command(&db.db_type, &creds);
+    let docker = state.docker.clone();
+    Ok(ws.on_upgrade(move |socket| handle_terminal(socket, docker, container_ref, cmd)))
+}
+
+/// The native client command for each engine, with credentials injected from the
+/// stored admin account. Falls back to a plain shell for engines without a known
+/// client. The password is passed via the CLI/env the engine expects.
+fn db_terminal_command(db_type: &str, creds: &serde_json::Value) -> Vec<String> {
+    let user = creds["user"].as_str().unwrap_or("icefall");
+    let password = creds["password"].as_str().unwrap_or_default();
+    let s = |v: &str| v.to_string();
+    match db_type {
+        // psql reads PGPASSWORD from the env; wrap in a shell so we can set it.
+        "postgres" | "cockroachdb" => vec![
+            s("sh"),
+            s("-c"),
+            format!("PGPASSWORD={password} psql -U {user}"),
+        ],
+        // mysql/mariadb accept -p<password> with no space.
+        "mysql" | "mariadb" => vec![s("sh"), s("-c"), format!("mysql -u {user} -p{password}")],
+        "mongo" => vec![
+            s("mongosh"),
+            s("-u"),
+            s(user),
+            s("-p"),
+            s(password),
+            s("--authenticationDatabase"),
+            s("admin"),
+        ],
+        "redis" | "valkey" | "keydb" | "dragonfly" => {
+            vec![s("redis-cli"), s("-a"), s(password)]
+        }
+        "clickhouse" => vec![
+            s("clickhouse-client"),
+            format!("--user={user}"),
+            format!("--password={password}"),
+        ],
+        _ => vec![s("/bin/sh")],
+    }
 }
 
 /// Resolve a terminal auth token (API token or session id) to the owning
@@ -130,8 +243,9 @@ async fn handle_terminal(
     socket: WebSocket,
     docker: std::sync::Arc<crate::docker::DockerClient>,
     container_id: String,
+    cmd: Vec<String>,
 ) {
-    if let Err(e) = handle_terminal_inner(socket, docker, container_id).await {
+    if let Err(e) = handle_terminal_inner(socket, docker, container_id, cmd).await {
         tracing::warn!("terminal session ended with error: {e}");
     }
 }
@@ -140,6 +254,7 @@ async fn handle_terminal_inner(
     socket: WebSocket,
     docker: std::sync::Arc<crate::docker::DockerClient>,
     container_id: String,
+    cmd: Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (mut ws_sink, mut ws_stream) = socket.split();
 
@@ -149,7 +264,7 @@ async fn handle_terminal_inner(
         .create_exec(
             &container_id,
             CreateExecOptions {
-                cmd: Some(vec!["/bin/sh".to_string()]),
+                cmd: Some(cmd),
                 attach_stdin: Some(true),
                 attach_stdout: Some(true),
                 attach_stderr: Some(true),
@@ -403,4 +518,58 @@ async fn handle_remote_server_terminal(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn creds() -> serde_json::Value {
+        serde_json::json!({ "user": "icefall", "password": "s3cret" })
+    }
+
+    #[test]
+    fn postgres_uses_psql_with_pgpassword() {
+        let cmd = db_terminal_command("postgres", &creds());
+        assert_eq!(cmd[0], "sh");
+        assert_eq!(cmd[1], "-c");
+        assert!(cmd[2].contains("PGPASSWORD=s3cret"));
+        assert!(cmd[2].contains("psql -U icefall"));
+    }
+
+    #[test]
+    fn mysql_uses_inline_password() {
+        let cmd = db_terminal_command("mysql", &creds());
+        assert_eq!(cmd, vec!["sh", "-c", "mysql -u icefall -ps3cret"]);
+        // mariadb shares the client.
+        assert_eq!(
+            db_terminal_command("mariadb", &creds()),
+            db_terminal_command("mysql", &creds())
+        );
+    }
+
+    #[test]
+    fn redis_family_uses_redis_cli() {
+        for engine in ["redis", "valkey", "keydb", "dragonfly"] {
+            assert_eq!(
+                db_terminal_command(engine, &creds()),
+                vec!["redis-cli", "-a", "s3cret"],
+                "engine {engine}"
+            );
+        }
+    }
+
+    #[test]
+    fn mongo_and_clickhouse_clients() {
+        assert_eq!(db_terminal_command("mongo", &creds())[0], "mongosh");
+        assert_eq!(
+            db_terminal_command("clickhouse", &creds())[0],
+            "clickhouse-client"
+        );
+    }
+
+    #[test]
+    fn unknown_engine_falls_back_to_shell() {
+        assert_eq!(db_terminal_command("cassandra", &creds()), vec!["/bin/sh"]);
+    }
 }
