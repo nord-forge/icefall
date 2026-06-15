@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tracing::{error, info, warn};
 
-use crate::update::apply::{PendingUpdate, DASHBOARD_DIR};
+use crate::update::apply::PendingUpdate;
 use crate::update::UpdateError;
 
 use super::UpdateRollback;
@@ -58,26 +58,9 @@ impl UpdateRollback {
             warn!(path = %db_backup.display(), "database backup not found, skipping database restore");
         }
 
-        if let Some(ref dashboard_bak) = marker.dashboard_backup {
-            let bak_path = Path::new(dashboard_bak);
-            let dashboard_path = PathBuf::from(DASHBOARD_DIR);
-            if bak_path.exists() {
-                if dashboard_path.exists() {
-                    let _ = std::fs::remove_dir_all(&dashboard_path);
-                }
-                if let Err(e) = std::fs::rename(bak_path, &dashboard_path) {
-                    warn!(error = %e, "failed to restore dashboard assets, trying copy");
-                    if let Err(e2) =
-                        crate::update::apply::copy_dir_recursive(bak_path, &dashboard_path)
-                    {
-                        error!(error = %e2, "failed to copy dashboard assets during rollback");
-                    }
-                }
-                info!("dashboard assets restored from backup");
-            } else {
-                warn!(path = %bak_path.display(), "dashboard backup not found, skipping dashboard restore");
-            }
-        }
+        // The dashboard is embedded in the binary (IF-255), so restoring the
+        // rollback binary above already restores the previous UI — nothing
+        // separate to restore here.
 
         if let Err(e) = std::fs::remove_file(&marker_path) {
             warn!(error = %e, "failed to remove pending update marker");

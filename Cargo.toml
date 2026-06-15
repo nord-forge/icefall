@@ -128,6 +128,10 @@ axum = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
 
+# Dashboard embedded into the binary (IF-255)
+include_dir = "0.7"
+mime_guess = "2"
+
 # CLI
 clap = { workspace = true }
 
