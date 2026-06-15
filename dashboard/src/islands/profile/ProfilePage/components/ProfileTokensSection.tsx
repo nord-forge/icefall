@@ -4,6 +4,7 @@ import { formatRelativeTime } from '@lib/format';
 import { Key, Copy, Plus, Trash2 } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
+import TokenAbilityPicker, { TokenAbilityBadges } from '@islands/shared/TokenAbilityPicker/TokenAbilityPicker';
 import styles from '../profile-page.module.css';
 
 type Props = {
@@ -12,35 +13,12 @@ type Props = {
   onRevokeToken: (tokenId: string) => Promise<void>;
 };
 
-// Keep in sync with ALL_ABILITIES in src/api/abilities.rs.
-const ALL_ABILITIES = [
-  'apps:read', 'apps:write', 'apps:deploy',
-  'databases:read', 'databases:write',
-  'domains:read', 'domains:write',
-  'env:read', 'env:write',
-  'servers:read', 'servers:write',
-  'users:read', 'users:write',
-  'settings:read', 'settings:write',
-];
-
-const PRESETS: Record<string, string[]> = {
-  'Full access': [],
-  'Read only': ALL_ABILITIES.filter(a => a.endsWith(':read')),
-  'Deploy only': ['apps:read', 'apps:deploy', 'env:read'],
-};
-
 export default function ProfileTokensSection({ tokens, onCreateToken, onRevokeToken }: Props) {
   const [showCreateToken, setShowCreateToken] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [abilities, setAbilities] = useState<string[]>([]);
   const [newTokenValue, setNewTokenValue] = useState('');
   const [tokenSubmitting, setTokenSubmitting] = useState(false);
-
-  function toggleAbility(ability: string) {
-    setAbilities(prev =>
-      prev.includes(ability) ? prev.filter(a => a !== ability) : [...prev, ability],
-    );
-  }
 
   async function handleCreateToken() {
     if (!tokenName.trim()) return;
@@ -96,37 +74,7 @@ export default function ProfileTokensSection({ tokens, onCreateToken, onRevokeTo
             placeholder="CI/CD pipeline"
           />
 
-          {/* a11y [1.3.1]: grouped controls labelled by a legend */}
-          <fieldset class={styles.abilitiesFieldset}>
-            <legend class={styles.abilitiesLegend}>Abilities</legend>
-            <p class={styles.abilitiesHint}>
-              Leave all unchecked for full access. Pick a preset or choose scopes.
-            </p>
-            <div class={styles.abilityPresets}>
-              {Object.entries(PRESETS).map(([label, scopes]) => (
-                <Button
-                  key={label}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAbilities([...scopes])}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-            <div class={styles.abilityGrid}>
-              {ALL_ABILITIES.map(ability => (
-                <label key={ability} class={styles.abilityCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={abilities.includes(ability)}
-                    onChange={() => toggleAbility(ability)}
-                  />
-                  <span>{ability}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <TokenAbilityPicker value={abilities} onChange={setAbilities} />
 
           <div class={styles.cardActions}>
             <Button variant="ghost" onClick={() => { setShowCreateToken(false); setTokenName(''); }}>Cancel</Button>
@@ -151,15 +99,7 @@ export default function ProfileTokensSection({ tokens, onCreateToken, onRevokeTo
               <tr key={t.id} class={styles.tableRow}>
                 <td class={styles.td}>{t.name}</td>
                 <td class={styles.td}>
-                  {t.abilities && t.abilities.length > 0 ? (
-                    <span class={styles.abilityBadges}>
-                      {t.abilities.map(a => (
-                        <span key={a} class={styles.abilityBadge}>{a}</span>
-                      ))}
-                    </span>
-                  ) : (
-                    <span class={styles.tdMuted}>Full access</span>
-                  )}
+                  <TokenAbilityBadges abilities={t.abilities} />
                 </td>
                 <td class={styles.tdMuted}>{t.last_used_at ? formatRelativeTime(t.last_used_at) : 'Never'}</td>
                 <td class={styles.tdMuted}>{t.expires_at ? new Date(t.expires_at).toLocaleDateString() : 'Never'}</td>

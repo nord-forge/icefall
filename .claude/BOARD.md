@@ -20,7 +20,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 6. IF-191 — Smart Resource Packer
 
 **Partial — schema/columns exist, enforcement/UI/orchestration missing (20):**
-- Security-relevant first: IF-168 (token ability scoping — not enforced)
+- ~~Security-relevant first: IF-168 (token ability scoping)~~ — ✅ done (enforced + UI on both token surfaces)
 - Phase 25: IF-161, IF-166, IF-167, IF-172, IF-174
 - Phase 26: IF-177, IF-184, IF-189, IF-190, IF-193, IF-194
 - Phase 27: IF-195 (26/30 tools), IF-197 (missing Windsurf guide + tool ref)
@@ -335,7 +335,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-165](tickets/phase-25-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | ⬜ | Terminal exists for apps/servers only; no DB terminal route/UI |
 | [IF-166](tickets/phase-25-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | ✅ | `GET /apps/{id}/branches` + settings branch picker (datalist fed by git ls-remote, "load branches" button) (2026-06-14) |
 | [IF-167](tickets/phase-25-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | ✅ | Built the event→rules→channels fan-out (`notifications/emit.rs`); wired server.online/offline, backup.success/failure, disk warning/critical/recovered + global-rules API (2026-06-14). Subscription-matrix UI follow-up |
-| [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | ✅ | Enforced in `require_auth` (`api/abilities.rs`), 403 `insufficient_scope`; token UI has presets + ability checkboxes + badges (2026-06-14) |
+| [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | ✅ | Enforced in `require_auth` (`api/abilities.rs`), 403 `insufficient_scope`; shared `TokenAbilityPicker` (presets + checkboxes + badges) now used on BOTH profile and admin Users-page token UIs — closed the admin gap where tokens were silently full-access (2026-06-15) |
 | [IF-169](tickets/phase-25-parity-gaps/IF-169-ssh-key-management.md) | SSH key management | ✅ | `ssh_keys` table, model (ed25519/rsa), encrypted private key |
 | [IF-170](tickets/phase-25-parity-gaps/IF-170-docker-registry-credentials.md) | Container registry credentials | ✅ | `registries` table, encrypted creds, dockerhub/ghcr/gitlab/custom |
 | [IF-171](tickets/phase-25-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | ✅ | `{app}.icefall.internal` generated in deploy + DB hostnames |
