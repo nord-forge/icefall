@@ -19,6 +19,12 @@ pub fn routes() -> Router<AppState> {
             "/settings/registration",
             get(get_registration_settings).put(update_registration_settings),
         )
+        // Global reverse proxy settings (IF-149)
+        .route(
+            "/settings/proxy",
+            get(get_proxy_settings).put(update_proxy_settings),
+        )
+        .route("/settings/proxy/reload", post(reload_proxy))
 }
 
 async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::Value>, ApiError> {
@@ -204,5 +210,97 @@ async fn update_registration_settings(
             "default_role": updated.default_role,
         },
         "message": "Registration settings updated"
+    })))
+}
+
+// --- Global Reverse Proxy Settings (IF-149) ---
+
+async fn get_proxy_settings(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+
+    let settings = state.db.get_proxy_settings().await?;
+
+    // Surface Caddy status alongside the stored defaults.
+    let caddy_running = state.caddy.health_check().await.is_ok();
+
+    Ok(Json(serde_json::json!({
+        "data": {
+            "default_headers": settings.default_headers,
+            "default_rate_limit": settings.default_rate_limit,
+            "force_https": settings.force_https,
+            "updated_at": settings.updated_at,
+            "caddy_running": caddy_running,
+            "caddy_version": env!("CARGO_PKG_VERSION"),
+        }
+    })))
+}
+
+#[derive(Deserialize)]
+struct UpdateProxySettingsRequest {
+    /// JSON object of header name -> value. Omit to leave unchanged.
+    default_headers: Option<serde_json::Value>,
+    /// JSON: { enabled, requests, window, burst }. Omit to leave unchanged.
+    default_rate_limit: Option<serde_json::Value>,
+    force_https: Option<bool>,
+}
+
+async fn update_proxy_settings(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<UpdateProxySettingsRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let caller = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+    if caller.role != "admin" {
+        return Err(ApiError::BadRequest("Admin access required".into()));
+    }
+
+    let update = crate::db::models::UpdateProxySettings {
+        default_headers: body.default_headers.map(|v| Some(v.to_string())),
+        default_rate_limit: body.default_rate_limit.map(|v| Some(v.to_string())),
+        force_https: body.force_https,
+    };
+
+    let updated = state.db.update_proxy_settings(&update).await?;
+
+    Ok(Json(serde_json::json!({
+        "data": {
+            "default_headers": updated.default_headers,
+            "default_rate_limit": updated.default_rate_limit,
+            "force_https": updated.force_https,
+            "updated_at": updated.updated_at,
+        },
+        "message": "Proxy settings updated"
+    })))
+}
+
+async fn reload_proxy(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let caller = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+    if caller.role != "admin" {
+        return Err(ApiError::BadRequest("Admin access required".into()));
+    }
+
+    // Re-apply the currently loaded config — a no-op reload that surfaces any
+    // config errors and forces Caddy to pick up out-of-band changes.
+    let config = state.caddy.get_full_config().await?;
+    state
+        .caddy
+        .load_config(&config)
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("Caddy reload failed: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Caddy config reloaded"
     })))
 }

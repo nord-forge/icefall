@@ -101,6 +101,7 @@ mod tests {
             template_version: None,
             has_custom_proxy_config: false,
             proxy_presets: None,
+            custom_proxy_config: None,
             tunnel_enabled: false,
             desired_instances: 1,
             lb_policy: "round_robin".into(),

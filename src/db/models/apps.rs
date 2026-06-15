@@ -51,6 +51,7 @@ pub struct App {
     pub template_version: Option<String>,
     pub has_custom_proxy_config: bool,
     pub proxy_presets: Option<String>,
+    pub custom_proxy_config: Option<String>,
     pub tunnel_enabled: bool,
     pub desired_instances: i64,
     pub lb_policy: String,

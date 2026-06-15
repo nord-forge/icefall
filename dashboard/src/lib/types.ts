@@ -358,3 +358,62 @@ export type TeamInvitation = {
   expires_at: string;
   created_at: string;
 }
+
+// Reverse proxy management (IF-149)
+
+export type RateLimitPreset = {
+  enabled: boolean;
+  requests: number;
+  window: 'second' | 'minute';
+  burst: number;
+  per_ip: boolean;
+}
+
+export type BasicAuthPreset = {
+  enabled: boolean;
+  username: string;
+  password_hash: string;
+  path?: string | null;
+}
+
+export type RedirectRule = {
+  from: string;
+  to: string;
+  status: number;
+}
+
+export type HeaderRule = {
+  name: string;
+  value: string;
+}
+
+export type ProxyPresets = {
+  force_https?: boolean | null;
+  rate_limit?: RateLimitPreset | null;
+  basic_auth?: BasicAuthPreset | null;
+  redirects: RedirectRule[];
+  headers: HeaderRule[];
+}
+
+export type ProxyConfig = {
+  has_custom_proxy_config: boolean;
+  custom_proxy_config: string | null;
+  presets: ProxyPresets;
+  routes: unknown;
+}
+
+export type ProxyConfigHistoryEntry = {
+  id: string;
+  app_id: string;
+  config: string;
+  created_at: string;
+}
+
+export type GlobalProxySettings = {
+  default_headers: string | null;
+  default_rate_limit: string | null;
+  force_https: boolean;
+  updated_at: string;
+  caddy_running: boolean;
+  caddy_version: string;
+}

@@ -13,6 +13,7 @@ import GitIntegrationsSection from './components/GitIntegrationsSection';
 import GlobalLogDrainsSection from './components/GlobalLogDrainsSection';
 import CloudflareTunnelSection from './components/CloudflareTunnelSection';
 import ContainerCleanupSection from './components/ContainerCleanupSection';
+import ReverseProxySection from './components/ReverseProxySection';
 import McpServerSection from './components/McpServerSection';
 import styles from './settings-page.module.css';
 
@@ -50,6 +51,8 @@ export default function SettingsPage() {
       <GlobalLogDrainsSection onSaveMessage={setSaveMessage} />
 
       <CloudflareTunnelSection onSaveMessage={setSaveMessage} />
+
+      <ReverseProxySection onSaveMessage={setSaveMessage} />
 
       <ContainerCleanupSection onSaveMessage={setSaveMessage} />
 

@@ -1,4 +1,4 @@
-import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation } from './types';
+import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -906,6 +906,55 @@ export const api = {
   declineInvitation: (token: string) =>
     request<{ message: string }>(`/invitations/${token}`, {
       method: 'DELETE',
+    }),
+
+  // Reverse proxy management (IF-149)
+  getProxyConfig: (appId: string) =>
+    request<{ data: ProxyConfig }>(`/apps/${appId}/proxy`),
+
+  updateProxyPresets: (appId: string, presets: ProxyPresets) =>
+    request<{ data: { presets: ProxyPresets }; message: string }>(`/apps/${appId}/proxy/presets`, {
+      method: 'PUT',
+      body: JSON.stringify(presets),
+    }),
+
+  setCustomProxyConfig: (appId: string, config: unknown) =>
+    request<{ data: { has_custom_proxy_config: boolean }; message: string }>(`/apps/${appId}/proxy/custom`, {
+      method: 'PUT',
+      body: JSON.stringify({ config }),
+    }),
+
+  validateProxyConfig: (appId: string, config: unknown) =>
+    request<{ data: { valid: boolean; error?: string } }>(`/apps/${appId}/proxy/validate`, {
+      method: 'POST',
+      body: JSON.stringify({ config }),
+    }),
+
+  resetProxyConfig: (appId: string) =>
+    request<{ data: { has_custom_proxy_config: boolean }; message: string }>(`/apps/${appId}/proxy/reset`, {
+      method: 'POST',
+    }),
+
+  undoProxyConfig: (appId: string) =>
+    request<{ data: { restored_at: string }; message: string }>(`/apps/${appId}/proxy/undo`, {
+      method: 'POST',
+    }),
+
+  getProxyHistory: (appId: string) =>
+    request<{ data: ProxyConfigHistoryEntry[] }>(`/apps/${appId}/proxy/history`),
+
+  getGlobalProxySettings: () =>
+    request<{ data: GlobalProxySettings }>('/settings/proxy'),
+
+  updateGlobalProxySettings: (body: { default_headers?: unknown; default_rate_limit?: unknown; force_https?: boolean }) =>
+    request<{ data: GlobalProxySettings; message: string }>('/settings/proxy', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  reloadProxy: () =>
+    request<{ message: string }>('/settings/proxy/reload', {
+      method: 'POST',
     }),
 };
 

@@ -26,6 +26,8 @@ mod oauth;
 mod onboarding;
 mod project_environments;
 mod projects;
+mod proxy;
+mod proxy_tests;
 mod public_ports;
 mod registries;
 mod restore;
@@ -155,6 +157,49 @@ impl Database for SqliteDatabase {
 
     async fn delete_app(&self, id: &str) -> Result<(), DbError> {
         apps::delete_app(&self.pool, id).await
+    }
+
+    // --- Reverse proxy management (IF-149) ---
+
+    async fn record_proxy_config_history(&self, app_id: &str, config: &str) -> Result<(), DbError> {
+        proxy::record_proxy_config_history(&self.pool, app_id, config).await
+    }
+
+    async fn list_proxy_config_history(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<ProxyConfigHistory>, DbError> {
+        proxy::list_proxy_config_history(&self.pool, app_id).await
+    }
+
+    async fn latest_proxy_config_history(
+        &self,
+        app_id: &str,
+    ) -> Result<Option<ProxyConfigHistory>, DbError> {
+        proxy::latest_proxy_config_history(&self.pool, app_id).await
+    }
+
+    async fn set_proxy_presets(&self, app_id: &str, presets: &str) -> Result<(), DbError> {
+        proxy::set_proxy_presets(&self.pool, app_id, presets).await
+    }
+
+    async fn set_custom_proxy_config(&self, app_id: &str, config: &str) -> Result<(), DbError> {
+        proxy::set_custom_proxy_config(&self.pool, app_id, config).await
+    }
+
+    async fn clear_custom_proxy_config(&self, app_id: &str) -> Result<(), DbError> {
+        proxy::clear_custom_proxy_config(&self.pool, app_id).await
+    }
+
+    async fn get_proxy_settings(&self) -> Result<ProxySettings, DbError> {
+        proxy::get_proxy_settings(&self.pool).await
+    }
+
+    async fn update_proxy_settings(
+        &self,
+        update: &UpdateProxySettings,
+    ) -> Result<ProxySettings, DbError> {
+        proxy::update_proxy_settings(&self.pool, update).await
     }
 
     async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError> {
