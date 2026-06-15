@@ -9,9 +9,17 @@ use crate::github::client::GitHubClient;
 use crate::github::token::get_valid_installation_token;
 
 /// Post or update the preview-env comment for `app`'s `env`. `status` is a short
-/// label (e.g. "success", "destroyed"). No-op for non-preview envs, apps with no
-/// linked installation, or branches with no open PR.
-pub async fn post_preview_comment(state: &AppState, app: &App, env: &Environment, status: &str) {
+/// label (e.g. "success", "destroyed"). `sha` is the deployed commit, when known
+/// — passing it matches fork PRs too (the branch fallback only matches same-repo
+/// PRs). No-op for non-preview envs, apps with no linked installation, or
+/// branches/commits with no open PR.
+pub async fn post_preview_comment(
+    state: &AppState,
+    app: &App,
+    env: &Environment,
+    status: &str,
+    sha: Option<&str>,
+) {
     if env.env_type != "preview" {
         return;
     }
@@ -38,15 +46,25 @@ pub async fn post_preview_comment(state: &AppState, app: &App, env: &Environment
 
     let client = GitHubClient::new(&resolved.api_url);
 
-    // Resolve the PR for this branch.
-    let pr_number = match client
-        .find_pr_for_branch(&resolved.token, &owner, &repo, branch)
-        .await
-    {
+    // Prefer the commit-based lookup (matches fork PRs); fall back to the
+    // branch lookup when no SHA is available (e.g. branch-delete teardown).
+    let pr_lookup = match sha {
+        Some(sha) => {
+            client
+                .find_pr_for_commit(&resolved.token, &owner, &repo, sha)
+                .await
+        }
+        None => {
+            client
+                .find_pr_for_branch(&resolved.token, &owner, &repo, branch)
+                .await
+        }
+    };
+    let pr_number = match pr_lookup {
         Ok(Some(n)) => n,
         Ok(None) => return, // No open PR — nothing to comment on.
         Err(e) => {
-            tracing::warn!(app_id = %app.id, error = %e, "failed to find PR for branch");
+            tracing::warn!(app_id = %app.id, error = %e, "failed to find PR for preview");
             return;
         }
     };

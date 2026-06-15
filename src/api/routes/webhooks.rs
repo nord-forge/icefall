@@ -284,8 +284,13 @@ async fn trigger_deploy(
                         .await;
                 } else if env_clone.env_type == "preview" {
                     // IF-174: update the preview PR comment for non-production envs.
+                    // Pass the deployed SHA so fork PRs are matched too.
                     crate::github::pr_comment::post_preview_comment(
-                        &state, &app, &env_clone, "success",
+                        &state,
+                        &app,
+                        &env_clone,
+                        "success",
+                        current_deploy.git_sha.as_deref(),
                     )
                     .await;
                 }
@@ -337,7 +342,8 @@ async fn handle_branch_delete(state: &AppState, app: &crate::db::models::App, br
     }
 
     // IF-174: note the teardown on the PR before dropping the env.
-    crate::github::pr_comment::post_preview_comment(state, app, &env, "destroyed").await;
+    // Branch is gone at teardown, so no SHA — falls back to the branch lookup.
+    crate::github::pr_comment::post_preview_comment(state, app, &env, "destroyed", None).await;
 
     let _ = state.db.delete_env_vars_by_environment(&env.id).await;
     let _ = state.db.delete_environment(&env.id).await;

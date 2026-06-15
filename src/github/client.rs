@@ -357,8 +357,9 @@ impl GitHubClient {
     }
 
     /// Find the open PR number for a branch, if any. Filters the pulls list by
-    /// `head` (`owner:branch`). Note: only matches PRs from the same repo, not
-    /// forks (a fork's head owner differs).
+    /// `head` (`owner:branch`), so it matches same-repo PRs only — fork PRs have
+    /// a different head owner. Prefer `find_pr_for_commit` when a SHA is known;
+    /// this is the fallback for cases with no SHA (e.g. branch-delete teardown).
     pub async fn find_pr_for_branch(
         &self,
         token: &str,
@@ -389,6 +390,43 @@ impl GitHubClient {
             return Err(format!("Failed to find PR ({status}): {body}"));
         }
         let pulls: Vec<PullRef> = resp.json().await.map_err(|e| e.to_string())?;
+        Ok(pulls.first().map(|p| p.number))
+    }
+
+    /// Find the open PR associated with a commit SHA, if any. Unlike
+    /// `find_pr_for_branch`, this matches PRs opened from forks too (it keys on
+    /// the commit, not on `head-owner:branch`). Prefer this when a SHA is known.
+    pub async fn find_pr_for_commit(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Option<i64>, String> {
+        let api = format!(
+            "{}/repos/{}/{}/commits/{}/pulls",
+            self.api_url,
+            enc(owner),
+            enc(repo),
+            enc(sha)
+        );
+        let resp = self
+            .http
+            .get(&api)
+            .query(&[("state", "open"), ("per_page", "100")])
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to find PR for commit ({status}): {body}"));
+        }
+        let pulls: Vec<PullRef> = resp.json().await.map_err(|e| e.to_string())?;
+        // Prefer the first open PR; GitHub returns the open one(s) for this commit.
         Ok(pulls.first().map(|p| p.number))
     }
 }
