@@ -21,6 +21,10 @@ pub struct ProxySettings {
     /// JSON: { enabled, requests, window, burst }, or NULL.
     pub default_rate_limit: Option<String>,
     pub force_https: bool,
+    /// Inclusive low bound of the public-port allocation range (IF-172).
+    pub public_port_range_start: i32,
+    /// Inclusive high bound of the public-port allocation range (IF-172).
+    pub public_port_range_end: i32,
     pub updated_at: String,
 }
 
@@ -31,4 +35,6 @@ pub struct UpdateProxySettings {
     pub default_headers: Option<Option<String>>,
     pub default_rate_limit: Option<Option<String>>,
     pub force_https: Option<bool>,
+    pub public_port_range_start: Option<i32>,
+    pub public_port_range_end: Option<i32>,
 }

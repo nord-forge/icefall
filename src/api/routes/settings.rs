@@ -234,6 +234,8 @@ async fn get_proxy_settings(
             "default_headers": settings.default_headers,
             "default_rate_limit": settings.default_rate_limit,
             "force_https": settings.force_https,
+            "public_port_range_start": settings.public_port_range_start,
+            "public_port_range_end": settings.public_port_range_end,
             "updated_at": settings.updated_at,
             "caddy_running": caddy_running,
             "caddy_version": env!("CARGO_PKG_VERSION"),
@@ -248,6 +250,9 @@ struct UpdateProxySettingsRequest {
     /// JSON: { enabled, requests, window, burst }. Omit to leave unchanged.
     default_rate_limit: Option<serde_json::Value>,
     force_https: Option<bool>,
+    /// Public-port allocation range (IF-172). Both omitted = unchanged.
+    public_port_range_start: Option<i32>,
+    public_port_range_end: Option<i32>,
 }
 
 async fn update_proxy_settings(
@@ -262,10 +267,37 @@ async fn update_proxy_settings(
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
 
+    // Validate the port range up front: a non-positive bound or an inverted
+    // range would let the allocator hand out unusable ports. Use the stored
+    // value for any side the caller didn't send so we validate the resulting pair.
+    if body.public_port_range_start.is_some() || body.public_port_range_end.is_some() {
+        let existing = state.db.get_proxy_settings().await?;
+        let start = body
+            .public_port_range_start
+            .unwrap_or(existing.public_port_range_start);
+        let end = body
+            .public_port_range_end
+            .unwrap_or(existing.public_port_range_end);
+        // Ports above 65535 don't exist; below 1024 are privileged. Stay in the
+        // unprivileged user range so Caddy can bind without elevated rights.
+        if !(1024..=65535).contains(&start) || !(1024..=65535).contains(&end) {
+            return Err(ApiError::BadRequest(
+                "Public port range must be within 1024-65535".into(),
+            ));
+        }
+        if start > end {
+            return Err(ApiError::BadRequest(
+                "Public port range start must not exceed end".into(),
+            ));
+        }
+    }
+
     let update = crate::db::models::UpdateProxySettings {
         default_headers: body.default_headers.map(|v| Some(v.to_string())),
         default_rate_limit: body.default_rate_limit.map(|v| Some(v.to_string())),
         force_https: body.force_https,
+        public_port_range_start: body.public_port_range_start,
+        public_port_range_end: body.public_port_range_end,
     };
 
     let updated = state.db.update_proxy_settings(&update).await?;
@@ -275,6 +307,8 @@ async fn update_proxy_settings(
             "default_headers": updated.default_headers,
             "default_rate_limit": updated.default_rate_limit,
             "force_https": updated.force_https,
+            "public_port_range_start": updated.public_port_range_start,
+            "public_port_range_end": updated.public_port_range_end,
             "updated_at": updated.updated_at,
         },
         "message": "Proxy settings updated"

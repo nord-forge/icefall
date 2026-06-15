@@ -42,6 +42,59 @@ pub(super) async fn allocate_public_port(
     })
 }
 
+/// Allocate the lowest free port in `[range_start, range_end]` for a resource.
+///
+/// The allocator picks the lowest unused port and inserts it; the `UNIQUE(port)`
+/// constraint is the source of truth. If two requests race onto the same port,
+/// the loser hits the unique violation and retries with the next free port, so
+/// concurrent enables never double-allocate. Returns [`DbError::Conflict`] only
+/// when the entire range is exhausted.
+pub(super) async fn allocate_free_public_port(
+    pool: &SqlitePool,
+    resource_type: &str,
+    resource_id: &str,
+    range_start: i32,
+    range_end: i32,
+    ip_whitelist: Option<&str>,
+) -> Result<PublicPort, DbError> {
+    if range_start > range_end {
+        return Err(DbError::InvalidInput(format!(
+            "invalid public port range {range_start}-{range_end}"
+        )));
+    }
+
+    // Bound the retry loop by the range size: each iteration claims a distinct
+    // port, so after at most (range_end - range_start + 1) attempts every port
+    // has been tried and the range is genuinely full.
+    let max_attempts = (range_end - range_start + 1) as usize;
+    for _ in 0..max_attempts {
+        // Lowest port in range not already present in public_ports.
+        let taken: Vec<i32> = sqlx::query_scalar(
+            "SELECT port FROM public_ports WHERE port BETWEEN ? AND ? ORDER BY port",
+        )
+        .bind(range_start)
+        .bind(range_end)
+        .fetch_all(pool)
+        .await?;
+
+        let candidate = (range_start..=range_end).find(|p| !taken.contains(p));
+        let Some(port) = candidate else {
+            break;
+        };
+
+        match allocate_public_port(pool, resource_type, resource_id, port, ip_whitelist).await {
+            Ok(allocated) => return Ok(allocated),
+            // Lost a race for this port — recompute and try the next free one.
+            Err(DbError::Duplicate(_)) => continue,
+            Err(other) => return Err(other),
+        }
+    }
+
+    Err(DbError::InvalidInput(format!(
+        "no free public ports in range {range_start}-{range_end}"
+    )))
+}
+
 pub(super) async fn release_public_port(
     pool: &SqlitePool,
     resource_id: &str,

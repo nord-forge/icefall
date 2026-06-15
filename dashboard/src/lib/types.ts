@@ -416,7 +416,26 @@ export type GlobalProxySettings = {
   default_headers: string | null;
   default_rate_limit: string | null;
   force_https: boolean;
+  public_port_range_start: number;
+  public_port_range_end: number;
   updated_at: string;
   caddy_running: boolean;
   caddy_version: string;
+}
+
+// IF-172: public TCP access status for a managed database.
+export type PublicAccessConnection = {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  url: string;
+}
+
+export type PublicAccess = {
+  enabled: boolean;
+  port?: number;
+  host?: string;
+  ip_whitelist?: string | null;
+  connection?: PublicAccessConnection | null;
 }

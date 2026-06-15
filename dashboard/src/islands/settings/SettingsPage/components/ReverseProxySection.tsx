@@ -33,6 +33,8 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
   const [headers, setHeaders] = useState<HeaderEntry[]>([]);
   const [rateRequests, setRateRequests] = useState('');
   const [rateWindow, setRateWindow] = useState<'minute' | 'second'>('minute');
+  const [portRangeStart, setPortRangeStart] = useState('10000');
+  const [portRangeEnd, setPortRangeEnd] = useState('10100');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reloading, setReloading] = useState(false);
@@ -43,6 +45,8 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
       .then(({ data }) => {
         setSettings(data);
         setForceHttps(data.force_https);
+        setPortRangeStart(String(data.public_port_range_start));
+        setPortRangeEnd(String(data.public_port_range_end));
         setHeaders(parseHeaders(data.default_headers));
         try {
           const rl = data.default_rate_limit ? JSON.parse(data.default_rate_limit) : null;
@@ -61,10 +65,26 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
       const rateLimit = rateRequests
         ? { enabled: true, requests: Number(rateRequests) || 0, window: rateWindow, burst: 0 }
         : null;
+
+      const start = Number(portRangeStart);
+      const end = Number(portRangeEnd);
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1024 || end > 65535) {
+        addToast('error', 'Public port range must be whole numbers between 1024 and 65535.');
+        setSaving(false);
+        return;
+      }
+      if (start > end) {
+        addToast('error', 'Public port range start must not exceed the end.');
+        setSaving(false);
+        return;
+      }
+
       const { data } = await api.updateGlobalProxySettings({
         default_headers: Object.keys(headerObj).length ? headerObj : null,
         default_rate_limit: rateLimit,
         force_https: forceHttps,
+        public_port_range_start: start,
+        public_port_range_end: end,
       });
       setSettings(data);
       onSaveMessage('Reverse proxy settings saved');
@@ -135,6 +155,26 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
               <option value="second">Per second</option>
             </select>
           </label>
+        </div>
+      </fieldset>
+
+      <fieldset class={styles.fieldset}>
+        <legend class={styles.legend}>Public database port range</legend>
+        <p class={styles.muted}>
+          Ports handed out when a database is exposed for public TCP access. Each public
+          database uses one port from this range.
+        </p>
+        <div class={styles.inlineFields}>
+          <Input
+            label="Range start" name="public-port-range-start" type="number" min={1024} max={65535}
+            value={portRangeStart}
+            onChange={setPortRangeStart}
+          />
+          <Input
+            label="Range end" name="public-port-range-end" type="number" min={1024} max={65535}
+            value={portRangeEnd}
+            onChange={setPortRangeEnd}
+          />
         </div>
       </fieldset>
 

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
@@ -8,9 +6,9 @@ use crate::api::error::ApiError;
 use crate::api::team_auth::{TeamCtx, TeamRole};
 use crate::api::AppState;
 use crate::db::models::{NewEnvVar, NewManagedDatabase};
-use crate::docker::containers::{ContainerConfig, PortMapping, VolumeMount};
+use crate::docker::containers::PortMapping;
 
-use super::config::{db_configs, generate_password};
+use super::config::{build_db_container_config, db_configs, generate_password, DbContainerSpec};
 
 #[derive(Deserialize)]
 pub(super) struct CreateDatabaseRequest {
@@ -77,87 +75,35 @@ pub(super) async fn create_database(
     let password = generate_password();
     let db_user = "icefall";
     let container_name = format!("icefall-db-{}", body.name.trim().to_lowercase());
-    let volume_name = format!("icefall-db-{}-data", body.name.trim().to_lowercase());
-    let env = (type_config.env_vars)(db_user, &password, &body.name);
 
     let memory_bytes = (body.memory_mb.unwrap_or(type_config.default_memory_mb)) * 1024 * 1024;
 
-    let mut labels = HashMap::new();
-    labels.insert("icefall.managed-db".to_string(), "true".to_string());
-    labels.insert("icefall.db-name".to_string(), body.name.clone());
-
-    let mut ports = Vec::new();
-    if body.expose_port.unwrap_or(false) {
-        ports.push(PortMapping {
+    // `expose_port` publishes the engine port on the runtime's default host IP
+    // (0.0.0.0 on Docker). Public access (IF-172) is the controlled alternative:
+    // a loopback-only publish fronted by Caddy's L4 proxy.
+    let extra_ports = if body.expose_port.unwrap_or(false) {
+        vec![PortMapping {
             container_port: type_config.port,
             host_port: None,
             protocol: "tcp".to_string(),
-        });
-    }
-
-    let data_path = match body.db_type.as_str() {
-        "postgres" | "cockroachdb" => "/var/lib/postgresql/data",
-        "mysql" | "mariadb" => "/var/lib/mysql",
-        "redis" | "keydb" | "valkey" => "/data",
-        "dragonfly" => "/data",
-        "mongo" => "/data/db",
-        "clickhouse" => "/var/lib/clickhouse",
-        "cassandra" => "/var/lib/cassandra",
-        _ => "/data",
+            host_ip: None,
+        }]
+    } else {
+        Vec::new()
     };
 
-    let cmd = match body.db_type.as_str() {
-        "redis" => Some(vec![
-            "redis-server".to_string(),
-            "--requirepass".to_string(),
-            password.clone(),
-        ]),
-        "keydb" => Some(vec![
-            "keydb-server".to_string(),
-            "--requirepass".to_string(),
-            password.clone(),
-            "--server-threads".to_string(),
-            "2".to_string(),
-        ]),
-        "dragonfly" => Some(vec![
-            "dragonfly".to_string(),
-            "--requirepass".to_string(),
-            password.clone(),
-        ]),
-        "valkey" => Some(vec![
-            "valkey-server".to_string(),
-            "--requirepass".to_string(),
-            password.clone(),
-        ]),
-        "cockroachdb" => Some(vec![
-            "start-single-node".to_string(),
-            "--insecure".to_string(),
-            "--store=/var/lib/postgresql/data".to_string(),
-        ]),
-        _ => None,
-    };
-
-    let container_config = ContainerConfig {
-        name: container_name.clone(),
-        image: type_config.image.to_string(),
-        env,
-        cmd,
-        ports,
-        volumes: vec![VolumeMount {
-            source: volume_name.clone(),
-            target: data_path.to_string(),
-            read_only: false,
-        }],
-        memory_bytes: Some(memory_bytes),
-        cpu_shares: None,
-        restart_policy: Some("unless-stopped".to_string()),
-        labels,
-        network: body
-            .app_id
-            .as_ref()
-            .map(|_| format!("icefall-{}", body.name)),
-        hostname: Some(format!("{}.icefall.internal", body.name)),
-    };
+    let container_config = build_db_container_config(
+        &DbContainerSpec {
+            name: &body.name,
+            db_type: &body.db_type,
+            user: db_user,
+            password: &password,
+            memory_bytes,
+            app_id: body.app_id.as_deref(),
+            extra_ports,
+        },
+        type_config,
+    );
 
     state
         .docker
@@ -269,6 +215,14 @@ pub(super) async fn delete_database(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
     ctx.verify_team_access(&db.team_id, TeamRole::Admin)?;
+
+    // Tear down public access first so we never leave an orphan L4 route bound
+    // to a port whose container is gone. Best-effort: a missing route/port must
+    // not block the delete.
+    if let Ok(Some(public)) = state.db.get_public_port(&db.id).await {
+        let _ = state.caddy.remove_tcp_proxy(public.port as u16).await;
+        let _ = state.db.release_public_port(&db.id).await;
+    }
 
     let container_name = format!("icefall-db-{}", db.name.to_lowercase());
     let _ = state.docker.stop_container(&container_name, Some(10)).await;
