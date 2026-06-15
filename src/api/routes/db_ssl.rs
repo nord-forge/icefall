@@ -69,11 +69,11 @@ fn generate_self_signed_certs(db_id: &str) -> Result<(String, String, String, St
 
     let subject_alt_names = vec![format!("{db_id}.icefall.internal"), "localhost".to_string()];
 
-    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(subject_alt_names)
+    let CertifiedKey { cert, signing_key } = generate_simple_self_signed(subject_alt_names)
         .map_err(|e| ApiError::BadRequest(format!("Certificate generation failed: {e}")))?;
 
     let cert_pem = cert.pem();
-    let key_pem = key_pair.serialize_pem();
+    let key_pem = signing_key.serialize_pem();
 
     let expires_at = (chrono::Utc::now() + chrono::Duration::days(365)).to_rfc3339();
 
