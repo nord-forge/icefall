@@ -11,13 +11,13 @@
 Code-verified remaining work. Everything else previously marked "backlog" in
 phases 22/25/26/27 is already implemented (see status columns below).
 
-**Missing — no real implementation (4):**
+**Missing — no real implementation (3):**
 1. IF-151 — Cloudflare Tunnel integration (only a `tunnel_enabled` flag exists)
 2. IF-180 — App dependency graph
 3. IF-181 — Built-in API playground
-4. IF-191 — Smart Resource Packer
    (IF-173 Raw Compose mode — ✅ done 2026-06-15)
    (IF-165 Database terminal access — ✅ done 2026-06-15)
+   (IF-191 Smart Resource Packer — ✅ done 2026-06-15)
 
 **Partial — schema/columns exist, enforcement/UI/orchestration missing (20):**
 - ~~Security-relevant first: IF-168 (token ability scoping)~~ — ✅ done (enforced + UI on both token surfaces)
@@ -363,7 +363,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-188](tickets/phase-26-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | ✅ | `deploy_events` table, `list_deploy_events()` |
 | [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | ✅ | `GET /apps/inactive` + sidebar inactive-apps count badge (2026-06-14). Weekly digest email is a follow-up (depends on notification dispatch) |
 | [IF-190](tickets/phase-26-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | 🟡 | `tunnel_enabled` flag; no tunnel route/CLI |
-| [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | ⬜ | No recommendation engine / UI |
+| [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | ✅ | New `container_metrics_history` table + collector persistence (1/min, 14-day prune) — the missing data foundation; pure `optimize` engine (over/under-provisioned, idle→ghost, co-location) with savings; `GET /servers/{id}/optimizations` + apply/apply-all (admin); weekly digest notification; Optimization section on server detail (2026-06-15) |
 | [IF-192](tickets/phase-26-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | ✅ | `bundles.rs` route, `bundle_imports`, export/import |
 | [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | ✅ | Log API applies stored noise patterns (suppress + `suppressed_count`) and highlight flags; `suppress_noise` toggle (2026-06-14) |
 | [IF-194](tickets/phase-26-icefall-plus/IF-194-power-nap-scheduler.md) | Power Nap Scheduler | 🟡 | `power_nap_*` cols; no quiet-hours scheduler |

@@ -310,6 +310,32 @@ export type ServerForecast = {
   data_points: number;
 }
 
+// IF-191: Smart Resource Packer
+export type OptimizationKind =
+  | 'over_provisioned' | 'under_provisioned' | 'idle' | 'colocation';
+
+export type Recommendation = {
+  app_id: string;
+  app_name: string;
+  kind: OptimizationKind;
+  message: string;
+  current_memory_bytes: number;
+  suggested_memory_bytes: number | null;
+  ram_saved_bytes: number;
+  estimated_monthly_savings_usd: number;
+  auto_applicable: boolean;
+}
+
+export type ServerOptimizations = {
+  recommendations: Recommendation[];
+  summary: {
+    count: number;
+    ram_saved_bytes: number;
+    estimated_monthly_savings_usd: number;
+  };
+  analysis_days: number;
+}
+
 export type DeployApproval = {
   id: string;
   deploy_id: string;

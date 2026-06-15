@@ -1,4 +1,4 @@
-import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings, PublicAccess } from './types';
+import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings, PublicAccess, ServerOptimizations } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -855,6 +855,18 @@ export const api = {
   // Server forecast
   getServerForecast: (serverId: string) =>
     request<{ data: ServerForecast }>(`/servers/${serverId}/forecast`),
+
+  // IF-191: Smart Resource Packer
+  getServerOptimizations: (serverId: string) =>
+    request<{ data: ServerOptimizations }>(`/servers/${serverId}/optimizations`),
+  applyOptimization: (serverId: string, body: { app_id: string; kind: string; memory_bytes?: number }) =>
+    request<{ message: string }>(`/servers/${serverId}/optimizations`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+  applyAllOptimizations: (serverId: string) =>
+    request<{ message: string; applied: number }>(`/servers/${serverId}/optimizations/apply-all`, {
+      method: 'POST',
+    }),
 
   // Bundles
   exportBundle: (appId: string) =>
