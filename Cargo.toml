@@ -79,10 +79,6 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-# OpenAPI
-utoipa = { version = "5", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "9", features = ["axum"] }
-
 # Build context (tar archives for Docker image builds)
 tar = "0.4"
 flate2 = "1"
@@ -192,10 +188,6 @@ thiserror = { workspace = true }
 # Logging / tracing
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
-# OpenAPI
-utoipa = { workspace = true }
-utoipa-swagger-ui = { workspace = true }
 
 # Build context (tar archives for Docker image builds)
 tar = { workspace = true }
