@@ -816,6 +816,10 @@ export const api = {
   listGitSourceRepos: (id: string) =>
     request<{ data: GitHubRepo[] }>(`/git-sources/${id}/repos`),
 
+  // IF-174: branches for a repo via the GitHub App installation.
+  listGitSourceBranches: (id: string, repo: string) =>
+    request<{ data: string[] }>(`/git-sources/${id}/branches?repo=${encodeURIComponent(repo)}`),
+
   // Cleanup
   getCleanupSchedule: () =>
     request<{ data: CleanupSchedule }>('/cleanup-schedule'),

@@ -4,6 +4,7 @@ import { addToast } from '@stores/toast';
 import { ExternalLink, AlertTriangle, Check, GitFork } from 'lucide-preact';
 import Input from '@islands/shared/Input/Input';
 import Button from '@islands/shared/Button/Button';
+import RepoBrowser from './RepoBrowser';
 import formStyles from '@styles/form.module.css';
 import styles from '../app-create.module.css';
 
@@ -25,6 +26,26 @@ export default function GitRepoStep({
   const [hasGitHubApp, setHasGitHubApp] = useState<boolean | null>(null);
   const [hasInstallations, setHasInstallations] = useState<boolean | null>(null);
   const [loadingSetup, setLoadingSetup] = useState(false);
+  const [browse, setBrowse] = useState(false);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  // After a repo is picked from the browser, load its branches for the selector.
+  async function selectFromBrowser(repo: string, branch: string, installationId: string) {
+    onUpdate('git_repo', `https://github.com/${repo}`);
+    onUpdate('git_branch', branch);
+    onUpdate('github_installation_id', installationId);
+    setBrowse(false);
+    setLoadingBranches(true);
+    try {
+      const { data } = await api.listGitSourceBranches(installationId, repo);
+      setBranches(data);
+    } catch {
+      setBranches([]);
+    } finally {
+      setLoadingBranches(false);
+    }
+  }
 
   useEffect(() => {
     api.listGitHubApps()
@@ -79,17 +100,46 @@ export default function GitRepoStep({
         id="create-repo-url"
         mono
         value={gitRepo}
-        onChange={(v) => onUpdate('git_repo', v)}
+        onChange={(v) => {
+          onUpdate('git_repo', v);
+          // Manual edits invalidate the browser-derived branch list + link.
+          if (branches.length > 0) setBranches([]);
+          onUpdate('github_installation_id', '');
+        }}
         placeholder="https://github.com/user/repo"
       />
-      <Input
-        label="Branch"
-        name="branch"
-        id="create-branch"
-        mono
-        value={gitBranch}
-        onChange={(v) => onUpdate('git_branch', v)}
-      />
+      {branches.length > 0 ? (
+        <div class={formStyles.field}>
+          <label htmlFor="create-branch-select" class={formStyles.label}>Branch</label>
+          <select
+            id="create-branch-select"
+            class={formStyles.select}
+            value={gitBranch}
+            onChange={(e) => onUpdate('git_branch', (e.target as HTMLSelectElement).value)}
+          >
+            {branches.map((b) => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </div>
+      ) : (
+        <Input
+          label="Branch"
+          name="branch"
+          id="create-branch"
+          mono
+          value={gitBranch}
+          helpText={loadingBranches ? 'Loading branches…' : undefined}
+          onChange={(v) => onUpdate('git_branch', v)}
+        />
+      )}
+
+      {isReady && (
+        <div>
+          <Button variant="secondary" size="sm" onClick={() => setBrowse((b) => !b)}>
+            <GitFork size={14} aria-hidden="true" /> {browse ? 'Hide repositories' : 'Browse repositories'}
+          </Button>
+          {browse && <RepoBrowser onSelect={selectFromBrowser} />}
+        </div>
+      )}
 
       {isGitHubUrl && hasGitHubApp !== null && needsSetup && (
         <div class={styles.githubNotice} role="status">

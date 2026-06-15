@@ -48,6 +48,21 @@ pub(super) async fn get_app(pool: &SqlitePool, id: &str) -> Result<Option<App>, 
     Ok(app)
 }
 
+/// Set the app's incoming-webhook HMAC secret (IF-174 auto webhook setup).
+pub(super) async fn set_app_webhook_secret(
+    pool: &SqlitePool,
+    app_id: &str,
+    secret: &str,
+) -> Result<(), DbError> {
+    sqlx::query("UPDATE apps SET webhook_secret = ?, updated_at = ? WHERE id = ?")
+        .bind(secret)
+        .bind(now_iso8601())
+        .bind(app_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub(super) async fn get_app_by_name(pool: &SqlitePool, name: &str) -> Result<Option<App>, DbError> {
     let app = sqlx::query_as::<_, App>("SELECT * FROM apps WHERE name = ?")
         .bind(name)
@@ -191,6 +206,10 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.project_environment_id.as_deref(),
     };
+    let github_installation_id = match &update.github_installation_id {
+        Some(v) => v.as_deref(),
+        None => existing.github_installation_id.as_deref(),
+    };
     let desired_instances = update
         .desired_instances
         .unwrap_or(existing.desired_instances);
@@ -217,7 +236,7 @@ pub(super) async fn update_app(
          canary_enabled = ?, canary_config = ?,
          log_noise_patterns = ?, log_highlight_patterns = ?,
          tunnel_enabled = ?, require_deploy_approval = ?,
-         project_environment_id = ?,
+         project_environment_id = ?, github_installation_id = ?,
          desired_instances = ?, lb_policy = ?,
          lb_health_check_path = ?, lb_sticky_sessions = ?,
          updated_at = ? WHERE id = ?",
@@ -257,6 +276,7 @@ pub(super) async fn update_app(
     .bind(tunnel_enabled)
     .bind(require_deploy_approval)
     .bind(project_environment_id)
+    .bind(github_installation_id)
     .bind(desired_instances)
     .bind(lb_policy)
     .bind(lb_health_check_path)

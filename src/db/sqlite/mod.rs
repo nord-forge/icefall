@@ -16,6 +16,7 @@ mod drift;
 mod environments;
 mod forecast;
 mod github;
+mod github_tests;
 mod health;
 mod incidents;
 mod instance_lifecycle_tests;
@@ -157,6 +158,10 @@ impl Database for SqliteDatabase {
 
     async fn delete_app(&self, id: &str) -> Result<(), DbError> {
         apps::delete_app(&self.pool, id).await
+    }
+
+    async fn set_app_webhook_secret(&self, app_id: &str, secret: &str) -> Result<(), DbError> {
+        apps::set_app_webhook_secret(&self.pool, app_id, secret).await
     }
 
     // --- Reverse proxy management (IF-149) ---
@@ -671,6 +676,75 @@ impl Database for SqliteDatabase {
 
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError> {
         github::delete_github_installation(&self.pool, id).await
+    }
+
+    async fn get_github_installation(
+        &self,
+        id: &str,
+    ) -> Result<Option<GitHubInstallation>, DbError> {
+        github::get_github_installation(&self.pool, &self.encryptor, id).await
+    }
+
+    async fn get_github_installation_by_installation_id(
+        &self,
+        installation_id: i64,
+    ) -> Result<Option<GitHubInstallation>, DbError> {
+        github::get_github_installation_by_installation_id(
+            &self.pool,
+            &self.encryptor,
+            installation_id,
+        )
+        .await
+    }
+
+    async fn update_github_installation_token(
+        &self,
+        installation_id: i64,
+        access_token: &str,
+        token_expires_at: &str,
+    ) -> Result<(), DbError> {
+        github::update_github_installation_token(
+            &self.pool,
+            &self.encryptor,
+            installation_id,
+            access_token,
+            token_expires_at,
+        )
+        .await
+    }
+
+    async fn list_installations_needing_token_refresh(
+        &self,
+        threshold: &str,
+    ) -> Result<Vec<GitHubInstallation>, DbError> {
+        github::list_installations_needing_token_refresh(&self.pool, threshold).await
+    }
+
+    async fn get_github_pr_comment(
+        &self,
+        app_id: &str,
+        pr_number: i64,
+    ) -> Result<Option<GitHubPrComment>, DbError> {
+        github::get_github_pr_comment(&self.pool, app_id, pr_number).await
+    }
+
+    async fn upsert_github_pr_comment(
+        &self,
+        app_id: &str,
+        installation_id: i64,
+        repo_full_name: &str,
+        pr_number: i64,
+        comment_id: i64,
+    ) -> Result<(), DbError> {
+        github::upsert_github_pr_comment(
+            &self.pool,
+            app_id,
+            installation_id,
+            repo_full_name,
+            pr_number,
+            comment_id,
+        )
+        .await
     }
 
     // --- GitHub Apps ---

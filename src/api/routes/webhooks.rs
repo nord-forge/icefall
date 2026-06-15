@@ -240,6 +240,11 @@ async fn trigger_deploy(
     let env_clone = env.clone();
     let state = state.clone();
 
+    // IF-174: report deploy progress to GitHub as a commit status. The watcher
+    // polls the deploy's terminal state, so it works regardless of which spawn
+    // branch runs and reports build failures too (best-effort, no-op if unlinked).
+    crate::github::status::watch_deploy(&state, &app, &deploy.id, Some(sha));
+
     tokio::spawn(async move {
         let _guard = lock.lock().await;
 
@@ -277,6 +282,17 @@ async fn trigger_deploy(
                         .db
                         .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
                         .await;
+                } else if env_clone.env_type == "preview" {
+                    // IF-174: update the preview PR comment for non-production envs.
+                    // Pass the deployed SHA so fork PRs are matched too.
+                    crate::github::pr_comment::post_preview_comment(
+                        &state,
+                        &app,
+                        &env_clone,
+                        "success",
+                        current_deploy.git_sha.as_deref(),
+                    )
+                    .await;
                 }
             }
             Err(e) => {
@@ -324,6 +340,10 @@ async fn handle_branch_delete(state: &AppState, app: &crate::db::models::App, br
     if let Err(e) = manager.teardown(app, &env, "").await {
         tracing::error!("Failed to tear down preview environment: {e}");
     }
+
+    // IF-174: note the teardown on the PR before dropping the env.
+    // Branch is gone at teardown, so no SHA — falls back to the branch lookup.
+    crate::github::pr_comment::post_preview_comment(state, app, &env, "destroyed", None).await;
 
     let _ = state.db.delete_env_vars_by_environment(&env.id).await;
     let _ = state.db.delete_environment(&env.id).await;
