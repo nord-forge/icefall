@@ -40,6 +40,7 @@ pub trait Database: Send + Sync + 'static {
     async fn list_apps_by_project(&self, project_id: &str) -> Result<Vec<App>, DbError>;
     async fn update_app(&self, id: &str, update: &UpdateApp) -> Result<App, DbError>;
     async fn delete_app(&self, id: &str) -> Result<(), DbError>;
+    async fn set_app_webhook_secret(&self, app_id: &str, secret: &str) -> Result<(), DbError>;
 
     // Reverse proxy management (IF-149)
     async fn record_proxy_config_history(&self, app_id: &str, config: &str) -> Result<(), DbError>;
@@ -284,6 +285,39 @@ pub trait Database: Send + Sync + 'static {
     ) -> Result<GitHubInstallation, DbError>;
     async fn list_github_installations(&self) -> Result<Vec<GitHubInstallation>, DbError>;
     async fn delete_github_installation(&self, id: &str) -> Result<(), DbError>;
+    async fn get_github_installation(
+        &self,
+        id: &str,
+    ) -> Result<Option<GitHubInstallation>, DbError>;
+    async fn get_github_installation_by_installation_id(
+        &self,
+        installation_id: i64,
+    ) -> Result<Option<GitHubInstallation>, DbError>;
+    async fn update_github_installation_token(
+        &self,
+        installation_id: i64,
+        access_token: &str,
+        token_expires_at: &str,
+    ) -> Result<(), DbError>;
+    async fn list_installations_needing_token_refresh(
+        &self,
+        threshold: &str,
+    ) -> Result<Vec<GitHubInstallation>, DbError>;
+
+    // GitHub PR comments (preview-env status)
+    async fn get_github_pr_comment(
+        &self,
+        app_id: &str,
+        pr_number: i64,
+    ) -> Result<Option<GitHubPrComment>, DbError>;
+    async fn upsert_github_pr_comment(
+        &self,
+        app_id: &str,
+        installation_id: i64,
+        repo_full_name: &str,
+        pr_number: i64,
+        comment_id: i64,
+    ) -> Result<(), DbError>;
 
     // GitHub Apps
     async fn create_github_app(&self, app: &GitHubApp) -> Result<GitHubApp, DbError>;

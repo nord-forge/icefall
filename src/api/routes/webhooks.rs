@@ -240,8 +240,20 @@ async fn trigger_deploy(
     let env_clone = env.clone();
     let state = state.clone();
 
+    let commit_sha = sha.to_string();
+
     tokio::spawn(async move {
         let _guard = lock.lock().await;
+
+        // IF-174: report deploy progress as a GitHub commit status (best-effort).
+        crate::github::status::report_deploy_status(
+            &state,
+            &app,
+            &commit_sha,
+            "pending",
+            "Build started",
+        )
+        .await;
 
         let orchestrator =
             BuildOrchestrator::new(state.docker.clone(), state.db.clone(), state.config.clone());
@@ -277,10 +289,42 @@ async fn trigger_deploy(
                         .db
                         .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
                         .await;
+                    crate::github::status::report_deploy_status(
+                        &state,
+                        &app,
+                        &commit_sha,
+                        "failure",
+                        &format!("Deploy failed: {e}"),
+                    )
+                    .await;
+                } else {
+                    crate::github::status::report_deploy_status(
+                        &state,
+                        &app,
+                        &commit_sha,
+                        "success",
+                        "Deployed successfully",
+                    )
+                    .await;
+                    // IF-174: update the preview PR comment for non-production envs.
+                    if env_clone.env_type == "preview" {
+                        crate::github::pr_comment::post_preview_comment(
+                            &state, &app, &env_clone, "success",
+                        )
+                        .await;
+                    }
                 }
             }
             Err(e) => {
                 tracing::error!("Build failed for {deploy_id}: {e}");
+                crate::github::status::report_deploy_status(
+                    &state,
+                    &app,
+                    &commit_sha,
+                    "failure",
+                    &format!("Build failed: {e}"),
+                )
+                .await;
             }
         }
     });
@@ -324,6 +368,9 @@ async fn handle_branch_delete(state: &AppState, app: &crate::db::models::App, br
     if let Err(e) = manager.teardown(app, &env, "").await {
         tracing::error!("Failed to tear down preview environment: {e}");
     }
+
+    // IF-174: note the teardown on the PR before dropping the env.
+    crate::github::pr_comment::post_preview_comment(state, app, &env, "destroyed").await;
 
     let _ = state.db.delete_env_vars_by_environment(&env.id).await;
     let _ = state.db.delete_environment(&env.id).await;

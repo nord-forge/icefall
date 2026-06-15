@@ -181,6 +181,9 @@ impl DaemonRunner {
         );
         spawn_instance_backup_scheduler(db.clone(), instance_backup_handle.clone());
 
+        // Keep GitHub App installation tokens warm (IF-174).
+        crate::github::refresh::spawn_token_refresher(db.clone());
+
         // Spawn periodic update checker + auto-update applier
         crate::update::scheduler::spawn_update_checker(
             db.clone(),

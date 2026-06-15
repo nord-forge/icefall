@@ -341,7 +341,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-171](tickets/phase-25-parity-gaps/IF-171-internal-url-generation.md) | Internal URL generation | ✅ | `{app}.icefall.internal` generated in deploy + DB hostnames |
 | [IF-172](tickets/phase-25-parity-gaps/IF-172-public-port-tcp-proxy.md) | Public port / TCP proxy | 🟡 | `public_ports` table + allocation; no Caddy L4 TCP proxy wiring |
 | [IF-173](tickets/phase-25-parity-gaps/IF-173-raw-compose-mode.md) | Raw Compose mode | ⬜ | No raw-compose field/logic |
-| [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | 🟡 | `github_apps`/`github_installations` tables + build use; webhook automation, PR status checks/comments not wired |
+| [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | ✅ | Installation token storage+refresh (30-min background task), app↔installation link, auto webhook creation on repo link, commit status checks (pending/success/failure), PR preview comments (edit-in-place + teardown), repo branch listing + browser wiring; reqwest client extended |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 
 ### Phase 26 — Icefall+ Differentiators — 13 ✅ · 4 🟡 · 3 ⬜

@@ -38,6 +38,7 @@ export default function AppCreateWizard() {
     envContent: '',
     image_ref: '',
     compose_content: '',
+    github_installation_id: '',
   });
 
   const projectId = useMemo(() => {
@@ -173,6 +174,12 @@ export default function AppCreateWizard() {
 
       if (projectId) {
         await api.updateApp(app.id, { project_id: projectId } as any);
+      }
+
+      // IF-174: link the GitHub installation so Icefall can auto-create the
+      // webhook and post deploy statuses / PR comments for this app.
+      if (form.github_installation_id) {
+        await api.updateApp(app.id, { github_installation_id: form.github_installation_id } as any);
       }
 
       if (form.envContent.trim()) {

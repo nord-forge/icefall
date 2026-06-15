@@ -143,6 +143,243 @@ impl GitHubClient {
 
         Ok(all_repos)
     }
+
+    /// List branch names for a repo (installation-token auth, paginated).
+    pub async fn list_repo_branches(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<String>, String> {
+        let mut branches = Vec::new();
+        let mut page = 1u32;
+        loop {
+            let url = format!(
+                "{}/repos/{}/{}/branches?per_page=100&page={}",
+                self.api_url, owner, repo, page
+            );
+            let resp = self
+                .http
+                .get(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "Icefall-PaaS")
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                return Err(format!("Failed to list branches ({status}): {body}"));
+            }
+            let page_branches: Vec<BranchRef> = resp.json().await.map_err(|e| e.to_string())?;
+            let count = page_branches.len();
+            branches.extend(page_branches.into_iter().map(|b| b.name));
+            if count < 100 || page > 50 {
+                break;
+            }
+            page += 1;
+        }
+        Ok(branches)
+    }
+
+    /// Create a repository webhook delivering `push`, `pull_request`, and `create`
+    /// events to `url`, secured with `secret`. Returns the new webhook's id.
+    pub async fn create_webhook(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        url: &str,
+        secret: &str,
+    ) -> Result<i64, String> {
+        let api = format!("{}/repos/{}/{}/hooks", self.api_url, owner, repo);
+        let payload = serde_json::json!({
+            "name": "web",
+            "active": true,
+            "events": ["push", "pull_request", "create"],
+            "config": {
+                "url": url,
+                "content_type": "json",
+                "secret": secret,
+                "insecure_ssl": "0",
+            },
+        });
+        let resp = self
+            .http
+            .post(&api)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to create webhook ({status}): {body}"));
+        }
+        let created: WebhookCreated = resp.json().await.map_err(|e| e.to_string())?;
+        Ok(created.id)
+    }
+
+    /// Create or update a commit status. `state` is one of pending/success/
+    /// failure/error. `context` groups statuses (e.g. "icefall/deploy").
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_commit_status(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+        state: &str,
+        description: &str,
+        context: &str,
+        target_url: Option<&str>,
+    ) -> Result<(), String> {
+        let api = format!("{}/repos/{}/{}/statuses/{}", self.api_url, owner, repo, sha);
+        let mut payload = serde_json::json!({
+            "state": state,
+            // GitHub truncates descriptions at 140 chars.
+            "description": description.chars().take(140).collect::<String>(),
+            "context": context,
+        });
+        if let Some(url) = target_url {
+            payload["target_url"] = serde_json::Value::String(url.to_string());
+        }
+        let resp = self
+            .http
+            .post(&api)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to set commit status ({status}): {body}"));
+        }
+        Ok(())
+    }
+
+    /// Post a comment on an issue/PR (PRs are issues in GitHub's API). Returns
+    /// the new comment's id so it can be edited later.
+    pub async fn create_comment(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        issue_number: i64,
+        body: &str,
+    ) -> Result<i64, String> {
+        let api = format!(
+            "{}/repos/{}/{}/issues/{}/comments",
+            self.api_url, owner, repo, issue_number
+        );
+        let resp = self
+            .http
+            .post(&api)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .json(&serde_json::json!({ "body": body }))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to create comment ({status}): {text}"));
+        }
+        let created: CommentCreated = resp.json().await.map_err(|e| e.to_string())?;
+        Ok(created.id)
+    }
+
+    /// Edit an existing issue/PR comment by id.
+    pub async fn update_comment(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        comment_id: i64,
+        body: &str,
+    ) -> Result<(), String> {
+        let api = format!(
+            "{}/repos/{}/{}/issues/comments/{}",
+            self.api_url, owner, repo, comment_id
+        );
+        let resp = self
+            .http
+            .patch(&api)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .json(&serde_json::json!({ "body": body }))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to update comment ({status}): {text}"));
+        }
+        Ok(())
+    }
+
+    /// Find the open PR number for a branch, if any. Uses the pulls list filtered
+    /// by `head` (which expects `owner:branch`).
+    pub async fn find_pr_for_branch(
+        &self,
+        token: &str,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> Result<Option<i64>, String> {
+        let api = format!(
+            "{}/repos/{}/{}/pulls?state=open&head={}:{}&per_page=1",
+            self.api_url, owner, repo, owner, branch
+        );
+        let resp = self
+            .http
+            .get(&api)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to find PR ({status}): {body}"));
+        }
+        let pulls: Vec<PullRef> = resp.json().await.map_err(|e| e.to_string())?;
+        Ok(pulls.first().map(|p| p.number))
+    }
+}
+
+#[derive(Deserialize)]
+struct BranchRef {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct WebhookCreated {
+    id: i64,
+}
+
+#[derive(Deserialize)]
+struct CommentCreated {
+    id: i64,
+}
+
+#[derive(Deserialize)]
+struct PullRef {
+    number: i64,
 }
 
 #[cfg(test)]

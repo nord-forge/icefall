@@ -62,6 +62,7 @@ pub(super) struct UpdateAppRequest {
     tunnel_enabled: Option<bool>,
     require_deploy_approval: Option<bool>,
     project_environment_id: Option<Option<String>>,
+    github_installation_id: Option<Option<String>>,
 }
 
 pub(super) async fn list_apps(
@@ -258,6 +259,7 @@ pub(super) async fn update_app(
                 tunnel_enabled: body.tunnel_enabled,
                 require_deploy_approval: body.require_deploy_approval,
                 project_environment_id: body.project_environment_id,
+                github_installation_id: body.github_installation_id,
                 desired_instances: None,
                 lb_policy: None,
                 lb_health_check_path: None,
@@ -265,6 +267,23 @@ pub(super) async fn update_app(
             },
         )
         .await?;
+
+    // IF-174: once an app is linked to a GitHub installation and a repo, create
+    // its repo webhook automatically (no manual URL/secret copying). Best-effort
+    // and only when not already provisioned — never fail the update over it.
+    if app.github_installation_id.is_some()
+        && app.git_repo.is_some()
+        && app.webhook_secret.is_none()
+    {
+        match crate::github::webhook_setup::provision_webhook(&state, &app).await {
+            Ok(hook_id) => {
+                tracing::info!(app_id = %app.id, hook_id, "auto-created GitHub webhook")
+            }
+            Err(e) => {
+                tracing::warn!(app_id = %app.id, error = %e, "failed to auto-create GitHub webhook")
+            }
+        }
+    }
 
     Ok(Json(serde_json::json!({ "data": app })))
 }

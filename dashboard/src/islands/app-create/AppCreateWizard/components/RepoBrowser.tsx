@@ -6,7 +6,9 @@ import { GitBranch, Lock, Search } from 'lucide-preact';
 import styles from './repo-browser.module.css';
 
 type Props = {
-  onSelect: (repo: string, branch: string) => void;
+  // installationId is the git-source (GitHub App installation) the repo belongs
+  // to — threaded through so the app can be linked for status checks / webhooks.
+  onSelect: (repo: string, branch: string, installationId: string) => void;
 };
 
 type SourceWithRepos = {
@@ -131,7 +133,7 @@ export default function RepoBrowser({ onSelect }: Props) {
                     class={styles.repoRow}
                     role="option"
                     aria-selected={false}
-                    onClick={() => onSelect(repo.full_name, repo.default_branch)}
+                    onClick={() => onSelect(repo.full_name, repo.default_branch, s.source.id)}
                   >
                     <GitBranch size={14} aria-hidden="true" />
                     <div class={styles.repoInfo}>
