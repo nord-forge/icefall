@@ -10,7 +10,8 @@ use crate::docker::stats::ContainerStats;
 use crate::docker::DockerClient;
 use crate::events::{EventBus, EventType};
 
-const MAX_HISTORY: usize = 360;
+/// Default live-history window per container (~1h at 10s cadence).
+const DEFAULT_MAX_HISTORY: usize = 360;
 
 #[derive(Clone, serde::Serialize)]
 pub struct MetricsSnapshot {
@@ -20,6 +21,8 @@ pub struct MetricsSnapshot {
 
 pub struct MetricsStore {
     history: RwLock<HashMap<String, VecDeque<MetricsSnapshot>>>,
+    /// Per-container ring-buffer length. Lower in low-memory mode.
+    max_history: usize,
 }
 
 impl Default for MetricsStore {
@@ -30,8 +33,14 @@ impl Default for MetricsStore {
 
 impl MetricsStore {
     pub fn new() -> Self {
+        Self::with_capacity(DEFAULT_MAX_HISTORY)
+    }
+
+    /// Construct with an explicit per-container history length.
+    pub fn with_capacity(max_history: usize) -> Self {
         Self {
             history: RwLock::new(HashMap::new()),
+            max_history: max_history.max(1),
         }
     }
 
@@ -39,14 +48,14 @@ impl MetricsStore {
         let mut history = self.history.write().await;
         let buf = history
             .entry(app_id.to_string())
-            .or_insert_with(|| VecDeque::with_capacity(MAX_HISTORY + 1));
+            .or_insert_with(|| VecDeque::with_capacity(self.max_history + 1));
 
         buf.push_back(MetricsSnapshot {
             timestamp: crate::db::models::now_iso8601(),
             stats,
         });
 
-        if buf.len() > MAX_HISTORY {
+        while buf.len() > self.max_history {
             buf.pop_front();
         }
     }

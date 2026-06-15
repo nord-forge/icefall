@@ -99,8 +99,18 @@ impl DaemonRunner {
 
         // Connect to database
         let db_url = format!("sqlite:{}", config.sqlite_path.display());
-        info!("Connecting to database at {}", config.sqlite_path.display());
-        let db = SqliteDatabase::connect(&db_url, encryptor).await?;
+        let cache_kib = config.sqlite_cache_kib();
+        info!(
+            "Connecting to database at {} (cache {} MiB{})",
+            config.sqlite_path.display(),
+            cache_kib / 1024,
+            if config.low_memory {
+                ", low-memory mode"
+            } else {
+                ""
+            }
+        );
+        let db = SqliteDatabase::connect_with_cache(&db_url, encryptor, cache_kib).await?;
         db.run_migrations().await?;
         info!("Database connected and migrations applied");
         let db: Arc<dyn Database> = Arc::new(db);
@@ -141,11 +151,11 @@ impl DaemonRunner {
         }
 
         // Create event bus, build locks, and monitoring stores
-        let event_bus = Arc::new(EventBus::new(1024));
+        let event_bus = Arc::new(EventBus::new(config.event_bus_capacity()));
         let build_locks = Arc::new(BuildLockMap::new());
         let server_metrics = Arc::new(RwLock::new(ServerMetrics::default()));
         let server_metrics_history = Arc::new(ServerMetricsHistory::new());
-        let metrics_store = Arc::new(MetricsStore::new());
+        let metrics_store = Arc::new(MetricsStore::with_capacity(config.metrics_history_len()));
         let log_store = Arc::new(LogStore::new(&config.data_dir));
         let backup_store = Arc::new(BackupStore::new(&config.data_dir));
         let instance_backup_handle = Arc::new(InstanceBackupHandle::new(db.clone()));

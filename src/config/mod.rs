@@ -119,6 +119,31 @@ pub struct IcefallConfig {
     pub ssl_check_interval_hours: u64,
     #[serde(default = "defaults::image_transfer_chunk_bytes")]
     pub image_transfer_chunk_bytes: usize,
+    /// Shrink in-memory buffers (SQLite cache, event bus, metrics window) to fit
+    /// a 1 vCPU / 1 GB server. Off by default.
+    #[serde(default = "defaults::low_memory")]
+    pub low_memory: bool,
+    /// Explicit SQLite page-cache size in KiB. `None` derives from `low_memory`.
+    #[serde(default = "defaults::sqlite_cache_kib")]
+    pub sqlite_cache_kib: Option<u32>,
+}
+
+impl IcefallConfig {
+    /// Effective SQLite page-cache size (KiB), honoring the override then the
+    /// low-memory flag.
+    pub fn sqlite_cache_kib(&self) -> u32 {
+        defaults::effective_sqlite_cache_kib(self.sqlite_cache_kib, self.low_memory)
+    }
+
+    /// Effective EventBus broadcast capacity.
+    pub fn event_bus_capacity(&self) -> usize {
+        defaults::event_bus_capacity(self.low_memory)
+    }
+
+    /// Effective in-memory per-container metrics window length.
+    pub fn metrics_history_len(&self) -> usize {
+        defaults::metrics_history_len(self.low_memory)
+    }
 }
 
 impl IcefallConfig {
@@ -247,6 +272,17 @@ impl IcefallConfig {
         if let Ok(val) = std::env::var("ICEFALL_PID_FILE") {
             self.pid_file = PathBuf::from(val);
         }
+        // Low-memory mode: accept 1/true/yes/on (case-insensitive).
+        if let Ok(val) = std::env::var("ICEFALL_LOW_MEMORY") {
+            let v = val.trim().to_ascii_lowercase();
+            self.low_memory = matches!(v.as_str(), "1" | "true" | "yes" | "on");
+        }
+        if let Ok(val) = std::env::var("ICEFALL_SQLITE_CACHE_KIB") {
+            match val.trim().parse::<u32>() {
+                Ok(kib) => self.sqlite_cache_kib = Some(kib),
+                Err(_) => info!("Invalid ICEFALL_SQLITE_CACHE_KIB value '{val}', ignoring"),
+            }
+        }
     }
 }
 
@@ -273,6 +309,8 @@ impl Default for IcefallConfig {
             deploy_stop_timeout_secs: defaults::deploy_stop_timeout_secs(),
             ssl_check_interval_hours: defaults::ssl_check_interval_hours(),
             image_transfer_chunk_bytes: defaults::image_transfer_chunk_bytes(),
+            low_memory: defaults::low_memory(),
+            sqlite_cache_kib: defaults::sqlite_cache_kib(),
         }
     }
 }
@@ -399,6 +437,8 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
             "ICEFALL_ENCRYPTION_KEY",
             "ICEFALL_LOG_LEVEL",
             "ICEFALL_PID_FILE",
+            "ICEFALL_LOW_MEMORY",
+            "ICEFALL_SQLITE_CACHE_KIB",
         ] {
             std::env::remove_var(var);
         }
@@ -508,5 +548,48 @@ encryption_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
         let podman: ContainerRuntime = serde_json::from_str("\"podman\"").unwrap();
         assert_eq!(podman, ContainerRuntime::Podman);
+    }
+
+    #[test]
+    fn low_memory_shrinks_derived_values() {
+        let mut config = IcefallConfig::default();
+        // Defaults: full-size cache + buffers.
+        assert_eq!(config.sqlite_cache_kib(), 64_000);
+        assert_eq!(config.event_bus_capacity(), 1024);
+        assert_eq!(config.metrics_history_len(), 360);
+
+        config.low_memory = true;
+        assert_eq!(config.sqlite_cache_kib(), 16_000);
+        assert_eq!(config.event_bus_capacity(), 256);
+        assert_eq!(config.metrics_history_len(), 120);
+    }
+
+    #[test]
+    fn explicit_cache_override_wins_over_low_memory() {
+        let mut config = IcefallConfig {
+            low_memory: true,
+            sqlite_cache_kib: Some(8_000),
+            ..Default::default()
+        };
+        assert_eq!(config.sqlite_cache_kib(), 8_000);
+        // The override is independent of the flag.
+        config.low_memory = false;
+        assert_eq!(config.sqlite_cache_kib(), 8_000);
+    }
+
+    #[test]
+    fn env_override_low_memory_and_cache() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_icefall_env_vars();
+        let mut config = IcefallConfig::default();
+
+        std::env::set_var("ICEFALL_LOW_MEMORY", "true");
+        std::env::set_var("ICEFALL_SQLITE_CACHE_KIB", "12000");
+        config.apply_env_overrides();
+        clear_icefall_env_vars();
+
+        assert!(config.low_memory);
+        assert_eq!(config.sqlite_cache_kib, Some(12_000));
+        assert_eq!(config.sqlite_cache_kib(), 12_000);
     }
 }

@@ -114,6 +114,45 @@ pub fn image_transfer_chunk_bytes() -> usize {
     8 * 1024 * 1024
 }
 
+/// Low-memory mode off by default. When enabled it shrinks the SQLite page
+/// cache and a few in-memory buffers so the daemon fits comfortably on a
+/// 1 vCPU / 1 GB server.
+pub fn low_memory() -> bool {
+    false
+}
+
+/// SQLite page-cache size in KiB (mapped to a negative `cache_size` pragma).
+/// `None` means "derive from `low_memory`": ~62 MB normally, ~16 MB in
+/// low-memory mode. An explicit value always wins.
+pub fn sqlite_cache_kib() -> Option<u32> {
+    None
+}
+
+/// Effective SQLite cache size (KiB) given the override and low-memory flag.
+pub fn effective_sqlite_cache_kib(override_kib: Option<u32>, low_memory: bool) -> u32 {
+    override_kib.unwrap_or(if low_memory { 16_000 } else { 64_000 })
+}
+
+/// EventBus broadcast capacity. Smaller in low-memory mode — events are
+/// transient so a shorter buffer only affects very-slow subscribers.
+pub fn event_bus_capacity(low_memory: bool) -> usize {
+    if low_memory {
+        256
+    } else {
+        1024
+    }
+}
+
+/// Per-container in-memory metrics ring-buffer length. Persisted history (IF-191)
+/// is unaffected; this only bounds the live in-RAM window.
+pub fn metrics_history_len(low_memory: bool) -> usize {
+    if low_memory {
+        120
+    } else {
+        360
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

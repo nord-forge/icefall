@@ -25,6 +25,15 @@ ICEFALL_CONFIG="/etc/icefall/config.toml"
 ICEFALL_SERVICE="/etc/systemd/system/icefall.service"
 ICEFALL_LOG="/var/log/icefall-install.log"
 
+# Populated by detect_memory(): total RAM (MB) and whether to enable low-memory
+# mode. On a small box (<= 1.5 GB) Icefall shrinks its SQLite cache and buffers
+# and the systemd unit gets a tighter MemoryMax.
+TOTAL_RAM_MB=0
+LOW_MEMORY="false"
+# RAM (MB) at or below which low-memory mode is enabled automatically. Override
+# with ICEFALL_LOW_MEMORY=true|false to force.
+LOW_MEMORY_THRESHOLD_MB="${ICEFALL_LOW_MEMORY_THRESHOLD_MB:-1536}"
+
 # Runtime preference: docker | podman | auto. Env var is the default; a
 # --runtime= flag overrides it. "auto" (or empty) means detect/prompt.
 RUNTIME_CHOICE="${ICEFALL_RUNTIME:-auto}"
@@ -95,6 +104,36 @@ detect_arch() {
 }
 
 is_alpine() { [ "$OS_ID" = "alpine" ]; }
+
+# Detect total RAM and decide whether to enable low-memory mode. An explicit
+# ICEFALL_LOW_MEMORY=true|false forces the choice; otherwise it's automatic
+# below LOW_MEMORY_THRESHOLD_MB. Also sizes the systemd MemoryMax later.
+detect_memory() {
+    # MemTotal is in kB; fall back to 0 if /proc/meminfo is unavailable.
+    local mem_kb
+    mem_kb=$(awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null || echo 0)
+    TOTAL_RAM_MB=$(( mem_kb / 1024 ))
+
+    case "${ICEFALL_LOW_MEMORY:-auto}" in
+        1|true|yes|on)   LOW_MEMORY="true" ;;
+        0|false|no|off)  LOW_MEMORY="false" ;;
+        *)
+            if [ "$TOTAL_RAM_MB" -gt 0 ] && [ "$TOTAL_RAM_MB" -le "$LOW_MEMORY_THRESHOLD_MB" ]; then
+                LOW_MEMORY="true"
+            else
+                LOW_MEMORY="false"
+            fi
+            ;;
+    esac
+
+    if [ "$TOTAL_RAM_MB" -gt 0 ]; then
+        if [ "$LOW_MEMORY" = "true" ]; then
+            info "Detected ${TOTAL_RAM_MB} MB RAM — enabling low-memory mode"
+        else
+            info "Detected ${TOTAL_RAM_MB} MB RAM"
+        fi
+    fi
+}
 
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -604,6 +643,13 @@ encryption_key = "$encryption_key"
 log_level = "info"
 pid_file = "/var/run/icefall.pid"
 
+# Low-memory mode shrinks the SQLite page cache (~62 MB -> ~16 MB) and a few
+# in-memory buffers so Icefall fits on a 1 vCPU / 1 GB server. Auto-enabled by
+# the installer below ${LOW_MEMORY_THRESHOLD_MB} MB RAM.
+low_memory = $LOW_MEMORY
+# Override the SQLite page cache directly (KiB). Omitted = derive from low_memory.
+# sqlite_cache_kib = 16000
+
 # base_domain = "apps.example.com"
 EOF
 
@@ -631,6 +677,18 @@ setup_systemd() {
         runtime_after="network.target docker.service caddy.service"
     fi
 
+    # Cap the daemon's memory so a leak or runaway cache can't OOM the box and
+    # take down the apps it manages. The daemon idles ~80-90 MB; give it a
+    # comfortable ceiling sized from total RAM, clamped to [256, 768] MB.
+    # MemoryHigh (soft) throttles before MemoryMax (hard) kills.
+    local mem_cap_mb=512
+    if [ "$TOTAL_RAM_MB" -gt 0 ]; then
+        mem_cap_mb=$(( TOTAL_RAM_MB / 8 ))
+        [ "$mem_cap_mb" -lt 256 ] && mem_cap_mb=256
+        [ "$mem_cap_mb" -gt 768 ] && mem_cap_mb=768
+    fi
+    local mem_high_mb=$(( mem_cap_mb * 4 / 5 ))
+
     cat > "$ICEFALL_SERVICE" << EOF
 [Unit]
 Description=Icefall Deployment Platform
@@ -649,6 +707,11 @@ StartLimitIntervalSec=300
 WatchdogSec=60
 KillMode=mixed
 TimeoutStopSec=30
+# Memory ceiling (IF: low-memory hardening). MemoryHigh throttles, MemoryMax is
+# the hard OOM limit. Sized from total RAM; raise if you run many apps and see
+# the daemon throttled in \`systemctl status icefall\`.
+MemoryHigh=${mem_high_mb}M
+MemoryMax=${mem_cap_mb}M
 Environment=ICEFALL_CONFIG=/etc/icefall/config.toml
 
 [Install]
@@ -738,6 +801,7 @@ main() {
     check_root
     detect_os
     detect_arch
+    detect_memory
     check_prereqs
     install_caddy
     install_icefall

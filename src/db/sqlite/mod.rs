@@ -76,12 +76,28 @@ pub struct SqliteDatabase {
 
 impl SqliteDatabase {
     pub async fn connect(database_url: &str, encryptor: Arc<Encryptor>) -> Result<Self, DbError> {
+        // Default cache (~62 MB) when called without an explicit size.
+        Self::connect_with_cache(database_url, encryptor, 64_000).await
+    }
+
+    /// Connect with an explicit SQLite page-cache size (KiB), set as a negative
+    /// `cache_size` pragma. Lower values cut idle RAM at the cost of more disk
+    /// reads — used by low-memory mode on small servers.
+    pub async fn connect_with_cache(
+        database_url: &str,
+        encryptor: Arc<Encryptor>,
+        cache_kib: u32,
+    ) -> Result<Self, DbError> {
+        // Apply cache_size on every pooled connection (not just the first) so the
+        // setting actually takes effect across the pool.
+        let cache_pragma = format!("PRAGMA cache_size = -{cache_kib};");
         let options: SqliteConnectOptions = database_url
             .parse::<SqliteConnectOptions>()
             .map_err(|e| sqlx::Error::Configuration(Box::new(e)))?
             .create_if_missing(true)
             .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-            .foreign_keys(true);
+            .foreign_keys(true)
+            .pragma("cache_size", format!("-{cache_kib}"));
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
@@ -95,9 +111,7 @@ impl SqliteDatabase {
         sqlx::query("PRAGMA wal_autocheckpoint = 5000")
             .execute(&pool)
             .await?;
-        sqlx::query("PRAGMA cache_size = -64000")
-            .execute(&pool)
-            .await?;
+        sqlx::query(&cache_pragma).execute(&pool).await?;
 
         Ok(Self { pool, encryptor })
     }
