@@ -89,13 +89,11 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
 
   const viewFullConfig = async () => {
     if (fullConfig !== null) { setFullConfig(null); return; }
-    // The read-only viewer reuses the app-scoped routes endpoint output; here we
-    // surface Caddy status. Full config view requires admin and is fetched lazily.
     try {
-      // Reuse settings payload — show a friendly note if Caddy is down.
-      setFullConfig('Loading full config requires Caddy admin access; use the per-app Proxy tab for route details.');
-    } catch {
-      setFullConfig('Could not load config.');
+      const { data } = await api.getFullProxyConfig();
+      setFullConfig(JSON.stringify(data ?? {}, null, 2));
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Could not load config');
     }
   };
 
@@ -169,7 +167,7 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
         </Button>
       </div>
 
-      {fullConfig !== null && <CodeBlock code={fullConfig} language="text" />}
+      {fullConfig !== null && <CodeBlock code={fullConfig} language="json" />}
     </Card>
   );
 }

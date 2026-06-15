@@ -24,6 +24,7 @@ pub fn routes() -> Router<AppState> {
             "/settings/proxy",
             get(get_proxy_settings).put(update_proxy_settings),
         )
+        .route("/settings/proxy/config", get(get_full_proxy_config))
         .route("/settings/proxy/reload", post(reload_proxy))
 }
 
@@ -278,6 +279,21 @@ async fn update_proxy_settings(
         },
         "message": "Proxy settings updated"
     })))
+}
+
+async fn get_full_proxy_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let caller = authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+    if caller.role != "admin" {
+        return Err(ApiError::BadRequest("Admin access required".into()));
+    }
+
+    let config = state.caddy.get_full_config().await?;
+    Ok(Json(serde_json::json!({ "data": config })))
 }
 
 async fn reload_proxy(

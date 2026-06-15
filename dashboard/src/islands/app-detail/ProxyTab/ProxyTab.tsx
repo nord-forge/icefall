@@ -312,7 +312,7 @@ function BasicAuthSection({ presets, setPresets }: SectionProps) {
           setPresets({
             ...presets,
             basic_auth: v
-              ? { enabled: true, username: ba?.username ?? '', password_hash: ba?.password_hash ?? '', path: ba?.path ?? null }
+              ? { enabled: true, username: ba?.username ?? '', path: ba?.path ?? null }
               : ba ? { ...ba, enabled: false } : null,
           })
         }
@@ -330,8 +330,8 @@ function BasicAuthSection({ presets, setPresets }: SectionProps) {
           <Input
             label="Password" name="ba-password" type="password" revealable
             value={password}
-            helpText="Stored as a bcrypt hash. Leave blank to keep the current password."
-            onChange={(v) => { setPassword(v); setPresets({ ...presets, basic_auth: { ...ba, password_hash: v } }); }}
+            helpText="Hashed on the server. Leave blank to keep the current password."
+            onChange={(v) => { setPassword(v); setPresets({ ...presets, basic_auth: { ...ba, password: v } }); }}
           />
         </div>
       )}

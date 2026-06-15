@@ -48,8 +48,16 @@ fn default_true() -> bool {
 pub struct BasicAuthPreset {
     pub enabled: bool,
     pub username: String,
-    /// bcrypt hash of the password — never the plaintext.
+    /// bcrypt hash of the password — never the plaintext. Populated server-side
+    /// from the transient `password` field; the plaintext is never persisted or
+    /// returned to the client.
+    #[serde(default)]
     pub password_hash: String,
+    /// Plaintext password from the client on update only. Hashed into
+    /// `password_hash` server-side, then cleared before storage. An empty value
+    /// means "keep the existing password".
+    #[serde(default, skip_serializing)]
+    pub password: Option<String>,
     /// Optional path prefix the auth applies to; None = whole app.
     #[serde(default)]
     pub path: Option<String>,
@@ -86,6 +94,52 @@ impl CaddyClient {
             return Err(CaddyError::ApiError { status, body });
         }
         Ok(response.json().await.unwrap_or(serde_json::Value::Null))
+    }
+
+    /// Apply a custom set of routes for a single app, scoped to its domains.
+    /// Removes the app's existing routes (matched by host) and appends the
+    /// supplied ones, leaving every other app's routes untouched. This is the
+    /// tenant-safe alternative to `load_config`, which would replace the whole
+    /// server config.
+    ///
+    /// `routes` is the user's custom config: either a JSON array of Caddy route
+    /// objects, or a single route object.
+    pub async fn apply_scoped_routes(
+        &self,
+        domains: &[String],
+        routes: &serde_json::Value,
+    ) -> Result<(), CaddyError> {
+        // Normalize the input to a list of route objects.
+        let new_routes: Vec<serde_json::Value> = match routes {
+            serde_json::Value::Array(arr) => arr.clone(),
+            serde_json::Value::Object(_) => vec![routes.clone()],
+            _ => {
+                return Err(CaddyError::ApiError {
+                    status: 400,
+                    body: "custom proxy config must be a route object or array of routes".into(),
+                })
+            }
+        };
+
+        // Remove this app's current routes first so we don't duplicate. Ignore
+        // not-found — a fresh app may have none yet.
+        for domain in domains {
+            match self.remove_route(domain).await {
+                Ok(()) | Err(CaddyError::RouteNotFound(_)) => {}
+                Err(e) => return Err(e),
+            }
+        }
+
+        let url = format!("{}/config/apps/http/servers/srv0/routes", self.base_url());
+        for route in &new_routes {
+            let response = self.client().post(&url).json(route).send().await?;
+            if !response.status().is_success() {
+                let status = response.status().as_u16();
+                let body = response.text().await.unwrap_or_default();
+                return Err(CaddyError::ApiError { status, body });
+            }
+        }
+        Ok(())
     }
 
     /// All routes on srv0 as raw JSON, for the read-only viewer.
@@ -315,6 +369,7 @@ mod tests {
                 enabled: false,
                 username: "u".into(),
                 password_hash: "h".into(),
+                password: None,
                 path: None,
             }),
             ..Default::default()
@@ -329,6 +384,7 @@ mod tests {
                 enabled: true,
                 username: "u".into(),
                 password_hash: "$2b$hash".into(),
+                password: None,
                 path: None,
             }),
             headers: vec![HeaderRule {

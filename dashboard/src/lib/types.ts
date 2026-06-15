@@ -372,7 +372,10 @@ export type RateLimitPreset = {
 export type BasicAuthPreset = {
   enabled: boolean;
   username: string;
-  password_hash: string;
+  /** Read-only: bcrypt hash returned by the server. Never set this from the client. */
+  password_hash?: string;
+  /** Plaintext password to set; hashed server-side. Empty = keep existing. */
+  password?: string;
   path?: string | null;
 }
 

@@ -956,6 +956,9 @@ export const api = {
     request<{ message: string }>('/settings/proxy/reload', {
       method: 'POST',
     }),
+
+  getFullProxyConfig: () =>
+    request<{ data: unknown }>('/settings/proxy/config'),
 };
 
 export { ApiError };
