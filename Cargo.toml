@@ -6,6 +6,10 @@ resolver = "2"
 lto = true
 codegen-units = 1
 strip = true
+# Abort on panic instead of unwinding (IF-258): drops the stack-unwinding tables
+# (~150-250 KB) for a panic path that ends in a systemd restart anyway. `cargo
+# test` uses the dev/test profile, so it keeps unwinding for test isolation.
+panic = "abort"
 
 [workspace.dependencies]
 # Async runtime
