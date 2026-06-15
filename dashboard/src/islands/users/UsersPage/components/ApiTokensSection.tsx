@@ -3,13 +3,14 @@ import type { ApiToken } from '@lib/types';
 import { formatRelativeTime } from '@lib/format';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
+import TokenAbilityPicker, { TokenAbilityBadges } from '@islands/shared/TokenAbilityPicker/TokenAbilityPicker';
 import { Key, Trash2, Copy } from 'lucide-preact';
 import styles from '../users-page.module.css';
 
 type Props = {
   tokens: ApiToken[];
   newTokenValue: string;
-  onCreateToken: (name: string) => Promise<void>;
+  onCreateToken: (name: string, abilities?: string[]) => Promise<void>;
   onRevokeToken: (tokenId: string) => void;
   onDismissNewToken: () => void;
 };
@@ -23,13 +24,15 @@ export default function ApiTokensSection({
 }: Props) {
   const [showCreateToken, setShowCreateToken] = useState(false);
   const [tokenName, setTokenName] = useState('');
+  const [abilities, setAbilities] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleCreate() {
     if (!tokenName.trim()) return;
     setSubmitting(true);
-    await onCreateToken(tokenName.trim());
+    await onCreateToken(tokenName.trim(), abilities);
     setTokenName('');
+    setAbilities([]);
     setShowCreateToken(false);
     setSubmitting(false);
   }
@@ -66,8 +69,9 @@ export default function ApiTokensSection({
             onChange={setTokenName}
             placeholder="CI/CD pipeline"
           />
+          <TokenAbilityPicker value={abilities} onChange={setAbilities} />
           <div class={styles.cardActions}>
-            <Button variant="ghost" onClick={() => setShowCreateToken(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setShowCreateToken(false); setAbilities([]); }}>Cancel</Button>
             <Button variant="primary" onClick={handleCreate} loading={submitting} disabled={!tokenName.trim()}>Create</Button>
           </div>
         </div>
@@ -78,6 +82,7 @@ export default function ApiTokensSection({
           <thead>
             <tr class={styles.tableRow}>
               <th class={styles.th}>Name</th>
+              <th class={styles.th}>Abilities</th>
               <th class={styles.th}>Prefix</th>
               <th class={styles.th}>Last Used</th>
               <th class={styles.th}>Expires</th>
@@ -88,6 +93,7 @@ export default function ApiTokensSection({
             {tokens.map(t => (
               <tr key={t.id} class={styles.tableRow}>
                 <td class={styles.td}>{t.name}</td>
+                <td class={styles.td}><TokenAbilityBadges abilities={t.abilities} /></td>
                 <td class={styles.tdMono}>{t.prefix}...</td>
                 <td class={styles.tdMuted}>{t.last_used_at ? formatRelativeTime(t.last_used_at) : 'Never'}</td>
                 <td class={styles.tdMuted}>{t.expires_at ? new Date(t.expires_at).toLocaleDateString() : 'Never'}</td>
@@ -100,7 +106,7 @@ export default function ApiTokensSection({
             ))}
             {tokens.length === 0 && (
               <tr>
-                <td class={styles.emptyRow} colSpan={5}>No API tokens yet.</td>
+                <td class={styles.emptyRow} colSpan={6}>No API tokens yet.</td>
               </tr>
             )}
           </tbody>

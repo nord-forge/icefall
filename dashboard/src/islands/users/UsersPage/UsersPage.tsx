@@ -121,9 +121,9 @@ export default function UsersPage() {
     setRegSaving(false);
   }
 
-  async function handleCreateToken(name: string) {
+  async function handleCreateToken(name: string, abilities?: string[]) {
     try {
-      const { data } = await api.createToken(name);
+      const { data } = await api.createToken(name, undefined, abilities);
       setNewTokenValue(data.token);
       const { data: refreshed } = await api.listTokens();
       setTokens(refreshed);
