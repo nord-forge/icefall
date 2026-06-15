@@ -131,10 +131,9 @@ full small-vs-large guidance.
 
 ## Manual install
 
-Releases are published as a tarball containing the `icefall` binary **and** the
-dashboard. The daemon serves the dashboard from `dashboard/dist` relative to its
-working directory, so extract the tarball into the data directory and point the
-service's `WorkingDirectory` there.
+Releases are a tarball containing just the `icefall` binary — **the dashboard is
+embedded in it**, so there's nothing else to extract, copy, or locate. Drop the
+binary on your `PATH` and run it.
 
 <Tabs>
 <TabItem label="Ubuntu/Debian">
@@ -150,7 +149,7 @@ ARCH=x86_64-linux
 TAG=$(curl -fsSL https://api.github.com/repos/nord-forge/icefall/releases/latest \
   | grep -m1 '"tag_name"' | cut -d'"' -f4)
 
-# Download and extract the binary + dashboard into the data directory
+# Download and extract the self-contained binary
 sudo mkdir -p /var/lib/icefall
 curl -fsSL "https://github.com/nord-forge/icefall/releases/download/${TAG}/icefall-${TAG}-${ARCH}.tar.gz" \
   | sudo tar -xz -C /var/lib/icefall
@@ -179,7 +178,7 @@ ARCH=x86_64-linux
 TAG=$(curl -fsSL https://api.github.com/repos/nord-forge/icefall/releases/latest \
   | grep -m1 '"tag_name"' | cut -d'"' -f4)
 
-# Download and extract the binary + dashboard into the data directory
+# Download and extract the self-contained binary
 sudo mkdir -p /var/lib/icefall
 curl -fsSL "https://github.com/nord-forge/icefall/releases/download/${TAG}/icefall-${TAG}-${ARCH}.tar.gz" \
   | sudo tar -xz -C /var/lib/icefall
@@ -191,10 +190,11 @@ sudo systemctl enable --now icefall
 </TabItem>
 </Tabs>
 
-:::caution[Manual installs need `WorkingDirectory`]
-When you write the systemd unit yourself, set `WorkingDirectory=/var/lib/icefall`
-so the daemon can find `dashboard/dist`. The one-liner installer does this for
-you.
+:::note[Self-contained binary]
+The dashboard is compiled into the `icefall` binary, so a hand-written systemd
+unit doesn't need any special `WorkingDirectory` to serve the UI — the binary is
+all you need. (For local UI development, set `ICEFALL_DASHBOARD_DIR` to a
+`dashboard/dist` on disk to serve from there without rebuilding the binary.)
 :::
 
 ## Non-interactive install

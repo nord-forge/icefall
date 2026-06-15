@@ -77,24 +77,6 @@ fn swap_binary_replaces_file() {
 }
 
 #[test]
-fn copy_dir_recursive_works() {
-    let tmp = TempDir::new().unwrap();
-    let src = tmp.path().join("src");
-    std::fs::create_dir_all(src.join("sub")).unwrap();
-    std::fs::write(src.join("a.txt"), b"file-a").unwrap();
-    std::fs::write(src.join("sub").join("b.txt"), b"file-b").unwrap();
-
-    let dst = tmp.path().join("dst");
-    super::copy_dir_recursive(&src, &dst).unwrap();
-
-    assert_eq!(std::fs::read(dst.join("a.txt")).unwrap(), b"file-a");
-    assert_eq!(
-        std::fs::read(dst.join("sub").join("b.txt")).unwrap(),
-        b"file-b"
-    );
-}
-
-#[test]
 fn pending_marker_deserializes_without_dashboard_backup() {
     let json = r#"{
         "from_version": "0.1.0",

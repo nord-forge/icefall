@@ -272,16 +272,15 @@ static CSP_VALUE: LazyLock<String> = LazyLock::new(|| {
 });
 
 fn load_csp_script_hashes() -> Vec<String> {
-    // The dashboard build (`dashboard/scripts/csp-hashes.mjs`) writes this
-    // file beside the served HTML in `dashboard/dist`.
-    let path = "dashboard/dist/csp-hashes.json";
-    if let Ok(contents) = std::fs::read_to_string(path) {
+    // The dashboard build (`dashboard/scripts/csp-hashes.mjs`) writes
+    // `csp-hashes.json` into dist, which is embedded in the binary (IF-255).
+    if let Some(contents) = crate::api::assets::csp_hashes_json() {
         if let Ok(hashes) = serde_json::from_str::<Vec<String>>(&contents) {
             return hashes.into_iter().map(|h| format!("'{h}'")).collect();
         }
     }
     tracing::warn!(
-        "csp-hashes.json not found — CSP will block inline scripts; run the dashboard build"
+        "csp-hashes.json not found in embedded dashboard — CSP will block inline scripts"
     );
     Vec::new()
 }

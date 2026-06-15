@@ -1,4 +1,5 @@
 pub mod abilities;
+pub mod assets;
 pub mod error;
 pub mod middleware;
 pub mod rate_limit;
@@ -10,10 +11,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::DefaultBodyLimit;
-use axum::response::IntoResponse;
 use axum::Router;
 use tokio::sync::{Mutex, RwLock};
-use tower_http::services::ServeDir;
 
 use crate::agent::registry::AgentRegistry;
 use crate::api::routes::server::{ServerMetrics, ServerMetricsHistory};
@@ -76,47 +75,8 @@ impl BuildLockMap {
 /// upload-style routes can raise it locally with their own `DefaultBodyLimit`.
 const MAX_BODY_BYTES: usize = 1024 * 1024;
 
-const DASHBOARD_DIST: &str = "dashboard/dist";
-
-/// Dynamic dashboard routes. The Astro build is static, so each dynamic route is a
-/// prerendered shell; this maps a URL prefix to its shell when `ServeDir` finds no file.
-const DYNAMIC_ROUTE_PREFIXES: &[&str] = &["/teams/", "/servers/", "/apps/", "/invitations/"];
-
-/// SPA fallback handler: pick the prerendered shell for an unmatched path.
-async fn dashboard_fallback(uri: axum::http::Uri) -> axum::response::Response {
-    let path = uri.path();
-    let shell = DYNAMIC_ROUTE_PREFIXES
-        .iter()
-        .find(|p| path.starts_with(*p))
-        .map_or_else(
-            || format!("{DASHBOARD_DIST}/index.html"),
-            |prefix| format!("{DASHBOARD_DIST}{prefix}_/index.html"),
-        );
-
-    match tokio::fs::read(&shell).await {
-        Ok(bytes) => (
-            [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-            bytes,
-        )
-            .into_response(),
-        Err(_) => (axum::http::StatusCode::NOT_FOUND, "dashboard not built").into_response(),
-    }
-}
-
 pub fn build_router(state: AppState) -> Router {
     let api_routes = routes::api_routes();
-
-    // Serve build-time precompressed variants directly (IF-254): when the client
-    // accepts br/gzip, ServeDir hands over the matching `.br`/`.gz` file with the
-    // right `Content-Encoding` and zero per-request compression. Falls back to the
-    // identity file otherwise. The router's CompressionLayer (IF-252) skips any
-    // response that already carries Content-Encoding, so there's no double work —
-    // it only kicks in for assets with no precompressed variant and for API JSON.
-    let serve_dir = ServeDir::new(DASHBOARD_DIST)
-        .append_index_html_on_directories(true)
-        .precompressed_br()
-        .precompressed_gzip()
-        .fallback(axum::routing::get(dashboard_fallback));
 
     let router = Router::new()
         .nest("/api/v1", api_routes)
@@ -125,7 +85,13 @@ pub fn build_router(state: AppState) -> Router {
             middleware::require_auth,
         ))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        .fallback_service(serve_dir);
+        // The dashboard is embedded in the binary (IF-255); `assets::serve`
+        // resolves the request to an embedded file, negotiates a precompressed
+        // (.br/.gz) variant, and sets Content-Type/Cache-Control/Content-Encoding.
+        // The IF-252 CompressionLayer skips responses that already carry an
+        // encoding, so precompressed assets aren't re-compressed; it still covers
+        // API JSON and any identity-served (too small) asset.
+        .fallback(axum::routing::get(assets::serve));
 
     middleware::apply_middleware(router, &state.config).with_state(state)
 }

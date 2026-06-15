@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::db::Database;
 use crate::update::UpdateError;
 
-use super::{copy_dir_recursive, UpdateApplier, DASHBOARD_DIR};
+use super::UpdateApplier;
 
 impl UpdateApplier {
     pub(super) fn backup_binary(&self) -> Result<PathBuf, UpdateError> {
@@ -38,38 +38,6 @@ impl UpdateApplier {
 
         info!(path = %backup_path.display(), "database backup created via VACUUM INTO");
         Ok(backup_path)
-    }
-
-    pub(super) fn backup_dashboard(&self) -> Result<Option<PathBuf>, UpdateError> {
-        let dashboard_src = PathBuf::from(DASHBOARD_DIR);
-        if !dashboard_src.exists() {
-            warn!(
-                "dashboard directory not found at {}, skipping backup",
-                dashboard_src.display()
-            );
-            return Ok(None);
-        }
-
-        let backup_path = PathBuf::from(format!("{}.bak", DASHBOARD_DIR));
-
-        if backup_path.exists() {
-            std::fs::remove_dir_all(&backup_path).map_err(|e| {
-                UpdateError::Apply(format!(
-                    "failed to remove old dashboard backup at {}: {e}",
-                    backup_path.display()
-                ))
-            })?;
-        }
-
-        copy_dir_recursive(&dashboard_src, &backup_path).map_err(|e| {
-            UpdateError::Apply(format!(
-                "failed to backup dashboard from {} to {}: {e}",
-                dashboard_src.display(),
-                backup_path.display()
-            ))
-        })?;
-
-        Ok(Some(backup_path))
     }
 
     pub(super) async fn run_update_migrations(&self, new_binary: &Path) -> Result<(), UpdateError> {

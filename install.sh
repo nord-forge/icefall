@@ -19,8 +19,6 @@ ICEFALL_VERSION="${ICEFALL_VERSION:-latest}"
 ICEFALL_REPO="${ICEFALL_REPO:-${ICEFALL_GITHUB_ORG:-nord-forge}/icefall}"
 ICEFALL_BIN="/usr/local/bin/icefall"
 ICEFALL_DATA="/var/lib/icefall"
-# The daemon serves "dashboard/dist" relative to its working directory (src/api/mod.rs).
-ICEFALL_DASHBOARD="$ICEFALL_DATA/dashboard/dist"
 ICEFALL_CONFIG="/etc/icefall/config.toml"
 ICEFALL_SERVICE="/etc/systemd/system/icefall.service"
 ICEFALL_LOG="/var/log/icefall-install.log"
@@ -685,8 +683,8 @@ install_icefall() {
         info "Installing Icefall $version ($ARCH)..."
     fi
 
-    # Release artifacts are tarballs containing the binary + dashboard/dist.
-    # Naming/layout is the source of truth in scripts/sign-release.py + release.yml.
+    # Release artifacts are tarballs containing just the icefall binary (the
+    # dashboard is embedded in it). Naming/layout: scripts/sign-release.py + release.yml.
     local arch_label="${ARCH}-linux"
     local tarball="icefall-${tag}-${arch_label}.tar.gz"
     local base_url="https://github.com/${ICEFALL_REPO}/releases/download/${tag}"
@@ -718,18 +716,7 @@ install_icefall() {
 
     install -m 755 "$extracted_bin" "$ICEFALL_BIN"
     ok "Binary installed to $ICEFALL_BIN"
-
-    # Install the dashboard so the daemon can serve it from WorkingDirectory.
-    local extracted_dash
-    extracted_dash="$(find "$workdir" -maxdepth 3 -type d -path '*/dashboard/dist' | head -1)"
-    if [ -n "$extracted_dash" ]; then
-        rm -rf "$ICEFALL_DASHBOARD"
-        mkdir -p "$(dirname "$ICEFALL_DASHBOARD")"
-        cp -r "$extracted_dash" "$ICEFALL_DASHBOARD"
-        ok "Dashboard installed to $ICEFALL_DASHBOARD"
-    else
-        warn "No dashboard/dist found in $tarball — the web UI will not be served"
-    fi
+    # The dashboard is embedded in the binary (IF-255) — nothing else to install.
 }
 
 setup_config() {

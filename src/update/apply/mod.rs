@@ -11,8 +11,6 @@ use tracing::info;
 use crate::db::Database;
 use crate::update::UpdateError;
 
-pub(crate) const DASHBOARD_DIR: &str = "dashboard/dist";
-
 pub use health::post_update_check;
 
 pub struct UpdateApplier {
@@ -26,7 +24,11 @@ pub struct PendingUpdate {
     pub to_version: String,
     pub rollback_binary: String,
     pub db_backup: String,
-    #[serde(default)]
+    /// Deprecated (IF-255): the dashboard is embedded in the binary, so there's
+    /// no separate dashboard to back up. Retained `#[serde(default)]` so a
+    /// pending marker written by an older binary still deserializes during an
+    /// in-flight upgrade; never written by current code.
+    #[serde(default, skip_serializing)]
     pub dashboard_backup: Option<String>,
     pub started_at: String,
 }
@@ -65,19 +67,14 @@ impl UpdateApplier {
         on_step("backup_db", "done");
         info!(path = %db_backup_path.display(), "database backup complete");
 
-        on_step("backup_dashboard", "running");
-        let dashboard_backup = self.backup_dashboard()?;
-        on_step("backup_dashboard", "done");
-        if let Some(ref p) = dashboard_backup {
-            info!(path = %p.display(), "dashboard backup complete");
-        }
-
+        // The dashboard is embedded in the binary (IF-255), so the binary swap
+        // updates the UI atomically — no separate dashboard backup/restore.
         let marker = PendingUpdate {
             from_version: from_version.to_string(),
             to_version: to_version.to_string(),
             rollback_binary: rollback_path.to_string_lossy().to_string(),
             db_backup: db_backup_path.to_string_lossy().to_string(),
-            dashboard_backup: dashboard_backup.map(|p| p.to_string_lossy().to_string()),
+            dashboard_backup: None,
             started_at: chrono::Utc::now().to_rfc3339(),
         };
         self.write_pending_marker(&marker)?;
@@ -128,19 +125,4 @@ impl UpdateApplier {
         }
         Ok(())
     }
-}
-
-pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let dest = dst.join(entry.file_name());
-        if ty.is_dir() {
-            copy_dir_recursive(&entry.path(), &dest)?;
-        } else {
-            std::fs::copy(entry.path(), dest)?;
-        }
-    }
-    Ok(())
 }
