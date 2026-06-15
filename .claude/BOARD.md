@@ -11,13 +11,13 @@
 Code-verified remaining work. Everything else previously marked "backlog" in
 phases 22/25/26/27 is already implemented (see status columns below).
 
-**Missing — no real implementation (5):**
+**Missing — no real implementation (4):**
 1. IF-151 — Cloudflare Tunnel integration (only a `tunnel_enabled` flag exists)
-2. IF-165 — Database terminal access (app/server terminals exist; DB does not)
-3. IF-180 — App dependency graph
-4. IF-181 — Built-in API playground
-5. IF-191 — Smart Resource Packer
+2. IF-180 — App dependency graph
+3. IF-181 — Built-in API playground
+4. IF-191 — Smart Resource Packer
    (IF-173 Raw Compose mode — ✅ done 2026-06-15)
+   (IF-165 Database terminal access — ✅ done 2026-06-15)
 
 **Partial — schema/columns exist, enforcement/UI/orchestration missing (20):**
 - ~~Security-relevant first: IF-168 (token ability scoping)~~ — ✅ done (enforced + UI on both token surfaces)
@@ -332,7 +332,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-162](tickets/phase-25-parity-gaps/IF-162-deploy-by-tag.md) | Deploy by git tag | ✅ | `tag` field on deploys, accepted in deploy API + MCP |
 | [IF-163](tickets/phase-25-parity-gaps/IF-163-post-deploy-commands.md) | Post-deployment commands | ✅ | `post_deploy_commands` exec after container start |
 | [IF-164](tickets/phase-25-parity-gaps/IF-164-backup-retention-config.md) | Configurable backup retention | ✅ | `backup_retention_count` field (default 7) |
-| [IF-165](tickets/phase-25-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | ⬜ | Terminal exists for apps/servers only; no DB terminal route/UI |
+| [IF-165](tickets/phase-25-parity-gaps/IF-165-database-terminal-access.md) | Database terminal access | ✅ | `/databases/{id}/terminal` WS reuses the app terminal exec/ws machinery with an engine-specific client (psql/mysql/mongosh/redis-cli/clickhouse-client, shell fallback); member+ role enforced, viewer denied; running-container check; DatabaseTerminal card + live-DB warning banner (2026-06-15) |
 | [IF-166](tickets/phase-25-parity-gaps/IF-166-branch-deployment-ui.md) | Branch-specific deployment UI | ✅ | `GET /apps/{id}/branches` + settings branch picker (datalist fed by git ls-remote, "load branches" button) (2026-06-14) |
 | [IF-167](tickets/phase-25-parity-gaps/IF-167-notification-alerts-disk-backup-server.md) | Server/disk/backup notification alerts | ✅ | Built the event→rules→channels fan-out (`notifications/emit.rs`); wired server.online/offline, backup.success/failure, disk warning/critical/recovered + global-rules API (2026-06-14). Subscription-matrix UI follow-up |
 | [IF-168](tickets/phase-25-parity-gaps/IF-168-token-ability-scoping.md) | API token ability scoping | ✅ | Enforced in `require_auth` (`api/abilities.rs`), 403 `insufficient_scope`; shared `TokenAbilityPicker` (presets + checkboxes + badges) now used on BOTH profile and admin Users-page token UIs — closed the admin gap where tokens were silently full-access (2026-06-15) |

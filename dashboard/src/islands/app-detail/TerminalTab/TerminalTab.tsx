@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
@@ -8,14 +9,21 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
 
 type Props = {
   appId: string;
+  /** WebSocket endpoint path (after /api/v1). Defaults to the app terminal. */
+  wsPath?: string;
+  /** Optional warning banner shown above the terminal (e.g. live-database notice). */
+  warning?: string;
+  /** Copy for the empty-state hint before connecting. */
+  emptyHint?: ComponentChildren;
 };
 
-function getWebSocketUrl(appId: string): string {
+function getWebSocketUrl(path: string): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}/api/v1/apps/${appId}/terminal`;
+  return `${proto}//${window.location.host}/api/v1${path}`;
 }
 
-export default function TerminalTab({ appId }: Props) {
+export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props) {
+  const resolvedPath = wsPath ?? `/apps/${appId}/terminal`;
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -84,7 +92,7 @@ export default function TerminalTab({ appId }: Props) {
       });
     }
 
-    const url = getWebSocketUrl(appId);
+    const url = getWebSocketUrl(resolvedPath);
     const ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
@@ -142,7 +150,7 @@ export default function TerminalTab({ appId }: Props) {
         ws.send(bytes.buffer);
       }
     });
-  }, [appId]);
+  }, [resolvedPath]);
 
   // Handle terminal resize
   useEffect(() => {
@@ -215,7 +223,9 @@ export default function TerminalTab({ appId }: Props) {
         <div class={styles.emptyState}>
           <p class={styles.emptyStateTitle}>Terminal</p>
           <p class={styles.emptyStateHint}>
-            Open a shell session into your running container. The app must have at least one <a href={`/apps/${appId}/deploys`} data-astro-prefetch="hover">running deploy</a>.
+            {emptyHint ?? (
+              <>Open a shell session into your running container. The app must have at least one <a href={`/apps/${appId}/deploys`} data-astro-prefetch="hover">running deploy</a>.</>
+            )}
           </p>
           <button
             type="button"
@@ -231,6 +241,10 @@ export default function TerminalTab({ appId }: Props) {
 
   return (
     <div class={styles.terminal}>
+      {warning && (
+        // a11y [WCAG 4.1.3]: surfaced as an alert so AT announces the live-DB risk
+        <div class={styles.warningBanner} role="alert">{warning}</div>
+      )}
       <div class={styles.toolbar}>
         <div class={styles.toolbarLeft}>
           {/* a11y [WCAG 4.1.3]: announce connection status to AT */}

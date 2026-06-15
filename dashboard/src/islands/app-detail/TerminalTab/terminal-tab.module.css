@@ -181,3 +181,14 @@
     transition: none;
   }
 }
+
+/* IF-165: live-database warning banner. Always-dark terminal theme, so a warm
+   tint on dark with a bright foreground keeps contrast well above 4.5:1. */
+.warningBanner {
+  background: oklch(0.32 0.07 75);
+  color: oklch(0.95 0.03 90);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid oklch(0.45 0.1 75);
+}
