@@ -280,12 +280,12 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | 2026-05-13 | audit_log table + migration, DB trait + SQLite impl, API endpoints (global + per-server), 90-day daily pruning |
 | [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | 2026-05-13 | Idempotent, NO_COLOR, Alpine/OpenRC, error trap with line numbers, Docker/Caddy verification, uninstall endpoint, log file |
 
-### Phase 22 — Expansion (v1.2) — 4 ✅ · 1 🟡 · 1 ⬜
+### Phase 22 — Expansion (v1.2) — 5 ✅ · 1 ⬜
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-147](tickets/phase-22-expansion/IF-147-environments-per-project.md) | Environments per project | ✅ | `project_environments`/`environment_variables_v2` tables, environments API, EnvironmentTabs UI |
 | [IF-148](tickets/phase-22-expansion/IF-148-one-click-service-templates.md) | One-click service templates | ✅ | `service_templates` table, `/templates` API, OneClickServices wizard step |
-| [IF-149](tickets/phase-22-expansion/IF-149-reverse-proxy-management-ui.md) | Reverse proxy management UI | 🟡 | Schema (`proxy_presets`, `proxy_config_history`) + skeleton ProxyTab; no preset PUT/POST API or advanced-mode validation |
+| [IF-149](tickets/phase-22-expansion/IF-149-reverse-proxy-management-ui.md) | Reverse proxy management UI | ✅ | `custom_proxy_config`/`proxy_settings` migration, proxy sqlite layer + history pruning, Caddy validate/load + preset→handler generation (rate-limit module detect w/ 429 fallback), 7 app proxy endpoints + 3 global `/settings/proxy` endpoints, full ProxyTab (viewer/presets/advanced/undo) + ReverseProxySection; deploy skips regen when custom config set |
 | [IF-150](tickets/phase-22-expansion/IF-150-log-drains.md) | Log drains | ✅ | `log_drains` table, full CRUD+test API (loki/axiom/http) |
 | [IF-151](tickets/phase-22-expansion/IF-151-cloudflare-tunnel-integration.md) | Cloudflare Tunnel integration | ⬜ | Only a `tunnel_enabled` flag; no cloudflared orchestration, ingress, or creds |
 | [IF-152](tickets/phase-22-expansion/IF-152-automated-docker-cleanup.md) | Automated Docker cleanup | ✅ | `cleanup_schedule`/`cleanup_runs` tables, cleanup API, ServerCleanupCard UI |
@@ -386,6 +386,15 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-203](tickets/phase-28-comprehensive-docs/IF-203-docs-troubleshooting-faq.md) | Troubleshooting & FAQ | ✅ | Added performance/auth/podman; 8 pages (2026-06-14) |
 | [IF-204](tickets/phase-28-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | ✅ | coolify/dokku/caprover/heroku/docker-compose present |
 | [IF-207](tickets/phase-28-comprehensive-docs/IF-207-docs-podman-reference.md) | Podman reference docs | ✅ | Added `reference/podman-config` + `reference/podman-differences` + podman how-to guides (2026-06-14) |
+
+### Proxy follow-ups — backlog (unscheduled)
+Spun out of IF-149's out-of-scope list. Load-balancer config is already Phase 31 (shipped).
+| Ticket | Title | Status | Notes |
+|--------|-------|--------|-------|
+| [IF-248](tickets/proxy-follow-ups/IF-248-caddy-ratelimit-plugin-install.md) | Bundle caddy-ratelimit module | ⬜ | Upgrades IF-149's 429 fallback to real enforcement |
+| [IF-249](tickets/proxy-follow-ups/IF-249-per-path-middleware.md) | Per-path middleware | ⬜ | IF-149 is per-app only; depends on IF-069 |
+| [IF-250](tickets/proxy-follow-ups/IF-250-pluggable-proxy-engine.md) | Pluggable proxy engine | ⬜ | Speculative — decide intent before scheduling |
+| [IF-251](tickets/proxy-follow-ups/IF-251-caddyfile-format-support.md) | Caddyfile format support | ⬜ | Likely won't-do — JSON-only by design |
 
 ---
 

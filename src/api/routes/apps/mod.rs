@@ -3,6 +3,7 @@ mod drift;
 mod insights;
 mod lifecycle;
 mod migrate;
+mod proxy;
 mod scaling;
 
 use axum::routing::{delete, get, post, put};
@@ -34,4 +35,12 @@ pub fn routes() -> Router<AppState> {
             "/apps/{id}/instances/{instance_id}",
             delete(scaling::delete_instance),
         )
+        // Reverse proxy management (IF-149)
+        .route("/apps/{id}/proxy", get(proxy::get_proxy))
+        .route("/apps/{id}/proxy/presets", put(proxy::update_presets))
+        .route("/apps/{id}/proxy/custom", put(proxy::set_custom))
+        .route("/apps/{id}/proxy/validate", post(proxy::validate))
+        .route("/apps/{id}/proxy/reset", post(proxy::reset))
+        .route("/apps/{id}/proxy/undo", post(proxy::undo))
+        .route("/apps/{id}/proxy/history", get(proxy::history))
 }

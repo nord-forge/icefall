@@ -1,3 +1,4 @@
+pub mod proxy;
 pub mod queue;
 pub mod routes;
 pub mod types;

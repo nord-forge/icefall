@@ -123,6 +123,16 @@ impl DeployManager {
         app: &App,
         env: &Environment,
     ) -> Result<(), DeployError> {
+        // Advanced mode (IF-149): the operator owns the raw proxy config, so
+        // auto-regeneration must not clobber it. Their custom config stays loaded.
+        if app.has_custom_proxy_config {
+            tracing::info!(
+                app_id = %app.id,
+                "skipping Caddy route regeneration: app has a custom proxy config"
+            );
+            return Ok(());
+        }
+
         let instances = self.db.list_app_instances(&app.id).await?;
 
         // Resolve server hosts once for any remote instances.

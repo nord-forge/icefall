@@ -41,6 +41,25 @@ pub trait Database: Send + Sync + 'static {
     async fn update_app(&self, id: &str, update: &UpdateApp) -> Result<App, DbError>;
     async fn delete_app(&self, id: &str) -> Result<(), DbError>;
 
+    // Reverse proxy management (IF-149)
+    async fn record_proxy_config_history(&self, app_id: &str, config: &str) -> Result<(), DbError>;
+    async fn list_proxy_config_history(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<ProxyConfigHistory>, DbError>;
+    async fn latest_proxy_config_history(
+        &self,
+        app_id: &str,
+    ) -> Result<Option<ProxyConfigHistory>, DbError>;
+    async fn set_proxy_presets(&self, app_id: &str, presets: &str) -> Result<(), DbError>;
+    async fn set_custom_proxy_config(&self, app_id: &str, config: &str) -> Result<(), DbError>;
+    async fn clear_custom_proxy_config(&self, app_id: &str) -> Result<(), DbError>;
+    async fn get_proxy_settings(&self) -> Result<ProxySettings, DbError>;
+    async fn update_proxy_settings(
+        &self,
+        update: &UpdateProxySettings,
+    ) -> Result<ProxySettings, DbError>;
+
     // App instances (multi-instance / load balancing)
     async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError>;
     async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError>;
