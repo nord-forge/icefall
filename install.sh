@@ -266,6 +266,10 @@ ensure_podman() {
             else
                 CONTAINER_SOCKET="/var/run/podman/podman.sock"
             fi
+            # Ensure the compose CLI and cgroup delegation are present even when
+            # Podman was already installed by hand.
+            command -v podman-compose &>/dev/null || install_podman_compose
+            setup_cgroup_delegation
             ok "Podman $podman_version detected (running)"
             return 0
         fi
@@ -277,6 +281,36 @@ ensure_podman() {
 # When both runtimes are installed and the user has not forced a choice,
 # offer an explicit pick (with an auto-detect fallback) so a Podman-committed
 # user is not silently given Docker.
+# Print an annotated Docker-vs-Podman comparison. On a small box the daemonless
+# nature of Podman is the deciding factor, so the callout is louder there.
+print_runtime_tradeoffs() {
+    echo ""
+    echo "  ${BOLD}Docker${RESET}"
+    echo "    + Widest compatibility — the default most images/tooling assume."
+    echo "    + Mature, familiar; easiest to debug with existing docs."
+    echo "    - Runs an always-on daemon (dockerd + containerd) that idles at"
+    echo "      ~60-100 MB RAM — a real cost on a 1 GB server."
+    echo ""
+    echo "  ${BOLD}Podman${RESET} (rootful — what this installer sets up)"
+    echo "    + Daemonless — no always-on process; ~0 MB idle. The runtime cost"
+    echo "      scales with running containers, not a fixed floor."
+    echo "    + Drop-in Docker-compatible API; Icefall supports it fully."
+    echo "    + Installer adds podman-compose (Raw Compose mode) and sets up"
+    echo "      cgroups-v2 delegation, so resource limits work."
+    echo "    - Slightly less ubiquitous; a few images expect the Docker socket"
+    echo "      path (Icefall handles this, but third-party tooling may not)."
+    echo "    - Rootless Podman is supported too, but can't enforce limits without"
+    echo "      delegation and can't bind ports < 1024 — rootful avoids both."
+    if [ "$LOW_MEMORY" = "true" ]; then
+        echo ""
+        warn "This looks like a small server (${TOTAL_RAM_MB} MB RAM)."
+        echo "  ${BOLD}${YELLOW}Recommended: Podman${RESET} — its daemonless design frees ~80 MB"
+        echo "  of RAM for your app containers. Pick Docker only if you specifically"
+        echo "  need Docker-only tooling."
+    fi
+    echo ""
+}
+
 prompt_runtime_choice() {
     # Only relevant in interactive auto mode.
     [ "$RUNTIME_CHOICE" = "auto" ] || return 0
@@ -289,15 +323,21 @@ prompt_runtime_choice() {
     # Only prompt when there is an actual choice to make.
     if [ "$have_docker" = true ] && [ "$have_podman" = true ]; then
         info "Both Docker and Podman are installed."
-        echo ""
+        print_runtime_tradeoffs
         echo "  Which container runtime should Icefall use?"
         echo ""
         echo "    1) Docker"
         echo "    2) Podman"
-        echo "    3) Auto-detect     — recommended, pick for me"
+        echo "    3) Auto-detect     — pick for me"
         echo ""
+        # On a small box, recommend Podman as the default for an empty answer.
+        local default_choice="3" prompt_hint="[1/2/3]"
+        if [ "$LOW_MEMORY" = "true" ]; then
+            default_choice="2"; prompt_hint="[1/2/3, default 2=Podman]"
+        fi
         local choice
-        read -rp "Use [1/2/3]: " choice
+        read -rp "Use $prompt_hint: " choice
+        choice="${choice:-$default_choice}"
         case "$choice" in
             1) RUNTIME_CHOICE="docker" ;;
             2) RUNTIME_CHOICE="podman" ;;
@@ -367,21 +407,36 @@ install_container_runtime() {
         fi
     fi
 
-    # Nothing installed — ask which to install.
+    # Nothing installed — ask which to install. On a small box the choice has
+    # real memory implications, so we surface the trade-offs and recommend
+    # Podman, while always leaving the final pick to the user.
     info "No container runtime detected."
-    echo ""
-    echo "  Which container runtime should Icefall use?"
+    print_runtime_tradeoffs
+    echo "  Which container runtime should Icefall install?"
     echo ""
     echo "    1) Docker          — widest compatibility"
-    echo "    2) Podman          — daemonless, rootless-capable"
-    echo "    3) Auto-detect     — recommended, pick for me"
+    echo "    2) Podman          — daemonless, lighter idle RAM"
+    echo "    3) Auto-detect     — pick for me"
     echo ""
+
+    # Default for an empty answer (and for non-interactive installs):
+    # Podman on a small box, Docker otherwise.
+    local default_choice="3"
+    if [ "$LOW_MEMORY" = "true" ]; then
+        default_choice="2"
+    fi
 
     local choice
     if [ "$NONINTERACTIVE" = "--yes" ]; then
-        choice="3"
+        choice="$default_choice"
+        if [ "$LOW_MEMORY" = "true" ]; then
+            info "Non-interactive small-server install — choosing Podman (lighter idle RAM)"
+        fi
     else
-        read -rp "Install [1/2/3]: " choice
+        local hint="[1/2/3]"
+        [ "$LOW_MEMORY" = "true" ] && hint="[1/2/3, default 2=Podman]"
+        read -rp "Install $hint: " choice
+        choice="${choice:-$default_choice}"
     fi
 
     case "$choice" in
@@ -392,10 +447,15 @@ install_container_runtime() {
             install_podman
             ;;
         *)
-            # Auto / unsure: default to Docker for a fresh box (widest
-            # compatibility), matching the prior behavior.
-            info "Auto-detect: no runtime present — installing Docker"
-            install_docker
+            # Auto / unsure: Docker on a normal box (widest compatibility),
+            # Podman on a small box (the daemonless RAM win is decisive there).
+            if [ "$LOW_MEMORY" = "true" ]; then
+                info "Auto-detect: small server — installing Podman (daemonless, lighter idle RAM)"
+                install_podman
+            else
+                info "Auto-detect: no runtime present — installing Docker"
+                install_docker
+            fi
             ;;
     esac
 }
@@ -421,8 +481,60 @@ install_docker() {
     ok "Docker installed and verified"
 }
 
+# Install the compose CLI for Podman so Raw Compose mode (deploy_mode =
+# "raw-compose") works out of the box. Best-effort: a missing package is a
+# warning, not a fatal error — only raw-compose deploys need it.
+install_podman_compose() {
+    info "Installing podman-compose (for Raw Compose mode)..."
+    local ok_compose=false
+    case "$OS_ID" in
+        ubuntu|debian)
+            apt-get install -y podman-compose &>/dev/null && ok_compose=true ;;
+        fedora|centos|rhel|rocky|almalinux)
+            { dnf install -y podman-compose &>/dev/null || yum install -y podman-compose &>/dev/null; } && ok_compose=true ;;
+        alpine)
+            apk add --no-cache podman-compose &>/dev/null && ok_compose=true ;;
+    esac
+    # Fall back to pip if the distro has no package (common on older releases).
+    if ! $ok_compose && command -v pip3 &>/dev/null; then
+        pip3 install --quiet podman-compose &>/dev/null && ok_compose=true
+    fi
+    if $ok_compose || command -v podman-compose &>/dev/null; then
+        ok "podman-compose available"
+    else
+        warn "Could not install podman-compose automatically. Raw Compose mode will"
+        warn "be unavailable until you install it (e.g. 'pip3 install podman-compose')."
+    fi
+}
+
+# Enable cgroups-v2 controller delegation so resource limits (memory/CPU) are
+# enforced even for rootless Podman. Without this the kernel silently ignores
+# limits on rootless containers. Rootful is unaffected. Best-effort, non-fatal.
+setup_cgroup_delegation() {
+    # Only meaningful on a cgroups-v2 (unified) host.
+    [ -f /sys/fs/cgroup/cgroup.controllers ] || return 0
+    # Delegate the cpu/memory controllers to user slices via a systemd drop-in.
+    local dropin="/etc/systemd/system/user@.service.d/icefall-delegate.conf"
+    if [ ! -f "$dropin" ] && command -v systemctl &>/dev/null; then
+        mkdir -p "$(dirname "$dropin")"
+        cat > "$dropin" << 'EOF'
+# Added by Icefall: delegate cpu/memory cgroup controllers to user sessions so
+# rootless Podman can enforce container resource limits.
+[Service]
+Delegate=cpu cpuset io memory pids
+EOF
+        systemctl daemon-reload 2>/dev/null || true
+        ok "Enabled cgroups-v2 delegation (rootless resource limits)"
+    fi
+}
+
 install_podman() {
-    info "Installing Podman..."
+    info "Installing Podman (rootful)..."
+    # Icefall installs and uses ROOTFUL Podman by default: it enforces container
+    # resource limits without extra setup and can publish privileged ports.
+    # Rootless Podman is fully supported too — point ICEFALL_CONTAINER_SOCKET at
+    # the per-user socket — but on rootless, limits need cgroups-v2 delegation
+    # (set up below) and ports < 1024 aren't publishable.
     case "$OS_ID" in
         ubuntu|debian)
             apt-get update &>/dev/null
@@ -442,6 +554,8 @@ install_podman() {
             ;;
     esac
 
+    install_podman_compose
+    setup_cgroup_delegation
     ensure_podman_socket
 
     if ! podman info &>/dev/null; then
@@ -450,7 +564,7 @@ install_podman() {
 
     CONTAINER_RUNTIME="podman"
     CONTAINER_SOCKET="/run/podman/podman.sock"
-    ok "Podman installed and verified"
+    ok "Podman installed and verified (rootful)"
 }
 
 install_caddy() {

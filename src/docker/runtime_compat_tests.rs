@@ -34,15 +34,17 @@ mod runtime_compat {
 
     #[test]
     fn quirks_matrix_rootless_podman() {
-        let q = RuntimeQuirks::detect(
+        // Explicit no-delegation so the assertion is host-independent.
+        let q = RuntimeQuirks::detect_with(
             ContainerRuntime::Podman,
             "/run/user/1000/podman/podman.sock",
             &["name=rootless".to_string()],
+            false,
         );
         assert_eq!(q.runtime, ContainerRuntime::Podman);
         assert!(q.rootless);
         assert_eq!(q.host_bind_ip, "127.0.0.1");
-        // Rootless cannot assume cgroup delegation.
+        // Rootless without delegation cannot enforce cgroup limits.
         assert!(!q.supports_cgroup_limits);
         // Rootless cannot publish privileged ports.
         assert_eq!(q.min_unprivileged_port, 1024);
@@ -87,13 +89,16 @@ mod runtime_compat {
         let q = client.quirks();
 
         // host_bind_ip and min_unprivileged_port must agree with rootless-ness.
+        // (cgroup-limit support varies by host delegation, so it's not asserted
+        // here — it's covered deterministically by the unit tests.)
         if q.rootless {
             assert_eq!(q.host_bind_ip, "127.0.0.1");
             assert_eq!(q.min_unprivileged_port, 1024);
-            assert!(!q.supports_cgroup_limits);
         } else {
             assert_eq!(q.host_bind_ip, "0.0.0.0");
             assert_eq!(q.min_unprivileged_port, 0);
+            // Rootful always enforces limits.
+            assert!(q.supports_cgroup_limits);
         }
 
         // Only Podman is ever flagged rootless.

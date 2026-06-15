@@ -51,10 +51,29 @@ impl RuntimeQuirks {
 
     /// Resolve quirks from the socket path (a per-user runtime dir signals
     /// rootless) and `security_options` (a `name=rootless` entry confirms it).
+    /// Probes the host for cgroups-v2 delegation so rootless limit enforcement
+    /// is detected rather than assumed off.
     pub fn detect(
         runtime: ContainerRuntime,
         socket_path: &str,
         security_options: &[String],
+    ) -> Self {
+        Self::detect_with(
+            runtime,
+            socket_path,
+            security_options,
+            cgroup_v2_delegation_available(),
+        )
+    }
+
+    /// Like [`detect`], but with cgroup delegation passed in (testable seam).
+    ///
+    /// [`detect`]: RuntimeQuirks::detect
+    pub fn detect_with(
+        runtime: ContainerRuntime,
+        socket_path: &str,
+        security_options: &[String],
+        cgroup_delegation: bool,
     ) -> Self {
         if runtime == ContainerRuntime::Docker {
             return Self::docker_default();
@@ -73,14 +92,52 @@ impl RuntimeQuirks {
             } else {
                 "0.0.0.0".to_string()
             },
-            // Rootful Podman honors cgroup limits; rootless only does so with
-            // cgroups v2 delegation, which we cannot assume.
-            supports_cgroup_limits: !rootless,
+            // Rootful Podman always honors cgroup limits. Rootless does too, but
+            // ONLY when the host has cgroups-v2 with memory/cpu controllers
+            // delegated to the user — which the installer now sets up. We probe
+            // for it rather than blanket-assume rootless can't enforce limits.
+            supports_cgroup_limits: !rootless || cgroup_delegation,
             // Modern Podman (>= 4, which the installer requires) uses netavark.
             dns_backend: DnsBackend::Netavark,
             min_unprivileged_port: if rootless { 1024 } else { 0 },
         }
     }
+}
+
+/// Whether the host has cgroups v2 with the `memory` and `cpu` controllers
+/// available for delegation to a rootless user. On a unified-v2 host with
+/// systemd `Delegate=` set up (what the installer configures), the user's
+/// cgroup exposes these controllers; without it, rootless resource limits are
+/// silently ignored by the kernel.
+///
+/// Best-effort filesystem probe — any error is treated as "no delegation" so we
+/// degrade to the conservative warning rather than over-promise enforcement.
+fn cgroup_v2_delegation_available() -> bool {
+    // cgroups v2 is a single unified hierarchy at /sys/fs/cgroup with a
+    // top-level `cgroup.controllers` file. cgroups v1 has no such file.
+    let root_controllers = match std::fs::read_to_string("/sys/fs/cgroup/cgroup.controllers") {
+        Ok(c) => c,
+        Err(_) => return false, // not unified v2 (or unreadable) → no delegation
+    };
+    if !(root_controllers.contains("memory") && root_controllers.contains("cpu")) {
+        return false;
+    }
+
+    // The controllers must also be delegated down to the user's slice. Check the
+    // running process's own cgroup subtree for the same controllers; if systemd
+    // delegated them, they appear in our subtree_control / controllers file.
+    for path in [
+        "/sys/fs/cgroup/cgroup.subtree_control",
+        // Per-user delegated slice (systemd user manager).
+        "/sys/fs/cgroup/user.slice/cgroup.controllers",
+    ] {
+        if let Ok(c) = std::fs::read_to_string(path) {
+            if c.contains("memory") && c.contains("cpu") {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// True if the socket path indicates a rootless (per-user) runtime.
@@ -120,7 +177,13 @@ mod tests {
 
     #[test]
     fn rootful_podman_socket_is_not_rootless() {
-        let q = RuntimeQuirks::detect(ContainerRuntime::Podman, "/run/podman/podman.sock", &[]);
+        // Rootful honors limits regardless of delegation.
+        let q = RuntimeQuirks::detect_with(
+            ContainerRuntime::Podman,
+            "/run/podman/podman.sock",
+            &[],
+            false,
+        );
         assert!(!q.rootless);
         assert_eq!(q.host_bind_ip, "0.0.0.0");
         assert!(q.supports_cgroup_limits);
@@ -129,11 +192,12 @@ mod tests {
     }
 
     #[test]
-    fn rootless_podman_detected_from_socket_path() {
-        let q = RuntimeQuirks::detect(
+    fn rootless_podman_without_delegation_cannot_enforce_limits() {
+        let q = RuntimeQuirks::detect_with(
             ContainerRuntime::Podman,
             "/run/user/1000/podman/podman.sock",
             &[],
+            false,
         );
         assert!(q.rootless);
         assert_eq!(q.host_bind_ip, "127.0.0.1");
@@ -142,11 +206,28 @@ mod tests {
     }
 
     #[test]
+    fn rootless_podman_with_delegation_enforces_limits() {
+        // The installer sets up cgroups-v2 delegation; then rootless limits work.
+        let q = RuntimeQuirks::detect_with(
+            ContainerRuntime::Podman,
+            "/run/user/1000/podman/podman.sock",
+            &[],
+            true,
+        );
+        assert!(q.rootless);
+        assert!(q.supports_cgroup_limits);
+        // Loopback bind + unprivileged-port floor still apply for rootless.
+        assert_eq!(q.host_bind_ip, "127.0.0.1");
+        assert_eq!(q.min_unprivileged_port, 1024);
+    }
+
+    #[test]
     fn rootless_podman_detected_from_security_options() {
-        let q = RuntimeQuirks::detect(
+        let q = RuntimeQuirks::detect_with(
             ContainerRuntime::Podman,
             "/run/podman/podman.sock",
             &["name=rootless".to_string(), "name=seccomp".to_string()],
+            false,
         );
         assert!(q.rootless);
         assert_eq!(q.host_bind_ip, "127.0.0.1");
