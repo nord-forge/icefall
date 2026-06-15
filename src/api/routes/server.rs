@@ -18,6 +18,7 @@ const SERVER_HISTORY_CAPACITY: usize = 120;
 const COLLECT_INTERVAL_SECS: u64 = 2;
 const SQLITE_WRITE_TICKS: u64 = 15; // every 30s (15 * 2s)
 const PRUNE_TICKS: u64 = 1800; // every hour (1800 * 2s)
+const DISK_REFRESH_TICKS: u64 = 15; // re-enumerate disks every 30s (15 * 2s)
 
 #[derive(Clone, serde::Serialize, Default)]
 pub struct ServerMetrics {
@@ -90,17 +91,28 @@ pub fn spawn_metrics_collector(
 ) {
     tokio::spawn(async move {
         let mut tick: u64 = 0;
+        // Persistent sysinfo handles, reused across cycles (IF-260). Keeping the
+        // `System` alive lets CPU% be computed from the delta between *cycles*
+        // (COLLECT_INTERVAL_SECS apart) instead of an in-cycle 200 ms sleep — and
+        // avoids re-parsing all of /proc via `System::new()` every 2 s.
+        let mut sys = sysinfo::System::new();
+        let mut disks = sysinfo::Disks::new_with_refreshed_list();
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(COLLECT_INTERVAL_SECS)).await;
 
-            let snapshot = tokio::task::spawn_blocking(|| {
-                let mut sys = sysinfo::System::new();
+            // Disk topology rarely changes — only re-enumerate it occasionally
+            // rather than every cycle.
+            let refresh_disks = tick % DISK_REFRESH_TICKS == 0;
+
+            // Move the persistent handles into the blocking refresh and take them
+            // back, so they survive across iterations without crossing an .await.
+            let result = tokio::task::spawn_blocking(move || {
                 sys.refresh_cpu_all();
                 sys.refresh_memory();
-                std::thread::sleep(std::time::Duration::from_millis(200));
-                sys.refresh_cpu_all();
+                if refresh_disks {
+                    disks.refresh(true);
+                }
 
-                let disks = sysinfo::Disks::new_with_refreshed_list();
                 let (disk_used, disk_total) =
                     disks.iter().fold((0u64, 0u64), |(used, total), disk| {
                         (
@@ -109,19 +121,28 @@ pub fn spawn_metrics_collector(
                         )
                     });
 
-                ServerMetrics {
+                let snapshot = ServerMetrics {
+                    // First cycle has no prior CPU sample, so this reads 0%; it's
+                    // accurate from the second cycle on.
                     cpu_percent: sys.global_cpu_usage(),
                     memory_used_bytes: sys.used_memory(),
                     memory_total_bytes: sys.total_memory(),
                     disk_used_bytes: disk_used,
                     disk_total_bytes: disk_total,
-                }
+                };
+                (snapshot, sys, disks)
             })
             .await;
 
-            let Ok(snapshot) = snapshot else {
+            let Ok((snapshot, returned_sys, returned_disks)) = result else {
+                // The blocking task panicked; the handles are gone. Recreate them
+                // so the loop can continue.
+                sys = sysinfo::System::new();
+                disks = sysinfo::Disks::new_with_refreshed_list();
                 continue;
             };
+            sys = returned_sys;
+            disks = returned_disks;
 
             let snap = history.record(&snapshot).await;
             *metrics.write().await = snapshot.clone();
