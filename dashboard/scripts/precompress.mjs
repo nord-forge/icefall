@@ -1,10 +1,15 @@
-// Post-build step: precompress static assets so the Rust server can serve
-// `.br` / `.gz` variants directly (zero per-request CPU) via
-// `ServeDir::precompressed_br()/precompressed_gzip()` (IF-254).
+// Post-build step: precompress static assets so the Rust server can serve a
+// build-time Brotli (`.br`) variant directly — zero per-request CPU, best ratio
+// (brotli quality 11). Important on a 1 vCPU server.
 //
-// Build-time Brotli at max quality beats per-request compression on both ratio
-// and CPU — important on a 1 vCPU server. Uses node:zlib (built in), so no CLI
-// or npm dependency. Runs after `astro build` + csp-hashes via the build script.
+// IF-256: we emit ONLY `.br`, not `.gz`. Brotli is accepted by ~all modern
+// browsers; the rare gzip-only (or no-Accept-Encoding) client is served the
+// identity asset, which the server's CompressionLayer (IF-252) gzips on the fly.
+// Dropping the `.gz` copies shrinks the dashboard embedded in the binary (IF-255)
+// by ~a third of the compressed set.
+//
+// Uses node:zlib (built in), so no CLI or npm dependency. Runs after
+// `astro build` + csp-hashes via the build script.
 
 import {
   readdirSync,
@@ -14,7 +19,6 @@ import {
 } from 'node:fs';
 import { join, extname } from 'node:path';
 import {
-  gzipSync,
   brotliCompressSync,
   constants as zlibConstants,
 } from 'node:zlib';
@@ -39,7 +43,6 @@ const COMPRESSIBLE = new Set([
 // worth it; the browser may as well take the identity file.
 const MIN_BYTES = 1024;
 
-const GZIP_OPTS = { level: 9 };
 const BROTLI_OPTS = {
   params: {
     [zlibConstants.BROTLI_PARAM_QUALITY]: 11, // max
@@ -70,7 +73,6 @@ for (const file of walk(DIST_DIR)) {
   const data = readFileSync(file);
   if (data.length < MIN_BYTES) continue;
 
-  const gz = gzipSync(data, GZIP_OPTS);
   const br = brotliCompressSync(data, {
     params: {
       ...BROTLI_OPTS.params,
@@ -78,9 +80,8 @@ for (const file of walk(DIST_DIR)) {
     },
   });
 
-  // Only keep a variant if it's actually smaller than the original — otherwise
-  // ServeDir would hand the client a *bigger* "compressed" file.
-  if (gz.length < data.length) writeFileSync(`${file}.gz`, gz);
+  // Only keep the variant if it's actually smaller than the original — otherwise
+  // the server would hand the client a *bigger* "compressed" file.
   if (br.length < data.length) writeFileSync(`${file}.br`, br);
 
   compressed += 1;
@@ -93,6 +94,6 @@ const pct =
     ? Math.round((1 - brBytes / originalBytes) * 100)
     : 0;
 console.log(
-  `precompress: ${compressed} files -> .br/.gz, ` +
+  `precompress: ${compressed} files -> .br, ` +
     `${Math.round(originalBytes / 1024)} KB -> ${Math.round(brBytes / 1024)} KB brotli (${pct}% smaller)`,
 );
