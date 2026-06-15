@@ -5,6 +5,7 @@ pub mod health;
 pub mod manager;
 pub mod native;
 pub mod preview;
+pub mod raw_compose;
 pub mod remote;
 pub mod s3_mount;
 pub mod scheduler;

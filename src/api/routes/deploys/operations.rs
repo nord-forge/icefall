@@ -138,7 +138,44 @@ pub(crate) async fn trigger_deploy(
     let app_clone = app.clone();
     let env_clone = env.clone();
 
-    if is_compose_deploy {
+    // Raw Compose mode (IF-173): hand the file to the `docker compose` CLI
+    // instead of Icefall's managed per-service container pipeline.
+    let is_raw_compose = is_compose_deploy && app.deploy_mode == "raw-compose";
+
+    if is_raw_compose {
+        let compose_yaml = app
+            .compose_content
+            .clone()
+            .expect("guarded by is_compose_deploy");
+
+        tokio::spawn(async move {
+            let deployer = crate::deploy::raw_compose::RawComposeDeployer::new(
+                state.db.clone(),
+                state.event_bus.clone(),
+                state.config.clone(),
+            );
+
+            let env_map: std::collections::HashMap<String, String> = state
+                .db
+                .get_env_vars(&env_clone.id)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|v| (v.key, v.value))
+                .collect();
+
+            if let Err(e) = deployer
+                .deploy(&app_clone, &deploy_id, &compose_yaml, &env_map)
+                .await
+            {
+                tracing::error!("Raw compose deploy failed for {deploy_id}: {e}");
+                let _ = state
+                    .db
+                    .update_deploy_status(&deploy_id, "failed", Some(&e.to_string()))
+                    .await;
+            }
+        });
+    } else if is_compose_deploy {
         let compose_yaml = app
             .compose_content
             .clone()
