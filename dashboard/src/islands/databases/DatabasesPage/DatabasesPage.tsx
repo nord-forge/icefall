@@ -7,6 +7,7 @@ import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import Select from '@islands/shared/Select/Select';
 import StatusDot from '@islands/shared/StatusDot/StatusDot';
 import DatabaseBrowser from '@islands/databases/DatabaseBrowser/DatabaseBrowser';
+import DatabasePublicAccess from '@islands/databases/DatabasePublicAccess/DatabasePublicAccess';
 import { formatRelativeTime, formatBytes } from '@lib/format';
 import { api } from '@lib/api';
 import { Plus, Database, Trash2, Copy, Eye, EyeOff, RefreshCw, Download, RotateCcw } from 'lucide-preact';
@@ -237,6 +238,10 @@ export default function DatabasesPage() {
                 </tbody>
               </table>
             )}
+          </div>
+
+          <div class={styles.card}>
+            <DatabasePublicAccess dbId={selectedDb.id} />
           </div>
 
           <div class={styles.card}>

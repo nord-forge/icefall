@@ -214,6 +214,7 @@ mod proxy {
             default_headers: Some(Some(r#"{"X-Frame-Options":"DENY"}"#.to_string())),
             default_rate_limit: None,
             force_https: Some(false),
+            ..Default::default()
         };
         let updated = db.update_proxy_settings(&update).await.expect("update");
         assert!(!updated.force_https);

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::docker::containers::{ContainerConfig, PortMapping, VolumeMount};
+
 /// Builds the in-container commands creating a read-only account, args
 /// `(admin_user, admin_password, ro_user, ro_password, db_name)`. Each inner `Vec` is one exec.
 type ReadonlySetupFn = fn(&str, &str, &str, &str, &str) -> Vec<Vec<String>>;
@@ -275,6 +277,106 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
         },
     );
     m
+}
+
+/// The in-container data directory each engine persists to, used as the volume
+/// mount target.
+pub(super) fn data_path_for(db_type: &str) -> &'static str {
+    match db_type {
+        "postgres" | "cockroachdb" => "/var/lib/postgresql/data",
+        "mysql" | "mariadb" => "/var/lib/mysql",
+        "redis" | "keydb" | "valkey" => "/data",
+        "dragonfly" => "/data",
+        "mongo" => "/data/db",
+        "clickhouse" => "/var/lib/clickhouse",
+        "cassandra" => "/var/lib/cassandra",
+        _ => "/data",
+    }
+}
+
+/// The container entrypoint override for engines whose password is passed on the
+/// command line rather than via env (Redis-family + CockroachDB insecure mode).
+pub(super) fn cmd_for(db_type: &str, password: &str) -> Option<Vec<String>> {
+    match db_type {
+        "redis" => Some(vec![
+            "redis-server".to_string(),
+            "--requirepass".to_string(),
+            password.to_string(),
+        ]),
+        "keydb" => Some(vec![
+            "keydb-server".to_string(),
+            "--requirepass".to_string(),
+            password.to_string(),
+            "--server-threads".to_string(),
+            "2".to_string(),
+        ]),
+        "dragonfly" => Some(vec![
+            "dragonfly".to_string(),
+            "--requirepass".to_string(),
+            password.to_string(),
+        ]),
+        "valkey" => Some(vec![
+            "valkey-server".to_string(),
+            "--requirepass".to_string(),
+            password.to_string(),
+        ]),
+        "cockroachdb" => Some(vec![
+            "start-single-node".to_string(),
+            "--insecure".to_string(),
+            "--store=/var/lib/postgresql/data".to_string(),
+        ]),
+        _ => None,
+    }
+}
+
+/// Inputs needed to (re)build a managed database's container config. Kept in one
+/// place so `create_database` and the public-access toggle (which recreates the
+/// container to add a port binding) produce byte-for-byte identical specs apart
+/// from the deliberately-varied port list.
+pub(super) struct DbContainerSpec<'a> {
+    pub name: &'a str,
+    pub db_type: &'a str,
+    pub user: &'a str,
+    pub password: &'a str,
+    pub memory_bytes: i64,
+    /// Set when the database is linked to an app — joins that app's network.
+    pub app_id: Option<&'a str>,
+    /// Extra published ports beyond the engine's own. Public access appends a
+    /// `127.0.0.1:<auto>` loopback mapping here.
+    pub extra_ports: Vec<PortMapping>,
+}
+
+/// Build the full `ContainerConfig` for a managed database from its stored spec.
+pub(super) fn build_db_container_config(
+    spec: &DbContainerSpec,
+    type_config: &DbTypeConfig,
+) -> ContainerConfig {
+    let slug = spec.name.trim().to_lowercase();
+    let container_name = format!("icefall-db-{slug}");
+    let volume_name = format!("icefall-db-{slug}-data");
+
+    let mut labels = HashMap::new();
+    labels.insert("icefall.managed-db".to_string(), "true".to_string());
+    labels.insert("icefall.db-name".to_string(), spec.name.to_string());
+
+    ContainerConfig {
+        name: container_name,
+        image: type_config.image.to_string(),
+        env: (type_config.env_vars)(spec.user, spec.password, spec.name),
+        cmd: cmd_for(spec.db_type, spec.password),
+        ports: spec.extra_ports.clone(),
+        volumes: vec![VolumeMount {
+            source: volume_name,
+            target: data_path_for(spec.db_type).to_string(),
+            read_only: false,
+        }],
+        memory_bytes: Some(spec.memory_bytes),
+        cpu_shares: None,
+        restart_policy: Some("unless-stopped".to_string()),
+        labels,
+        network: spec.app_id.map(|_| format!("icefall-{}", spec.name)),
+        hostname: Some(format!("{}.icefall.internal", spec.name)),
+    }
 }
 
 pub(super) fn generate_password() -> String {

@@ -55,6 +55,7 @@ pub(super) fn resolve_service_ports(service: &ComposeService) -> Vec<PortMapping
                         container_port,
                         host_port,
                         protocol: protocol.to_string(),
+                        host_ip: None,
                     })
                 } else {
                     None
@@ -70,6 +71,7 @@ pub(super) fn resolve_service_ports(service: &ComposeService) -> Vec<PortMapping
                     container_port,
                     host_port: None,
                     protocol: protocol.to_string(),
+                    host_ip: None,
                 })
             }
         })

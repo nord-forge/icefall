@@ -272,6 +272,16 @@ pub trait Database: Send + Sync + 'static {
         port: i32,
         ip_whitelist: Option<&str>,
     ) -> Result<PublicPort, DbError>;
+    /// Allocate the lowest free port in the inclusive range for a resource,
+    /// retrying past races. Errors if the range is exhausted.
+    async fn allocate_free_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        range_start: i32,
+        range_end: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError>;
     async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError>;
     async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError>;
 

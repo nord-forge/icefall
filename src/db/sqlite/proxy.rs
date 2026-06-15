@@ -144,7 +144,8 @@ pub(super) async fn clear_custom_proxy_config(
 pub(super) async fn get_proxy_settings(pool: &SqlitePool) -> Result<ProxySettings, DbError> {
     // Row is seeded by the migration; fall back to defaults if it was deleted.
     let row = sqlx::query_as::<_, ProxySettings>(
-        "SELECT id, default_headers, default_rate_limit, force_https, updated_at
+        "SELECT id, default_headers, default_rate_limit, force_https,
+                public_port_range_start, public_port_range_end, updated_at
          FROM proxy_settings WHERE id = 'global'",
     )
     .fetch_optional(pool)
@@ -154,6 +155,8 @@ pub(super) async fn get_proxy_settings(pool: &SqlitePool) -> Result<ProxySetting
         default_headers: None,
         default_rate_limit: None,
         force_https: true,
+        public_port_range_start: 10000,
+        public_port_range_end: 10100,
         updated_at: now_iso8601(),
     }))
 }
@@ -172,21 +175,32 @@ pub(super) async fn update_proxy_settings(
         None => existing.default_rate_limit.as_deref(),
     };
     let force_https = update.force_https.unwrap_or(existing.force_https);
+    let range_start = update
+        .public_port_range_start
+        .unwrap_or(existing.public_port_range_start);
+    let range_end = update
+        .public_port_range_end
+        .unwrap_or(existing.public_port_range_end);
     let now = now_iso8601();
 
     // Upsert — the global row normally exists, but re-create it if it was removed.
     sqlx::query(
-        "INSERT INTO proxy_settings (id, default_headers, default_rate_limit, force_https, updated_at)
-         VALUES ('global', ?, ?, ?, ?)
+        "INSERT INTO proxy_settings (id, default_headers, default_rate_limit, force_https,
+                                     public_port_range_start, public_port_range_end, updated_at)
+         VALUES ('global', ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
             default_headers = excluded.default_headers,
             default_rate_limit = excluded.default_rate_limit,
             force_https = excluded.force_https,
+            public_port_range_start = excluded.public_port_range_start,
+            public_port_range_end = excluded.public_port_range_end,
             updated_at = excluded.updated_at",
     )
     .bind(default_headers)
     .bind(default_rate_limit)
     .bind(force_https)
+    .bind(range_start)
+    .bind(range_end)
     .bind(&now)
     .execute(pool)
     .await?;

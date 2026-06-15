@@ -424,6 +424,7 @@ impl DeployManager {
                         container_port: detected_port,
                         host_port: None,
                         protocol: "tcp".to_string(),
+                        host_ip: None,
                     }],
                     volumes: Vec::new(),
                     memory_bytes: resource_limits.as_ref().and_then(|r| r.memory_bytes),

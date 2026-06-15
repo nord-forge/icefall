@@ -29,6 +29,8 @@ mod projects;
 mod proxy;
 mod proxy_tests;
 mod public_ports;
+#[cfg(test)]
+mod public_ports_tests;
 mod registries;
 mod restore;
 mod scheduled_deploys_tests;
@@ -640,6 +642,25 @@ impl Database for SqliteDatabase {
             resource_type,
             resource_id,
             port,
+            ip_whitelist,
+        )
+        .await
+    }
+
+    async fn allocate_free_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        range_start: i32,
+        range_end: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError> {
+        public_ports::allocate_free_public_port(
+            &self.pool,
+            resource_type,
+            resource_id,
+            range_start,
+            range_end,
             ip_whitelist,
         )
         .await

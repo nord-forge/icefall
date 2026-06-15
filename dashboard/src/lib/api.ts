@@ -1,4 +1,4 @@
-import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings } from './types';
+import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings, PublicAccess } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -241,6 +241,20 @@ export const api = {
 
   restartDatabase: (dbId: string) =>
     request<{ message: string }>(`/databases/${dbId}/restart`, { method: 'POST' }),
+
+  // Public TCP access (IF-172)
+  getDatabasePublicAccess: (dbId: string) =>
+    request<{ data: PublicAccess }>(`/databases/${dbId}/public-access`),
+  enableDatabasePublicAccess: (dbId: string, ipWhitelist?: string) =>
+    request<{ data: PublicAccess; message: string }>(
+      `/databases/${dbId}/public-access`,
+      { method: 'POST', body: JSON.stringify({ ip_whitelist: ipWhitelist ?? '' }) },
+    ),
+  disableDatabasePublicAccess: (dbId: string) =>
+    request<{ data: PublicAccess; message: string }>(
+      `/databases/${dbId}/public-access`,
+      { method: 'DELETE' },
+    ),
 
   getHealth: (appId: string) =>
     request<{ data: HealthCheckResult[] }>(`/apps/${appId}/health`),
@@ -946,7 +960,7 @@ export const api = {
   getGlobalProxySettings: () =>
     request<{ data: GlobalProxySettings }>('/settings/proxy'),
 
-  updateGlobalProxySettings: (body: { default_headers?: unknown; default_rate_limit?: unknown; force_https?: boolean }) =>
+  updateGlobalProxySettings: (body: { default_headers?: unknown; default_rate_limit?: unknown; force_https?: boolean; public_port_range_start?: number; public_port_range_end?: number }) =>
     request<{ data: GlobalProxySettings; message: string }>('/settings/proxy', {
       method: 'PUT',
       body: JSON.stringify(body),
