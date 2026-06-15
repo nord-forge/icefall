@@ -5,6 +5,7 @@ use axum::http::{HeaderName, HeaderValue, Method, Request, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::Router;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -369,9 +370,53 @@ fn cors_layer(config: &IcefallConfig) -> CorsLayer {
         .allow_credentials(true)
 }
 
+/// `Cache-Control` value for a request path (IF-253).
+///
+/// Astro content-hashes asset filenames (`Alert.CXSNITkF.js`), so anything under
+/// `/_astro/` is immutable and can be cached for a year. HTML shells must NOT be
+/// cached long — they reference the hashed assets, and a deploy changes those
+/// hashes, so the shell has to be re-fetched to discover them. API responses are
+/// dynamic and left uncached. Returns `None` when no header should be set.
+fn cache_control_for_path(path: &str) -> Option<&'static str> {
+    if path.starts_with("/api/") {
+        return None;
+    }
+    if path.starts_with("/_astro/") {
+        // Immutable, content-hashed assets.
+        Some("public, max-age=31536000, immutable")
+    } else {
+        // HTML shells and other dashboard files — always revalidate so updates
+        // (new asset hashes) are picked up immediately.
+        Some("no-cache")
+    }
+}
+
+/// Set `Cache-Control` on dashboard responses based on the request path. Only
+/// adds the header when the response doesn't already carry one, so a handler
+/// that sets its own caching wins.
+async fn dashboard_cache_control(req: Request<Body>, next: Next) -> Response {
+    let cache_value = cache_control_for_path(req.uri().path());
+    let mut response = next.run(req).await;
+    if let Some(value) = cache_value {
+        let headers = response.headers_mut();
+        if !headers.contains_key(axum::http::header::CACHE_CONTROL) {
+            if let Ok(hv) = HeaderValue::from_str(value) {
+                headers.insert(axum::http::header::CACHE_CONTROL, hv);
+            }
+        }
+    }
+    response
+}
+
 pub fn apply_middleware(router: Router<AppState>, config: &IcefallConfig) -> Router<AppState> {
     let mut router = router
         .layer(TraceLayer::new_for_http())
+        // Compress responses (gzip/br) — the dashboard ships ~900 KB of JS that
+        // was previously sent uncompressed (IF-252). Negotiated per
+        // Accept-Encoding; clients that don't ask get identity.
+        .layer(CompressionLayer::new())
+        // Path-based Cache-Control for dashboard assets (IF-253).
+        .layer(axum::middleware::from_fn(dashboard_cache_control))
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID.clone()))
         .layer(SetRequestIdLayer::new(
             X_REQUEST_ID.clone(),
@@ -396,6 +441,86 @@ mod tests {
         assert!(is_public_path("/api/v1/health"));
         assert!(is_public_path("/api/v1/onboarding/status"));
         assert!(is_public_path("/api/v1/onboarding/admin"));
+    }
+
+    #[test]
+    fn cache_control_policy() {
+        // Content-hashed assets are immutable.
+        assert_eq!(
+            cache_control_for_path("/_astro/Alert.CXSNITkF.js"),
+            Some("public, max-age=31536000, immutable")
+        );
+        // HTML shells must revalidate so new asset hashes are discovered.
+        assert_eq!(cache_control_for_path("/"), Some("no-cache"));
+        assert_eq!(cache_control_for_path("/apps/abc"), Some("no-cache"));
+        assert_eq!(cache_control_for_path("/index.html"), Some("no-cache"));
+        // API responses are dynamic — never cached by this layer.
+        assert_eq!(cache_control_for_path("/api/v1/apps"), None);
+    }
+
+    // Drive the cache-control middleware through a real router to confirm it
+    // actually sets the response header for the matched path.
+    async fn cache_header_for(path: &'static str) -> Option<String> {
+        use axum::routing::get;
+        use tower::ServiceExt; // for `oneshot`
+
+        let app = Router::new()
+            .route("/{*rest}", get(|| async { "body" }))
+            .route("/", get(|| async { "body" }))
+            .layer(axum::middleware::from_fn(dashboard_cache_control));
+
+        let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        resp.headers()
+            .get(axum::http::header::CACHE_CONTROL)
+            .map(|v| v.to_str().unwrap().to_string())
+    }
+
+    #[tokio::test]
+    async fn cache_control_header_is_set_on_responses() {
+        assert_eq!(
+            cache_header_for("/_astro/x.js").await.as_deref(),
+            Some("public, max-age=31536000, immutable")
+        );
+        assert_eq!(cache_header_for("/").await.as_deref(), Some("no-cache"));
+        assert_eq!(cache_header_for("/api/v1/apps").await, None);
+    }
+
+    #[tokio::test]
+    async fn does_not_override_existing_cache_control() {
+        use axum::routing::get;
+        use tower::ServiceExt;
+
+        // A handler that sets its own Cache-Control must win over the middleware.
+        let app = Router::new()
+            .route(
+                "/_astro/{*rest}",
+                get(|| async {
+                    (
+                        [(axum::http::header::CACHE_CONTROL, "private, max-age=1")],
+                        "x",
+                    )
+                }),
+            )
+            .layer(axum::middleware::from_fn(dashboard_cache_control));
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/_astro/x.js")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.headers()
+                .get(axum::http::header::CACHE_CONTROL)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "private, max-age=1"
+        );
     }
 
     #[test]
