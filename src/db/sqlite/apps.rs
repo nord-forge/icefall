@@ -198,7 +198,6 @@ pub(super) async fn update_app(
         Some(v) => v.as_deref(),
         None => existing.log_highlight_patterns.as_deref(),
     };
-    let tunnel_enabled = update.tunnel_enabled.unwrap_or(existing.tunnel_enabled);
     let require_deploy_approval = update
         .require_deploy_approval
         .unwrap_or(existing.require_deploy_approval);
@@ -235,7 +234,7 @@ pub(super) async fn update_app(
          ghost_mode_enabled = ?, ghost_mode_idle_minutes = ?,
          canary_enabled = ?, canary_config = ?,
          log_noise_patterns = ?, log_highlight_patterns = ?,
-         tunnel_enabled = ?, require_deploy_approval = ?,
+         require_deploy_approval = ?,
          project_environment_id = ?, github_installation_id = ?,
          desired_instances = ?, lb_policy = ?,
          lb_health_check_path = ?, lb_sticky_sessions = ?,
@@ -273,7 +272,6 @@ pub(super) async fn update_app(
     .bind(canary_config)
     .bind(log_noise_patterns)
     .bind(log_highlight_patterns)
-    .bind(tunnel_enabled)
     .bind(require_deploy_approval)
     .bind(project_environment_id)
     .bind(github_installation_id)

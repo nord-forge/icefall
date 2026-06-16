@@ -11,18 +11,21 @@
 Code-verified remaining work. Everything else previously marked "backlog" in
 phases 22/25/26/27 is already implemented (see status columns below).
 
-**Missing — no real implementation (3):**
-1. IF-151 — Cloudflare Tunnel integration (only a `tunnel_enabled` flag exists)
-2. IF-180 — App dependency graph
-3. IF-181 — Built-in API playground
+> Tunnel features removed 2026-06-16: IF-151 (Cloudflare Tunnel), IF-190 (Secure
+> Tunnel Debugger), and IF-236 (Cloudflare Tunnel UI) were cancelled and their
+> code/docs/tickets deleted. The `apps.tunnel_enabled` column was dropped.
+
+**Missing — no real implementation (2):**
+1. IF-180 — App dependency graph
+2. IF-181 — Built-in API playground
    (IF-173 Raw Compose mode — ✅ done 2026-06-15)
    (IF-165 Database terminal access — ✅ done 2026-06-15)
    (IF-191 Smart Resource Packer — ✅ done 2026-06-15)
 
-**Partial — schema/columns exist, enforcement/UI/orchestration missing (20):**
+**Partial — schema/columns exist, enforcement/UI/orchestration missing (19):**
 - ~~Security-relevant first: IF-168 (token ability scoping)~~ — ✅ done (enforced + UI on both token surfaces)
 - Phase 25: IF-161, IF-166, IF-167, IF-172, IF-174
-- Phase 26: IF-177, IF-184, IF-189, IF-190, IF-193, IF-194
+- Phase 26: IF-177, IF-184, IF-189, IF-193, IF-194
 - Phase 27: IF-195 (26/30 tools), IF-197 (missing Windsurf guide + tool ref)
 - Docs (Phase 28): IF-199, IF-201, IF-202, IF-203, IF-207
 
@@ -280,14 +283,13 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-145](tickets/phase-20-multi-server/IF-145-audit-logging-server-operations.md) | Audit logging for server operations | 2026-05-13 | audit_log table + migration, DB trait + SQLite impl, API endpoints (global + per-server), 90-day daily pruning |
 | [IF-146](tickets/phase-20-multi-server/IF-146-setup-script-hardening.md) | Setup script hardening | 2026-05-13 | Idempotent, NO_COLOR, Alpine/OpenRC, error trap with line numbers, Docker/Caddy verification, uninstall endpoint, log file |
 
-### Phase 22 — Expansion (v1.2) — 5 ✅ · 1 ⬜
+### Phase 22 — Expansion (v1.2) — 5 ✅ — complete (IF-151 removed 2026-06-16)
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-147](tickets/phase-22-expansion/IF-147-environments-per-project.md) | Environments per project | ✅ | `project_environments`/`environment_variables_v2` tables, environments API, EnvironmentTabs UI |
 | [IF-148](tickets/phase-22-expansion/IF-148-one-click-service-templates.md) | One-click service templates | ✅ | `service_templates` table, `/templates` API, OneClickServices wizard step |
 | [IF-149](tickets/phase-22-expansion/IF-149-reverse-proxy-management-ui.md) | Reverse proxy management UI | ✅ | `custom_proxy_config`/`proxy_settings` migration, proxy sqlite layer + history pruning, Caddy validate/load + preset→handler generation (rate-limit module detect w/ 429 fallback), 7 app proxy endpoints + 3 global `/settings/proxy` endpoints, full ProxyTab (viewer/presets/advanced/undo) + ReverseProxySection; deploy skips regen when custom config set |
 | [IF-150](tickets/phase-22-expansion/IF-150-log-drains.md) | Log drains | ✅ | `log_drains` table, full CRUD+test API (loki/axiom/http) |
-| [IF-151](tickets/phase-22-expansion/IF-151-cloudflare-tunnel-integration.md) | Cloudflare Tunnel integration | ⬜ | Only a `tunnel_enabled` flag; no cloudflared orchestration, ingress, or creds |
 | [IF-152](tickets/phase-22-expansion/IF-152-automated-docker-cleanup.md) | Automated Docker cleanup | ✅ | `cleanup_schedule`/`cleanup_runs` tables, cleanup API, ServerCleanupCard UI |
 
 ### Phase 23 — Rust Quality & Performance
@@ -344,7 +346,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-174](tickets/phase-25-parity-gaps/IF-174-github-app-integration.md) | GitHub App integration | ✅ | Installation token storage+refresh (30-min background task), app↔installation link, auto webhook creation on repo link, commit status checks (pending/success/failure), PR preview comments (edit-in-place + teardown), repo branch listing + browser wiring; reqwest client extended |
 | [IF-206](tickets/phase-25-parity-gaps/IF-206-podman-runtime-support.md) | Podman runtime support (opt-in) | ✅ | ContainerRuntime enum, auto-detect, runtime compat tests |
 
-### Phase 26 — Icefall+ Differentiators — 13 ✅ · 4 🟡 · 3 ⬜
+### Phase 26 — Icefall+ Differentiators — 13 ✅ · 3 🟡 · 3 ⬜ (IF-190 removed 2026-06-16)
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
 | [IF-175](tickets/phase-26-icefall-plus/IF-175-deploy-analytics-dashboard.md) | Deploy analytics dashboard | ✅ | `analytics.rs` route + AnalyticsPage |
@@ -362,7 +364,6 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-187](tickets/phase-26-icefall-plus/IF-187-config-time-machine.md) | Config Time Machine | ✅ | `config_history` table + route, full audit trail |
 | [IF-188](tickets/phase-26-icefall-plus/IF-188-deploy-replay.md) | Deploy Replay | ✅ | `deploy_events` table, `list_deploy_events()` |
 | [IF-189](tickets/phase-26-icefall-plus/IF-189-dead-app-detector.md) | Dead App Detector | ✅ | `GET /apps/inactive` + sidebar inactive-apps count badge (2026-06-14). Weekly digest email is a follow-up (depends on notification dispatch) |
-| [IF-190](tickets/phase-26-icefall-plus/IF-190-secure-tunnel-debugger.md) | Secure Tunnel Debugger | 🟡 | `tunnel_enabled` flag; no tunnel route/CLI |
 | [IF-191](tickets/phase-26-icefall-plus/IF-191-smart-resource-packer.md) | Smart Resource Packer | ✅ | New `container_metrics_history` table + collector persistence (1/min, 14-day prune) — the missing data foundation; pure `optimize` engine (over/under-provisioned, idle→ghost, co-location) with savings; `GET /servers/{id}/optimizations` + apply/apply-all (admin); weekly digest notification; Optimization section on server detail (2026-06-15) |
 | [IF-192](tickets/phase-26-icefall-plus/IF-192-portable-app-bundles.md) | Portable App Bundles | ✅ | `bundles.rs` route, `bundle_imports`, export/import |
 | [IF-193](tickets/phase-26-icefall-plus/IF-193-noise-free-logs.md) | Noise-Free Log Streams | ✅ | Log API applies stored noise patterns (suppress + `suppressed_count`) and highlight flags; `suppress_noise` toggle (2026-06-14) |
@@ -371,7 +372,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 ### Phase 27 — MCP Expansion — 3 ✅ — complete
 | Ticket | Title | Status | Notes (code-verified 2026-06-14) |
 |--------|-------|--------|-------|
-| [IF-195](tickets/phase-27-mcp-expansion/IF-195-mcp-workflow-tools.md) | MCP workflow orchestration tools | ✅ | 30 tools — added `bulk_env_set`, `deploy_workflow`, `rollback_if_unhealthy` (2026-06-14). `server_optimize`/`tunnel` deferred (depend on missing IF-191/IF-190) |
+| [IF-195](tickets/phase-27-mcp-expansion/IF-195-mcp-workflow-tools.md) | MCP workflow orchestration tools | ✅ | 30 tools — added `bulk_env_set`, `deploy_workflow`, `rollback_if_unhealthy` (2026-06-14). `server_optimize` deferred (depends on IF-191); `tunnel` tool dropped with IF-190 (2026-06-16) |
 | [IF-196](tickets/phase-27-mcp-expansion/IF-196-mcp-resource-protocol.md) | MCP resources & prompts protocol | ✅ | 9 `icefall://` resources + 5 prompt templates, role-gated |
 | [IF-197](tickets/phase-27-mcp-expansion/IF-197-mcp-claude-code-integration-guide.md) | MCP integration guides | ✅ | Added Windsurf guide + `api/mcp-tools` full reference (2026-06-14) |
 
@@ -381,7 +382,7 @@ phases 22/25/26/27 is already implemented (see status columns below).
 | [IF-198](tickets/phase-28-comprehensive-docs/IF-198-docs-getting-started-overhaul.md) | Getting started overhaul | ✅ | 6/6 pages present |
 | [IF-199](tickets/phase-28-comprehensive-docs/IF-199-docs-concepts-deep-dives.md) | Concepts deep dives | ✅ | Added `concepts/multi-server` + `concepts/databases`; all 10 in sidebar (2026-06-14) |
 | [IF-200](tickets/phase-28-comprehensive-docs/IF-200-docs-framework-guides-complete.md) | Complete framework guides | ✅ | 21 framework guides (≥19 target) |
-| [IF-201](tickets/phase-28-comprehensive-docs/IF-201-docs-how-to-guides.md) | How-to guides | ✅ | 47 guides (+25 new, 2026-06-14); Cloudflare Tunnel is a planned-feature stub (IF-151 not built) |
+| [IF-201](tickets/phase-28-comprehensive-docs/IF-201-docs-how-to-guides.md) | How-to guides | ✅ | 46 guides (Cloudflare Tunnel guide removed with IF-151, 2026-06-16) |
 | [IF-202](tickets/phase-28-comprehensive-docs/IF-202-docs-api-reference-complete.md) | Complete API reference | ✅ | 16 per-resource API pages + expanded rest/mcp (2026-06-14) |
 | [IF-203](tickets/phase-28-comprehensive-docs/IF-203-docs-troubleshooting-faq.md) | Troubleshooting & FAQ | ✅ | Added performance/auth/podman; 8 pages (2026-06-14) |
 | [IF-204](tickets/phase-28-comprehensive-docs/IF-204-docs-migration-guides.md) | Migration guides | ✅ | coolify/dokku/caprover/heroku/docker-compose present |
@@ -402,17 +403,22 @@ Spun out of IF-149's out-of-scope list. Load-balancer config is already Phase 31
 
 | Metric | Count |
 |--------|-------|
-| Total tickets | 220 |
+| Total tickets | 217 |
 | Done (✅) | ~206 |
-| Partial (🟡) | 7 |
-| Missing (⬜) | 6 |
-| Phases fully complete | 23 / 28 |
+| Partial (🟡) | 6 |
+| Missing (⬜) | 4 |
+| Phases fully complete | 24 / 28 |
 | Superseded | 1 |
+| Removed (cancelled) | 3 |
 
 > Re-audit note (2026-06-14): the previous board reported Done 167 / Backlog 52.
 > A code-grounded audit of phases 22 & 25–28 found ~25 more tickets already
 > implemented than the board recorded, and downgraded IF-207 (docs) from done to
 > partial. Remaining real work: **6 missing + 20 partial** tickets (IF-179 done).
+>
+> Update (2026-06-16): tunnel features cancelled — IF-151, IF-190, IF-236 removed
+> (code, docs, tickets, and the `apps.tunnel_enabled` column). Phase 22 is now
+> complete. Remaining real work: **4 missing + 6 partial** tickets.
 
 ### Progress
 | Phase | Status | Tickets |
@@ -436,11 +442,11 @@ Spun out of IF-149's out-of-scope list. Load-balancer config is already Phase 31
 | 17 — v1.1 Fast Follow | **Done** | 13/13 |
 | 18 — UX Polish | **Done** | 11/11 |
 | 20 — Multi-Server | **Done** | 30/30 |
-| 22 — Expansion (v1.2) | Near done | 4✅ 1🟡 1⬜ / 6 |
+| 22 — Expansion (v1.2) | **Done** | 5/5 (IF-151 removed) |
 | 23 — Rust Quality | **Done** | 7/7 |
 | 24 — Feature Parity | **Done** | 18/18 |
 | 25 — Parity Gaps | Near done | 14✅ 1🟡 2⬜ / 17 |
-| 26 — Icefall+ | Near done | 12✅ 5🟡 3⬜ / 20 |
+| 26 — Icefall+ | Near done | 12✅ 4🟡 3⬜ / 19 (IF-190 removed) |
 | 27 — MCP Expansion | **Done** | 3/3 |
 | 28 — Comprehensive Docs | **Done** | 8/8 |
 
@@ -490,7 +496,6 @@ Icefall+ (Phase 26):
   IF-184 (MCP Copilot) — high demo value, no deps
   IF-186 (Canary Probe) — no deps
   IF-187 (Config Time Machine) + IF-188 (Deploy Replay) — small, start first
-  IF-190 (Secure Tunnel) — no deps
 
 MCP Expansion (Phase 27):
   IF-195 (workflow tools) → IF-196 (resources + prompts) → IF-197 (integration guides)

@@ -21,7 +21,7 @@ Write a comprehensive troubleshooting section covering every common issue a user
 - [ ] 502 Bad Gateway: container not running, wrong port, Caddy misconfigured
 - [ ] SSL certificate errors: DNS not propagated, rate limit, CAA records
 - [ ] DNS not resolving: wrong record type, TTL, propagation time
-- [ ] Can't reach app from internet: firewall, ports not open, tunnel not configured
+- [ ] Can't reach app from internet: firewall, ports not open, DNS not pointed at the host
 - [ ] WebSocket not working: Caddy config, proxy timeout
 
 ### `troubleshooting/databases.mdx`

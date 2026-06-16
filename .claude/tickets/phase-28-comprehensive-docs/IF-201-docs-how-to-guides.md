@@ -30,7 +30,6 @@ Write task-oriented how-to guides for every common workflow a user might need. T
 ### Domain & Networking
 - [ ] `guides/custom-domain.mdx` — add and verify a custom domain
 - [ ] `guides/wildcard-domain.mdx` — set up a base domain with wildcard subdomains
-- [ ] `guides/cloudflare-tunnel.mdx` — deploy behind Cloudflare Tunnel (no public IP)
 - [ ] `guides/path-routing.mdx` — route `/api` and `/` to different services
 
 ### Multi-Server

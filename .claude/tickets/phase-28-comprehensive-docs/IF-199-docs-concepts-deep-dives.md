@@ -43,7 +43,6 @@ Write comprehensive concept pages that explain HOW Icefall works under the hood.
 - [ ] Path-based routing: how multiple services share a domain
 - [ ] Internal URLs: service-to-service communication
 - [ ] Port mapping: container ports vs external ports
-- [ ] Cloudflare Tunnel: how it bypasses NAT
 
 ### `concepts/security.mdx` (new)
 - [ ] Authentication: sessions, API tokens, OAuth
