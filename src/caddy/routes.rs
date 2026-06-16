@@ -1,4 +1,4 @@
-use crate::caddy::types::{CaddyRoute, RouteInfo};
+use crate::caddy::types::{CaddyRoute, RouteInfo, DASHBOARD_ROUTE_ID};
 use crate::caddy::{CaddyClient, CaddyError};
 
 impl CaddyClient {
@@ -127,12 +127,16 @@ impl CaddyClient {
     pub async fn remove_route(&self, domain: &str) -> Result<(), CaddyError> {
         let routes = self.get_routes_raw().await?;
 
+        // Never delete the daemon-managed dashboard route via a host-keyed
+        // removal: if an app ever shares the dashboard's base_domain, removing
+        // that app must not take the dashboard route down with it.
         let index = routes
             .iter()
             .position(|r| {
-                r.matchers
-                    .iter()
-                    .any(|m| m.host.contains(&domain.to_string()))
+                r.id.as_deref() != Some(DASHBOARD_ROUTE_ID)
+                    && r.matchers
+                        .iter()
+                        .any(|m| m.host.contains(&domain.to_string()))
             })
             .ok_or_else(|| CaddyError::RouteNotFound(domain.to_string()))?;
 
@@ -148,6 +152,75 @@ impl CaddyClient {
             let status = response.status().as_u16();
             let body = response.text().await.unwrap_or_default();
             return Err(CaddyError::ApiError { status, body });
+        }
+
+        Ok(())
+    }
+
+    /// Ensure the control-plane dashboard is reachable over `base_domain` by
+    /// upserting a Caddy route (`@id` = [`DASHBOARD_ROUTE_ID`]) that
+    /// reverse-proxies the host to the locally-served dashboard on
+    /// `127.0.0.1:{listen_port}`. Idempotent: re-running replaces the same
+    /// object via Caddy's `/id/{id}` endpoint rather than appending a duplicate.
+    ///
+    /// No-ops when `base_domain` is `None`. Best-effort: on any Caddy error
+    /// (e.g. Caddy not yet reachable at boot) it logs and returns `Ok(())` so a
+    /// transient failure never aborts daemon startup — the route is re-ensured
+    /// on the next start.
+    pub async fn ensure_dashboard_route(
+        &self,
+        base_domain: Option<&str>,
+        listen_port: u16,
+    ) -> Result<(), CaddyError> {
+        let Some(domain) = base_domain else {
+            return Ok(());
+        };
+
+        let route = CaddyRoute::dashboard(domain, listen_port);
+
+        // Replace the object in place if the id already exists.
+        let id_url = format!("{}/id/{}", self.base_url(), DASHBOARD_ROUTE_ID);
+        match self.client().patch(&id_url).json(&route).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                tracing::info!(
+                    domain,
+                    "dashboard route ensured at {domain} -> 127.0.0.1:{listen_port}"
+                );
+                return Ok(());
+            }
+            Ok(resp) if resp.status().as_u16() == 404 || resp.status().as_u16() == 400 => {
+                // Id not registered yet — fall through to append it once.
+            }
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::warn!(status, %body, "could not update dashboard route by id; will retry on next start");
+                return Ok(());
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Caddy unreachable while ensuring dashboard route; will retry on next start");
+                return Ok(());
+            }
+        }
+
+        // First-time creation: append the route (it carries the @id, so
+        // subsequent boots find and replace it via the id path above).
+        let routes_url = format!("{}/config/apps/http/servers/srv0/routes", self.base_url());
+        match self.client().post(&routes_url).json(&route).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                tracing::info!(
+                    domain,
+                    "dashboard route created at {domain} -> 127.0.0.1:{listen_port}"
+                );
+            }
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::warn!(status, %body, "could not create dashboard route; will retry on next start");
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Caddy unreachable while creating dashboard route; will retry on next start");
+            }
         }
 
         Ok(())

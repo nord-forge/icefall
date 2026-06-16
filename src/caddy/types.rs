@@ -1,7 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+/// Stable Caddy `@id` for the control-plane dashboard route the daemon manages
+/// on boot. Addressable at `/id/icefall-dashboard` so the route is upserted
+/// idempotently and never collides with per-app routes.
+pub const DASHBOARD_ROUTE_ID: &str = "icefall-dashboard";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaddyRoute {
+    /// Caddy object id (`@id`). Set only for routes the daemon needs to address
+    /// by id (the dashboard route); omitted from JSON otherwise so per-app
+    /// route payloads are unchanged.
+    #[serde(rename = "@id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     #[serde(rename = "match")]
     pub matchers: Vec<CaddyMatch>,
     pub handle: Vec<CaddyHandler>,
@@ -72,6 +82,7 @@ impl CaddyRoute {
         });
 
         Self {
+            id: None,
             matchers: vec![CaddyMatch {
                 host: vec![domain.to_string()],
                 path: path_matcher,
@@ -89,6 +100,16 @@ impl CaddyRoute {
             }],
             terminal: Some(true),
         }
+    }
+
+    /// Build the control-plane dashboard route: host-match `domain` →
+    /// reverse_proxy to the locally-served dashboard on `127.0.0.1:{port}`,
+    /// tagged with [`DASHBOARD_ROUTE_ID`]. Caddy auto-provisions HTTPS for the
+    /// matched host (needs public DNS + reachable :80/:443).
+    pub fn dashboard(domain: &str, listen_port: u16) -> Self {
+        let mut route = Self::reverse_proxy(domain, &format!("127.0.0.1:{listen_port}"));
+        route.id = Some(DASHBOARD_ROUTE_ID.to_string());
+        route
     }
 
     /// Create a reverse_proxy route with multiple upstreams, a load balancing
@@ -117,6 +138,7 @@ impl CaddyRoute {
             .collect();
 
         Self {
+            id: None,
             matchers: vec![CaddyMatch {
                 host: vec![domain.to_string()],
                 path: path_matcher,
@@ -173,6 +195,7 @@ impl CaddyRoute {
     /// Create a file_server route for serving static files with SPA fallback.
     pub fn file_server(domain: &str, root_path: &str) -> Self {
         Self {
+            id: None,
             matchers: vec![CaddyMatch {
                 host: vec![domain.to_string()],
                 path: None,
@@ -278,5 +301,25 @@ mod tests {
         let json = serde_json::to_string(&route).unwrap();
         assert!(!json.contains("load_balancing"));
         assert!(!json.contains("health_checks"));
+    }
+
+    #[test]
+    fn dashboard_route_has_id_and_loopback_upstream() {
+        let route = CaddyRoute::dashboard("dash.example.com", 3000);
+        assert_eq!(route.id.as_deref(), Some(DASHBOARD_ROUTE_ID));
+        assert_eq!(route.matchers[0].host, vec!["dash.example.com".to_string()]);
+        let ups = route.handle[0].upstreams.as_ref().unwrap();
+        assert_eq!(ups[0].dial, "127.0.0.1:3000");
+
+        let json = serde_json::to_string(&route).unwrap();
+        assert!(json.contains("\"@id\":\"icefall-dashboard\""));
+    }
+
+    #[test]
+    fn non_dashboard_routes_omit_id_in_json() {
+        let route = CaddyRoute::reverse_proxy("app.example.com", "localhost:8000");
+        assert!(route.id.is_none());
+        let json = serde_json::to_string(&route).unwrap();
+        assert!(!json.contains("@id"));
     }
 }
