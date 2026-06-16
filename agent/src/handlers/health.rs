@@ -27,7 +27,7 @@ fn default_timeout_ms() -> u64 {
     5000
 }
 
-pub async fn check(ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
+pub async fn check(_ctx: &HandlerContext, params: Value) -> Result<Value, HandlerError> {
     let p: HealthCheckParams =
         serde_json::from_value(params).map_err(|e| HandlerError::InvalidParams(e.to_string()))?;
 

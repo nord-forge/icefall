@@ -144,7 +144,7 @@ fn flush_batch(
     container_id: &str,
     batch: &mut Vec<String>,
 ) {
-    let lines: Vec<String> = batch.drain(..).collect();
+    let lines: Vec<String> = std::mem::take(batch);
     let _ = event_tx.send(AgentMessage::Event {
         event_type: "container.logs".to_string(),
         data: serde_json::json!({

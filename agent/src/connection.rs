@@ -229,7 +229,7 @@ fn handle_binary_chunk(
 }
 
 fn jittered_delay(base: Duration) -> Duration {
-    use rand::Rng;
+    use rand::RngExt;
     let ms = base.as_millis() as f64;
     let jitter = rand::rng().random_range(0.8..1.2);
     Duration::from_millis((ms * jitter) as u64)

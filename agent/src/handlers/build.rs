@@ -23,7 +23,10 @@ struct BuildRunParams {
     token: Option<String>,
     deploy_id: String,
     app_name: String,
+    // Received from the control plane but not yet consumed by the worker build
+    // (env vars are applied at container-create time, not build time).
     #[serde(default)]
+    #[allow(dead_code)]
     env_vars: Vec<String>,
     config: Option<BuildConfig>,
 }
@@ -167,7 +170,6 @@ async fn execute_build(
     send_step(ctx, &p.deploy_id, "building", "done");
 
     // Step 5: Tag as latest
-    let latest_tag = format!("icefall/{}:latest", p.app_name);
     let tag_opts = bollard::query_parameters::TagImageOptions {
         repo: Some(format!("icefall/{}", p.app_name)),
         tag: Some("latest".to_string()),

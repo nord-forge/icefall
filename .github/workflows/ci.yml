@@ -35,10 +35,10 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Check compilation
-        run: cargo check --all-targets
+        run: cargo check --workspace --all-targets
 
       - name: Lint with Clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --workspace -- -D warnings
 
       - name: Run tests
         run: cargo test
@@ -119,4 +119,4 @@ jobs:
         run: cargo test
 
       - name: Clippy with Podman config
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --workspace -- -D warnings

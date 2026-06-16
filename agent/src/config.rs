@@ -2,18 +2,13 @@ use serde::Deserialize;
 
 const DEFAULT_CONFIG_PATH: &str = "/etc/icefall-agent/config.toml";
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Default)]
 pub enum ContainerRuntime {
+    #[default]
     #[serde(rename = "docker")]
     Docker,
     #[serde(rename = "podman")]
     Podman,
-}
-
-impl Default for ContainerRuntime {
-    fn default() -> Self {
-        Self::Docker
-    }
 }
 
 impl std::fmt::Display for ContainerRuntime {
@@ -21,16 +16,6 @@ impl std::fmt::Display for ContainerRuntime {
         match self {
             Self::Docker => write!(f, "docker"),
             Self::Podman => write!(f, "podman"),
-        }
-    }
-}
-
-impl ContainerRuntime {
-    pub fn from_socket(socket: &str) -> Self {
-        if socket.contains("podman") {
-            Self::Podman
-        } else {
-            Self::Docker
         }
     }
 }
