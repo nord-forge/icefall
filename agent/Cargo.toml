@@ -1,6 +1,6 @@
 [package]
 name = "icefall-agent"
-version = "0.1.0"
+version = "0.1.0-beta.1"
 edition = "2021"
 rust-version = "1.85"
 description = "Icefall worker agent — runs on remote servers managed by the Icefall control plane"
