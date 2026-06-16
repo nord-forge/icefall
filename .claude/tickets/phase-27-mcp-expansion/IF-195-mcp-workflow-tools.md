@@ -33,7 +33,6 @@ Expand the MCP server from 13 individual tools to a comprehensive orchestration 
 - [ ] `server_optimize` — get optimization suggestions (from IF-191)
 
 ### Utility
-- [ ] `tunnel` — open a secure tunnel to a container port (for agent-based tools)
 - [ ] `export_bundle` — export an app as a `.icefall` bundle
 - [ ] `import_bundle` — import a `.icefall` bundle
 

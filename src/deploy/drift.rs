@@ -103,7 +103,6 @@ mod tests {
             proxy_presets: None,
             custom_proxy_config: None,
             github_installation_id: None,
-            tunnel_enabled: false,
             desired_instances: 1,
             lb_policy: "round_robin".into(),
             lb_health_check_path: "/".into(),

@@ -657,18 +657,6 @@ export const api = {
       body: JSON.stringify({ base_domain: baseDomain }),
     }),
 
-  // Cloudflare tunnel
-  getTunnelSettings: () =>
-    request<{ data: { tunnel_id: string | null; status: string; has_token: boolean } }>(
-      '/settings/tunnel'
-    ),
-
-  updateTunnelSettings: (body: { tunnel_id: string; tunnel_token?: string }) =>
-    request<{ message: string }>('/settings/tunnel', {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    }),
-
   // Notification channels
   listNotificationChannels: () =>
     request<{ data: Array<{ id: string; channel_type: string; config: Record<string, string>; created_at: string }> }>(

@@ -22,7 +22,6 @@ export type App = {
   ghost_mode_status: string;
   canary_enabled: boolean;
   canary_config: string | null;
-  tunnel_enabled: boolean;
   require_deploy_approval: boolean;
   log_noise_patterns: string | null;
   log_highlight_patterns: string | null;

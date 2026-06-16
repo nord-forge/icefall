@@ -100,7 +100,6 @@ export default defineConfig({
             { label: 'Custom domain', slug: 'guides/custom-domain' },
             { label: 'Wildcard domains', slug: 'guides/wildcard-domain' },
             { label: 'Path routing', slug: 'guides/path-routing' },
-            { label: 'Cloudflare Tunnel', slug: 'guides/cloudflare-tunnel' },
             { label: 'Connect a database', slug: 'guides/connect-database' },
             { label: 'Back up and restore', slug: 'guides/backup-restore' },
             { label: 'Database browser', slug: 'guides/database-browser' },

@@ -17,7 +17,6 @@ import ServerPlacementCard from './components/ServerPlacementCard';
 import ScalingCard from './components/ScalingCard';
 import EnvironmentAssignmentCard from './components/EnvironmentAssignmentCard';
 import DeployApprovalCard from './components/DeployApprovalCard';
-import TunnelCard from './components/TunnelCard';
 import CanaryProbeCard from './components/CanaryProbeCard';
 import LogPatternsCard from './components/LogPatternsCard';
 import ExportBundleCard from './components/ExportBundleCard';
@@ -381,8 +380,6 @@ export default function SettingsTab({ app, servers = [] }: Props) {
       />
 
       <DeployApprovalCard app={app} />
-
-      <TunnelCard app={app} />
 
       <PersistentStorageCard
         volumes={volumes}

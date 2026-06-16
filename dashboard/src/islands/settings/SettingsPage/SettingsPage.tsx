@@ -11,7 +11,6 @@ import InstanceBackupSection from './components/InstanceBackupSection';
 import OAuthProvidersSection from './components/OAuthProvidersSection';
 import GitIntegrationsSection from './components/GitIntegrationsSection';
 import GlobalLogDrainsSection from './components/GlobalLogDrainsSection';
-import CloudflareTunnelSection from './components/CloudflareTunnelSection';
 import ContainerCleanupSection from './components/ContainerCleanupSection';
 import ReverseProxySection from './components/ReverseProxySection';
 import McpServerSection from './components/McpServerSection';
@@ -49,8 +48,6 @@ export default function SettingsPage() {
       <GitIntegrationsSection onSaveMessage={setSaveMessage} />
 
       <GlobalLogDrainsSection onSaveMessage={setSaveMessage} />
-
-      <CloudflareTunnelSection onSaveMessage={setSaveMessage} />
 
       <ReverseProxySection onSaveMessage={setSaveMessage} />
 
