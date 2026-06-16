@@ -12,6 +12,8 @@
 # Flags (positional, any order):
 #   --yes             - Non-interactive; accept defaults
 #   --runtime=NAME    - Container runtime: docker | podman | auto
+#   --port=N          - Dashboard listen port (default 3000)
+#   --domain=NAME     - Base domain for the dashboard + apps (e.g. apps.example.com)
 
 set -euo pipefail
 
@@ -37,6 +39,17 @@ LOW_MEMORY_THRESHOLD_MB="${ICEFALL_LOW_MEMORY_THRESHOLD_MB:-1536}"
 RUNTIME_CHOICE="${ICEFALL_RUNTIME:-auto}"
 NONINTERACTIVE=""
 
+# Dashboard port and base domain. Env vars seed the defaults; flags override;
+# otherwise we prompt (interactive) or fall back to the default (--yes).
+# LISTEN_PORT_SET / BASE_DOMAIN_SET track whether the value came from a flag/env
+# so the interactive prompts know whether to ask.
+LISTEN_PORT="${ICEFALL_PORT:-3000}"
+LISTEN_PORT_SET=""
+[ -n "${ICEFALL_PORT:-}" ] && LISTEN_PORT_SET="1"
+BASE_DOMAIN="${ICEFALL_BASE_DOMAIN:-}"
+BASE_DOMAIN_SET=""
+[ -n "${ICEFALL_BASE_DOMAIN:-}" ] && BASE_DOMAIN_SET="1"
+
 for _arg in "$@"; do
     case "$_arg" in
         --yes)
@@ -45,8 +58,24 @@ for _arg in "$@"; do
         --runtime=*)
             RUNTIME_CHOICE="${_arg#--runtime=}"
             ;;
+        --port=*)
+            LISTEN_PORT="${_arg#--port=}"
+            LISTEN_PORT_SET="1"
+            ;;
+        --domain=*)
+            BASE_DOMAIN="${_arg#--domain=}"
+            BASE_DOMAIN_SET="1"
+            ;;
     esac
 done
+
+# Validate the port now so a bad flag fails fast, before any install work.
+case "$LISTEN_PORT" in
+    ''|*[!0-9]*) echo "Invalid --port / ICEFALL_PORT value: '$LISTEN_PORT' (expected a number 1-65535)" >&2; exit 1 ;;
+esac
+if [ "$LISTEN_PORT" -lt 1 ] || [ "$LISTEN_PORT" -gt 65535 ]; then
+    echo "Invalid --port / ICEFALL_PORT value: '$LISTEN_PORT' (expected 1-65535)" >&2; exit 1
+fi
 
 case "$RUNTIME_CHOICE" in
     docker|podman|auto) ;;
@@ -719,6 +748,114 @@ install_icefall() {
     # The dashboard is embedded in the binary (IF-255) — nothing else to install.
 }
 
+# Best-effort public IP of this server, used for the DNS instructions. Falls
+# back to the first local address, then a placeholder.
+SERVER_IP=""
+detect_public_ip() {
+    if [ -n "$SERVER_IP" ]; then return 0; fi
+    SERVER_IP=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)
+    [ -z "$SERVER_IP" ] && SERVER_IP=$(curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null || true)
+    [ -z "$SERVER_IP" ] && SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    [ -z "$SERVER_IP" ] && SERVER_IP="<your-server-ip>"
+}
+
+# Interactive setup: confirm the dashboard port and (optionally) the base
+# domain before anything is written. Flags/env that were already supplied are
+# respected and not re-prompted. Under --yes we keep the defaults silently.
+prompt_setup() {
+    # Port: only ask when interactive and not already set by flag/env.
+    if [ -z "$LISTEN_PORT_SET" ] && [ "$NONINTERACTIVE" != "--yes" ]; then
+        local answer
+        read -rp "Dashboard port [${LISTEN_PORT}]: " answer
+        answer="${answer:-$LISTEN_PORT}"
+        case "$answer" in
+            ''|*[!0-9]*) warn "Not a number — keeping ${LISTEN_PORT}" ;;
+            *)
+                if [ "$answer" -ge 1 ] && [ "$answer" -le 65535 ]; then
+                    LISTEN_PORT="$answer"
+                else
+                    warn "Out of range — keeping ${LISTEN_PORT}"
+                fi
+                ;;
+        esac
+    fi
+    info "Dashboard port: ${LISTEN_PORT}"
+
+    # Base domain: only ask when interactive and not already set. Empty answer
+    # means "no domain" — the dashboard is reached by IP:port for now.
+    if [ -z "$BASE_DOMAIN_SET" ] && [ "$NONINTERACTIVE" != "--yes" ]; then
+        echo ""
+        info "A base domain lets Icefall serve the dashboard and your apps over"
+        info "HTTPS (e.g. https://apps.example.com). Leave blank to skip for now"
+        info "and reach the dashboard by IP:port — you can set it later."
+        local answer
+        read -rp "Base domain (blank to skip): " answer
+        BASE_DOMAIN="$(echo "$answer" | tr -d '[:space:]')"
+    fi
+}
+
+# Print the exact DNS records the user must create, and (interactively) offer to
+# wait until the domain resolves to this server before finishing.
+guide_dns() {
+    [ -n "$BASE_DOMAIN" ] || return 0
+    detect_public_ip
+
+    # Choose A (IPv4) vs AAAA (IPv6) by the shape of the detected address.
+    local record_type="A"
+    case "$SERVER_IP" in
+        *:*) record_type="AAAA" ;;
+    esac
+
+    echo ""
+    echo "  ${BOLD}DNS records to create for ${BASE_DOMAIN}:${RESET}"
+    echo ""
+    echo "    ${record_type}      ${BASE_DOMAIN}        ->  ${SERVER_IP}"
+    echo "    ${record_type}      *.${BASE_DOMAIN}      ->  ${SERVER_IP}    (wildcard, for per-app subdomains)"
+    echo ""
+    echo "  The wildcard lets each app get its own subdomain automatically."
+    echo "  Caddy provisions HTTPS certificates once DNS points here and ports"
+    echo "  80 and 443 are reachable from the internet."
+    echo ""
+
+    if [ "$NONINTERACTIVE" = "--yes" ]; then
+        return 0
+    fi
+    if ! confirm "Wait now until ${BASE_DOMAIN} resolves to ${SERVER_IP}?"; then
+        info "Skipping DNS verification — set the records when ready."
+        return 0
+    fi
+
+    info "Waiting for DNS… (Ctrl-C to stop waiting; install continues regardless)"
+    local resolver=""
+    if command -v dig &>/dev/null; then
+        resolver="dig"
+    elif command -v host &>/dev/null; then
+        resolver="host"
+    elif command -v nslookup &>/dev/null; then
+        resolver="nslookup"
+    else
+        warn "No dig/host/nslookup available to verify DNS — skipping the wait."
+        return 0
+    fi
+
+    local resolved="" attempts=0
+    while [ "$attempts" -lt 60 ]; do
+        case "$resolver" in
+            dig)      resolved=$(dig +short "$BASE_DOMAIN" 2>/dev/null | tail -1) ;;
+            host)     resolved=$(host "$BASE_DOMAIN" 2>/dev/null | awk '/has .* address/ {print $NF; exit}') ;;
+            nslookup) resolved=$(nslookup "$BASE_DOMAIN" 2>/dev/null | awk '/^Address: / {print $2; exit}') ;;
+        esac
+        if [ "$resolved" = "$SERVER_IP" ]; then
+            ok "${BASE_DOMAIN} now resolves to ${SERVER_IP}"
+            return 0
+        fi
+        attempts=$((attempts + 1))
+        sleep 5
+    done
+    warn "${BASE_DOMAIN} did not resolve to ${SERVER_IP} within ~5 min."
+    warn "Install will finish anyway; HTTPS will be issued once DNS propagates."
+}
+
 setup_config() {
     if [ -f "$ICEFALL_CONFIG" ]; then
         ok "Config already exists at $ICEFALL_CONFIG (not overwriting)"
@@ -732,9 +869,16 @@ setup_config() {
     local encryption_key
     encryption_key=$(openssl rand -base64 32)
 
+    # Emit base_domain only when the user provided one; otherwise leave a
+    # commented example so the dashboard is reached by IP:port until set.
+    local base_domain_line="# base_domain = \"apps.example.com\""
+    if [ -n "$BASE_DOMAIN" ]; then
+        base_domain_line="base_domain = \"$BASE_DOMAIN\""
+    fi
+
     cat > "$ICEFALL_CONFIG" << EOF
 listen_addr = "0.0.0.0"
-listen_port = 3000
+listen_port = $LISTEN_PORT
 data_dir = "$ICEFALL_DATA"
 sqlite_path = "$ICEFALL_DATA/icefall.db"
 runtime = "$CONTAINER_RUNTIME"
@@ -751,7 +895,7 @@ low_memory = $LOW_MEMORY
 # Override the SQLite page cache directly (KiB). Omitted = derive from low_memory.
 # sqlite_cache_kib = 16000
 
-# base_domain = "apps.example.com"
+$base_domain_line
 EOF
 
     ok "Config written to $ICEFALL_CONFIG"
@@ -868,15 +1012,24 @@ start_services() {
 }
 
 print_success() {
-    local server_ip
-    server_ip=$(curl -s https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+    detect_public_ip
+
+    # Prefer the HTTPS domain URL when a base domain was configured; the daemon
+    # serves the dashboard route over it. Otherwise fall back to IP:port.
+    local dashboard_url="http://${SERVER_IP}:${LISTEN_PORT}"
+    if [ -n "$BASE_DOMAIN" ]; then
+        dashboard_url="https://${BASE_DOMAIN}"
+    fi
 
     echo ""
     echo "============================================"
     echo ""
     info "Icefall is installed and running!"
     echo ""
-    echo "  Dashboard: http://${server_ip}:3000"
+    echo "  Dashboard: ${dashboard_url}"
+    if [ -n "$BASE_DOMAIN" ]; then
+        echo "             (also http://${SERVER_IP}:${LISTEN_PORT} until DNS/HTTPS is ready)"
+    fi
     echo "  Runtime:   $CONTAINER_RUNTIME ($CONTAINER_SOCKET)"
     echo "  Config:    $ICEFALL_CONFIG"
     echo "  Data:      $ICEFALL_DATA"
@@ -887,6 +1040,14 @@ print_success() {
     fi
     echo "  Install:   $ICEFALL_LOG"
     echo ""
+    if [ -n "$BASE_DOMAIN" ]; then
+        echo "  Make sure DNS for ${BASE_DOMAIN} (and *.${BASE_DOMAIN}) points to"
+        echo "  ${SERVER_IP}, and ports 80 + 443 are open, so Caddy can issue HTTPS."
+        echo ""
+    else
+        echo "  Tip: open port ${LISTEN_PORT} in your firewall to reach the dashboard."
+        echo ""
+    fi
     echo "  Next: Open the dashboard to create your admin account."
     echo ""
     echo "============================================"
@@ -904,11 +1065,17 @@ main() {
     detect_arch
     detect_memory
     check_prereqs
+    # Gather the interactive choices (port, base domain) up front, before the
+    # long download/install steps — so the rest of the install runs unattended.
+    prompt_setup
     install_caddy
     install_icefall
     setup_config
     setup_service
     start_services
+    # With the daemon up, point the user at the DNS records for their domain
+    # (and optionally wait until it resolves) so HTTPS can be issued.
+    guide_dns
     print_success
 }
 

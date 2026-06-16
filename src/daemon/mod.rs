@@ -143,6 +143,14 @@ impl DaemonRunner {
             Err(e) => warn!("Caddy unreachable (will retry): {e}"),
         }
 
+        // Ensure the dashboard is reachable over the configured base domain
+        // (Caddy reverse-proxies it to the locally-served dashboard, with
+        // automatic HTTPS). Best-effort and idempotent — no-ops without a
+        // base_domain, and re-ensured on each start if Caddy was down.
+        let _ = caddy
+            .ensure_dashboard_route(config.base_domain.as_deref(), config.listen_port)
+            .await;
+
         // Run post-update health check (clears pending marker if successful)
         match crate::update::apply::post_update_check(&config.data_dir, db.as_ref(), &docker).await
         {
