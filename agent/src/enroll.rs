@@ -28,7 +28,7 @@ pub async fn run_enrollment(url: &str, token: &str, data_dir: &str) -> Result<()
     );
 
     // Generate X25519 keypair
-    use rand::Rng;
+    use rand::RngExt;
     let secret_bytes: [u8; 32] = rand::rng().random();
     let secret_key = x25519_dalek::StaticSecret::from(secret_bytes);
     let public_key = x25519_dalek::PublicKey::from(&secret_key);

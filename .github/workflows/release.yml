@@ -86,7 +86,7 @@ jobs:
         run: cd dashboard && bun install --frozen-lockfile && bun run build
 
       - name: Build binaries
-        run: cross build --release --target ${{ matrix.target }}
+        run: cross build --release --workspace --target ${{ matrix.target }}
         env:
           SOURCE_DATE_EPOCH: "0"
 
