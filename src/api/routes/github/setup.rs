@@ -26,17 +26,20 @@ struct RepoStatusParams {
     url: String,
 }
 
-/// Probe whether a pasted repo URL points to a *public* GitHub repo, so the app
-/// wizard can skip the "connect a GitHub App" prompt for public repos (they
-/// deploy with no credentials). The daemon does the probe server-side to avoid
-/// browser CORS and anonymous per-IP rate limits, and so it can also tell the
-/// UI whether a GitHub App / public domain is available for the private case.
+/// Probe whether a pasted repo URL points to a *public* repo, so the app wizard
+/// can skip the "connect a provider" prompt for public repos (they deploy with
+/// no credentials). The daemon probes server-side to avoid browser CORS and
+/// anonymous per-IP rate limits, and so it can tell the UI whether a GitHub App
+/// / public domain is available for the private case.
+///
+/// Supports github.com, gitlab.com, and bitbucket.org, plus a guarded heuristic
+/// for self-hosted GitLab on custom domains. See [`crate::git_provider`].
 ///
 /// Response `status` is one of:
-/// - `public` — reachable anonymously; no GitHub connection needed
+/// - `public` — reachable anonymously; no connection needed
 /// - `private_or_missing` — 404 anonymously: private repo (or typo)
-/// - `not_github` — not a github.com URL (e.g. GitLab, bare host)
-/// - `unknown` — probe failed (network/rate limit); UI uses generic guidance
+/// - `not_github` — not a recognized git host
+/// - `unknown` — probe failed / unrecognized self-hosted; UI uses generic guidance
 async fn repo_status(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -47,7 +50,6 @@ async fn repo_status(
         .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
 
     let trimmed = params.url.trim();
-    let is_github = trimmed.contains("github.com");
 
     // Context the UI needs to decide messaging without extra round-trips.
     let github_app_available = !state
@@ -58,31 +60,20 @@ async fn repo_status(
         .is_empty();
     let domain_configured = has_public_domain(&state);
 
-    let parsed = if is_github {
-        crate::github::owner_repo(trimmed)
-    } else {
-        None
-    };
-
-    let (status, private) = match parsed {
-        None => ("not_github", serde_json::Value::Null),
+    let (provider, status) = match crate::github::owner_repo(trimmed) {
         Some((owner, repo)) => {
-            let client = GitHubClient::new("https://api.github.com");
-            match client.repo_visibility(&owner, &repo).await {
-                Ok(Some(false)) => ("public", serde_json::json!(false)),
-                Ok(Some(true)) => ("private_or_missing", serde_json::json!(true)),
-                Ok(None) => ("private_or_missing", serde_json::Value::Null),
-                Err(e) => {
-                    tracing::warn!("repo visibility probe failed for {owner}/{repo}: {e}");
-                    ("unknown", serde_json::Value::Null)
-                }
-            }
+            let http = reqwest::Client::new();
+            crate::git_provider::probe(&http, trimmed, &owner, &repo).await
         }
+        None => (
+            crate::git_provider::Provider::Unknown,
+            crate::git_provider::RepoStatus::NotRecognized,
+        ),
     };
 
     Ok(Json(serde_json::json!({
-        "status": status,
-        "private": private,
+        "status": status.as_str(),
+        "provider": format!("{provider:?}"),
         "github_app_available": github_app_available,
         "domain_configured": domain_configured,
     })))

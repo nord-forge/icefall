@@ -33,6 +33,7 @@ export default function GitRepoStep({
   // Live public/private probe of the pasted repo URL (debounced, server-side).
   type RepoProbe = {
     status: 'public' | 'private_or_missing' | 'not_github' | 'unknown';
+    provider: 'GitHub' | 'GitLab' | 'Bitbucket' | 'GitLabSelfHosted' | 'Unknown';
     domain_configured: boolean;
   };
   const [repoProbe, setRepoProbe] = useState<RepoProbe | null>(null);
@@ -67,12 +68,15 @@ export default function GitRepoStep({
       .catch(() => setHasInstallations(false));
   }, []);
 
-  const isGitHubUrl = /github\.com/i.test(gitRepo) && gitRepo.trim().length > 0;
+  // Looks like a repo URL worth probing: a host with at least an owner/name path.
+  const looksLikeRepoUrl =
+    /^(https?:\/\/|git@)[^/\s]+[/:][^/\s]+\/[^/\s]+/i.test(gitRepo.trim());
 
-  // Debounced repo-status probe: when the URL looks like a GitHub repo, ask the
-  // daemon whether it's public so we can skip the GitHub-App prompt entirely.
+  // Debounced repo-status probe: when the URL looks like a repo, ask the daemon
+  // whether it's public (across GitHub/GitLab/Bitbucket + self-hosted GitLab) so
+  // we can skip the provider-connection prompt for public repos entirely.
   useEffect(() => {
-    if (!isGitHubUrl) {
+    if (!looksLikeRepoUrl) {
       setRepoProbe(null);
       setProbing(false);
       return;
@@ -84,22 +88,35 @@ export default function GitRepoStep({
         .then((res) => {
           // Ignore if a newer change superseded this probe.
           if (seq !== probeSeq.current) return;
-          setRepoProbe({ status: res.status, domain_configured: res.domain_configured });
+          setRepoProbe({
+            status: res.status,
+            provider: res.provider,
+            domain_configured: res.domain_configured,
+          });
         })
         .catch(() => {
           if (seq !== probeSeq.current) return;
-          setRepoProbe({ status: 'unknown', domain_configured: false });
+          setRepoProbe({ status: 'unknown', provider: 'Unknown', domain_configured: false });
         })
         .finally(() => {
           if (seq === probeSeq.current) setProbing(false);
         });
     }, 500);
     return () => clearTimeout(t);
-  }, [gitRepo, isGitHubUrl]);
+  }, [gitRepo, looksLikeRepoUrl]);
 
   const isPublicRepo = repoProbe?.status === 'public';
-  // Only nudge toward a GitHub App when the repo isn't known-public.
-  const showPrivateGuidance = isGitHubUrl && !probing && !isPublicRepo && repoProbe !== null && repoProbe.status !== 'not_github';
+  const isGitHubProvider = repoProbe?.provider === 'GitHub';
+  // Show private-repo guidance when the probe didn't confirm public and the host
+  // was at least recognized as a git provider.
+  const showPrivateGuidance =
+    looksLikeRepoUrl &&
+    !probing &&
+    !isPublicRepo &&
+    repoProbe !== null &&
+    repoProbe.status !== 'not_github';
+  // The GitHub-App connection flow only applies to github.com repos.
+  const showGitHubConnect = showPrivateGuidance && isGitHubProvider;
   const needsSetup = hasGitHubApp === false;
   const needsInstallation = hasGitHubApp === true && hasInstallations === false;
   const isReady = hasGitHubApp === true && hasInstallations === true;
@@ -184,23 +201,23 @@ export default function GitRepoStep({
       )}
 
       {/* Live probe feedback while we check the pasted URL. */}
-      {isGitHubUrl && probing && (
+      {looksLikeRepoUrl && probing && (
         <div class={styles.githubReady} role="status" aria-live="polite">
           <Loader size={16} aria-hidden="true" class={styles.spin} />
           <span>Checking repository…</span>
         </div>
       )}
 
-      {/* Public repo: no GitHub connection needed at all. */}
+      {/* Public repo: no provider connection needed at all. */}
       {isPublicRepo && (
         <div class={styles.githubReady} role="status" aria-live="polite">
           <Check size={16} aria-hidden="true" />
-          <span>Public repository — no GitHub connection needed, ready to deploy.</span>
+          <span>Public repository — no connection needed, ready to deploy.</span>
         </div>
       )}
 
-      {/* Private / not-reachable repo, and no GitHub App configured yet. */}
-      {showPrivateGuidance && hasGitHubApp !== null && needsSetup && (
+      {/* GitHub private/not-reachable repo, and no GitHub App configured yet. */}
+      {showGitHubConnect && hasGitHubApp !== null && needsSetup && (
         <div class={styles.githubNotice} role="status" aria-live="polite">
           <GitFork size={18} aria-hidden="true" class={styles.githubNoticeIcon} />
           <div>
@@ -226,7 +243,7 @@ export default function GitRepoStep({
       )}
 
       {/* GitHub App exists but isn't installed on an account yet. */}
-      {showPrivateGuidance && hasGitHubApp !== null && needsInstallation && (
+      {showGitHubConnect && hasGitHubApp !== null && needsInstallation && (
         <div class={styles.githubNotice} role="status" aria-live="polite">
           <AlertTriangle size={18} aria-hidden="true" class={styles.githubNoticeIcon} />
           <div>
@@ -247,10 +264,26 @@ export default function GitRepoStep({
       )}
 
       {/* GitHub App ready and installed — private repos supported. */}
-      {showPrivateGuidance && isReady && (
+      {showGitHubConnect && isReady && (
         <div class={styles.githubReady} role="status" aria-live="polite">
           <Check size={16} aria-hidden="true" />
           <span>GitHub integration active — private repos are supported.</span>
+        </div>
+      )}
+
+      {/* Non-GitHub (GitLab/Bitbucket/self-hosted) private or unreadable repo:
+          we can't auto-connect those yet, so guide the user to add credentials. */}
+      {showPrivateGuidance && !isGitHubProvider && (
+        <div class={styles.githubNotice} role="status" aria-live="polite">
+          <GitFork size={18} aria-hidden="true" class={styles.githubNoticeIcon} />
+          <div>
+            <p class={styles.githubNoticeTitle}>
+              This looks like a private repository
+            </p>
+            <p class={styles.githubNoticeText}>
+              We couldn't read it without authentication. Make sure the repository is public, or add deploy credentials for this provider in settings before deploying.
+            </p>
+          </div>
         </div>
       )}
     </div>

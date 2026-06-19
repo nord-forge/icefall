@@ -820,7 +820,7 @@ export const api = {
   getRepoStatus: (url: string) =>
     request<{
       status: 'public' | 'private_or_missing' | 'not_github' | 'unknown';
-      private: boolean | null;
+      provider: 'GitHub' | 'GitLab' | 'Bitbucket' | 'GitLabSelfHosted' | 'Unknown';
       github_app_available: boolean;
       domain_configured: boolean;
     }>(`/github/repo-status?url=${encodeURIComponent(url)}`, undefined, { noCache: true }),
