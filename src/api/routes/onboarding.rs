@@ -1,9 +1,12 @@
 use axum::extract::{Path, State};
+use axum::http::{HeaderMap, HeaderValue};
+use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
+use crate::api::routes::auth::session_cookie;
 use crate::api::AppState;
 use crate::db::models::{now_iso8601, NewUser};
 
@@ -104,7 +107,7 @@ struct CreateAdminRequest {
 async fn create_admin(
     State(state): State<AppState>,
     Json(body): Json<CreateAdminRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<axum::response::Response, ApiError> {
     // 12-char minimum — matches auth.rs setup_admin (audit M11; onboarding
     // previously allowed weaker 8-char admin passwords).
     if body.password.len() < 12 {
@@ -134,12 +137,24 @@ async fn create_admin(
 
     mark_step_complete(&state, "admin_account").await?;
 
-    Ok(Json(serde_json::json!({
+    let payload = serde_json::json!({
         "data": {
             "user": { "id": user.id, "email": user.email, "role": user.role },
             "session_id": session.id,
         }
-    })))
+    });
+
+    // Set the session cookie so the rest of onboarding (and the dashboard) is
+    // authenticated. Without this the wizard created the admin but stayed
+    // unauthenticated, bounced back to the admin step, and a re-submit hit the
+    // "admin already exists" guard with a 409. Mirrors auth.rs::setup_admin.
+    let cookie = session_cookie(&session.id, state.config.base_domain.as_deref());
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "set-cookie",
+        HeaderValue::from_str(&cookie).map_err(ApiError::internal)?,
+    );
+    Ok((headers, Json(payload)).into_response())
 }
 
 async fn run_server_check(
