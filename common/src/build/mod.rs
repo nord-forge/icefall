@@ -1,3 +1,4 @@
+pub mod compose_audit;
 pub mod detect;
 pub mod dockerfile;
 
@@ -76,6 +77,34 @@ pub struct DetectionResult {
     pub start_command: Option<String>,
     pub detected_port: u16,
     pub astro_mode: Option<AstroMode>,
+}
+
+/// Repo-shape hints surfaced to the create wizard alongside `DetectionResult`.
+/// Kept separate from `DetectionResult` so the core detection contract stays
+/// stable; these drive "how should this deploy" resolution (AC1/AC2/AC3).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoHints {
+    /// Dockerfile names found at the probed directory. Includes the plain
+    /// `Dockerfile` and any `Dockerfile.*` variants (e.g. `Dockerfile.api`).
+    pub dockerfiles: Vec<String>,
+    /// True when a plain `Dockerfile` exists (an unambiguous single build
+    /// target). When false but `dockerfiles` is non-empty, the variants are
+    /// ambiguous and the wizard must ask which to use.
+    pub has_plain_dockerfile: bool,
+    /// Compose files found at the probed directory (`docker-compose.yml`,
+    /// `docker-compose.*.yml`, `compose.yaml`, `compose.yml`). When non-empty
+    /// the wizard offers to deploy as a Compose stack instead (AC1).
+    pub compose_files: Vec<String>,
+    /// True when the probed directory looks like a workspace monorepo with no
+    /// deployable app at its root — root `package.json` declares `workspaces`
+    /// and framework detection fell through to a bare static site. The wizard
+    /// must require a `base_directory` selection rather than shipping the repo
+    /// root as a static site (AC3 guardrail).
+    pub is_monorepo: bool,
+    /// Workspace directories resolved from the root `package.json`
+    /// `workspaces` globs (e.g. `packages/api`, `packages/web`). Empty when not
+    /// a monorepo or when no workspace dirs exist on disk.
+    pub workspaces: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

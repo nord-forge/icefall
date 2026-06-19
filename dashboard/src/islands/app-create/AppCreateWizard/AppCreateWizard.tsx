@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'preact/hooks';
 import { api } from '@lib/api';
-import type { Server } from '@lib/types';
+import type { Server, RepoDetection } from '@lib/types';
 import Button from '@islands/shared/Button/Button';
 import ServerSelectStep from '@islands/app-create/ServerSelectStep/ServerSelectStep';
 import { ArrowLeft, ArrowRight, Rocket } from 'lucide-preact';
@@ -9,6 +9,7 @@ import OneClickServices from './components/OneClickServices';
 import type { OneClickService } from './components/OneClickServices';
 import GitRepoStep from './components/GitRepoStep';
 import BuildSettingsStep from './components/BuildSettingsStep';
+import DetectStep from './components/DetectStep';
 import ImageStep from './components/ImageStep';
 import ComposeStep from './components/ComposeStep';
 import EnvStep from './components/EnvStep';
@@ -23,6 +24,9 @@ export default function AppCreateWizard() {
   const [deploying, setDeploying] = useState(false);
   const [deployingService, setDeployingService] = useState<string | null>(null);
   const [composeError, setComposeError] = useState('');
+  const [detecting, setDetecting] = useState(false);
+  const [detectError, setDetectError] = useState('');
+  const [detection, setDetection] = useState<RepoDetection | null>(null);
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
   const hasMultipleServers = servers.length >= 2;
@@ -40,6 +44,7 @@ export default function AppCreateWizard() {
     compose_content: '',
     deploy_mode: 'auto',
     github_installation_id: '',
+    base_directory: '',
   });
 
   const projectId = useMemo(() => {
@@ -62,7 +67,7 @@ export default function AppCreateWizard() {
   const steps = useMemo(() => {
     if (!deploySource) return ['Source'];
     const base = deploySource === 'git'
-      ? ['Source', 'Repository', 'Build Settings']
+      ? ['Source', 'Repository', 'Detecting', 'Build Settings']
       : deploySource === 'compose'
         ? ['Source', 'Compose File']
         : ['Source', 'Docker Image'];
@@ -95,6 +100,11 @@ export default function AppCreateWizard() {
     if (field === 'compose_content') {
       setComposeError('');
     }
+    // Changing the repo/branch invalidates a prior detection.
+    if (field === 'git_repo' || field === 'git_branch') {
+      setDetection(null);
+      setDetectError('');
+    }
   }
 
   function handleSourceSelect(source: DeploySource) {
@@ -110,9 +120,77 @@ export default function AppCreateWizard() {
 
   const currentStepName = steps[step] || '';
 
+  // Run repo detection on entering the Detecting step, then prefill the build
+  // fields. Re-runs when base_directory changes (workspace pick).
+  async function runDetection(baseDir: string) {
+    if (!form.git_repo.trim()) {
+      setDetectError('Enter a repository URL first');
+      return;
+    }
+    setDetecting(true);
+    setDetectError('');
+    try {
+      const { data } = await api.detectApp({
+        git_repo: form.git_repo,
+        git_branch: form.git_branch || undefined,
+        github_installation_id: form.github_installation_id || undefined,
+        base_directory: baseDir || undefined,
+      });
+      setDetection(data);
+      prefillFromDetection(data);
+    } catch (err: any) {
+      setDetectError(err?.message || 'Could not inspect the repository');
+      setDetection(null);
+    } finally {
+      setDetecting(false);
+    }
+  }
+
+  // Pre-fill build settings from detection only where the user hasn't typed.
+  function prefillFromDetection(data: RepoDetection) {
+    const d = data.detection;
+    setForm((prev) => ({
+      ...prev,
+      build_command: prev.build_command || d.build_command || '',
+      output_dir: prev.output_dir || d.output_dir || '',
+      start_command: prev.start_command || d.start_command || '',
+      port: prev.port || String(d.detected_port),
+    }));
+  }
+
+  // Fire detection once when the user reaches the Detecting step.
+  useEffect(() => {
+    if (currentStepName === 'Detecting' && !detection && !detecting && !detectError) {
+      runDetection(form.base_directory);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStepName]);
+
+  function handlePickWorkspace(dir: string) {
+    setForm((prev) => ({ ...prev, base_directory: dir }));
+    runDetection(dir);
+  }
+
+  function handleSwitchToCompose(_file: string) {
+    // Compose content is loaded server-side on switch; for now move the user to
+    // the Compose source so they paste/confirm the file.
+    setDeploySource('compose');
+    setDetection(null);
+    setStep(1);
+  }
+
+  // Detecting step blocks Next while inspecting, on error, or when a monorepo
+  // still needs a workspace pick (AC3 guardrail).
+  function detectionBlocks(): boolean {
+    if (detecting || detectError) return true;
+    if (detection?.hints.is_monorepo && !form.base_directory) return true;
+    return false;
+  }
+
   function canAdvance(): boolean {
     if (step === 0) return false;
     if (currentStepName === 'Repository') return !!form.name.trim();
+    if (currentStepName === 'Detecting') return !detectionBlocks();
     if (currentStepName === 'Docker Image') return !!form.name.trim() && !!form.image_ref.trim() && !!form.port.trim();
     if (currentStepName === 'Compose File') return !!form.name.trim() && !!form.compose_content.trim();
     if (currentStepName === 'Server') return !!selectedServerId;
@@ -136,6 +214,9 @@ export default function AppCreateWizard() {
     }
     if (currentStepName === 'Server' && !selectedServerId) {
       errors.server = 'Select a server';
+    }
+    if (currentStepName === 'Detecting' && detectionBlocks()) {
+      return;
     }
 
     if (Object.keys(errors).length > 0) {
@@ -169,6 +250,12 @@ export default function AppCreateWizard() {
       } else {
         createBody.git_repo = form.git_repo || undefined;
         createBody.git_branch = form.git_branch;
+        // AC4: send the build overrides the user saw/edited so they're honored.
+        if (form.build_command.trim()) createBody.build_command = form.build_command.trim();
+        if (form.output_dir.trim()) createBody.output_dir = form.output_dir.trim();
+        if (form.start_command.trim()) createBody.start_command = form.start_command.trim();
+        if (form.port.trim()) createBody.port = parseInt(form.port, 10) || undefined;
+        if (form.base_directory.trim()) createBody.base_directory = form.base_directory.trim();
       }
 
       if (hasMultipleServers && selectedServerId) {
@@ -264,6 +351,17 @@ export default function AppCreateWizard() {
             gitBranch={form.git_branch}
             validationErrors={validationErrors}
             onUpdate={update}
+          />
+        );
+      case 'Detecting':
+        return (
+          <DetectStep
+            loading={detecting}
+            error={detectError}
+            result={detection}
+            baseDirectory={form.base_directory}
+            onPickWorkspace={handlePickWorkspace}
+            onSwitchToCompose={handleSwitchToCompose}
           />
         );
       case 'Build Settings':
