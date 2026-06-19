@@ -22,16 +22,9 @@ pub fn artifact_target() -> &'static str {
     }
 }
 
-/// GitHub repository ("org/icefall") to query for releases. The organization is
-/// overridable via the `ICEFALL_GITHUB_ORG` environment variable (the repo name
-/// is always `icefall`); it defaults to the canonical `nord-forge` org.
+/// GitHub repository ("org/icefall") to query for releases.
 pub fn github_repo() -> String {
-    let org = std::env::var("ICEFALL_GITHUB_ORG")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "nord-forge".to_string());
-    format!("{org}/icefall")
+    "nord-forge/icefall".to_string()
 }
 
 #[derive(Debug, Error)]
