@@ -14,10 +14,78 @@ use crate::github::client::GitHubClient;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/github/setup", get(get_manifest))
+        .route("/github/repo-status", get(repo_status))
         .route("/github/callback", get(handle_callback))
         .route("/github/apps", get(list_apps))
         .route("/github/apps/seed-demo", post(seed_demo))
         .route("/github/apps/{id}", delete(delete_app))
+}
+
+#[derive(Deserialize)]
+struct RepoStatusParams {
+    url: String,
+}
+
+/// Probe whether a pasted repo URL points to a *public* GitHub repo, so the app
+/// wizard can skip the "connect a GitHub App" prompt for public repos (they
+/// deploy with no credentials). The daemon does the probe server-side to avoid
+/// browser CORS and anonymous per-IP rate limits, and so it can also tell the
+/// UI whether a GitHub App / public domain is available for the private case.
+///
+/// Response `status` is one of:
+/// - `public` — reachable anonymously; no GitHub connection needed
+/// - `private_or_missing` — 404 anonymously: private repo (or typo)
+/// - `not_github` — not a github.com URL (e.g. GitLab, bare host)
+/// - `unknown` — probe failed (network/rate limit); UI uses generic guidance
+async fn repo_status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<RepoStatusParams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+
+    let trimmed = params.url.trim();
+    let is_github = trimmed.contains("github.com");
+
+    // Context the UI needs to decide messaging without extra round-trips.
+    let github_app_available = !state
+        .db
+        .list_github_apps()
+        .await
+        .unwrap_or_default()
+        .is_empty();
+    let domain_configured = has_public_domain(&state);
+
+    let parsed = if is_github {
+        crate::github::owner_repo(trimmed)
+    } else {
+        None
+    };
+
+    let (status, private) = match parsed {
+        None => ("not_github", serde_json::Value::Null),
+        Some((owner, repo)) => {
+            let client = GitHubClient::new("https://api.github.com");
+            match client.repo_visibility(&owner, &repo).await {
+                Ok(Some(false)) => ("public", serde_json::json!(false)),
+                Ok(Some(true)) => ("private_or_missing", serde_json::json!(true)),
+                Ok(None) => ("private_or_missing", serde_json::Value::Null),
+                Err(e) => {
+                    tracing::warn!("repo visibility probe failed for {owner}/{repo}: {e}");
+                    ("unknown", serde_json::Value::Null)
+                }
+            }
+        }
+    };
+
+    Ok(Json(serde_json::json!({
+        "status": status,
+        "private": private,
+        "github_app_available": github_app_available,
+        "domain_configured": domain_configured,
+    })))
 }
 
 /// Returns the GitHub App Manifest and form action URL. The frontend POSTs the manifest

@@ -38,6 +38,12 @@ struct RepoListResponse {
     pub repositories: Vec<GitHubRepo>,
 }
 
+/// Minimal `GET /repos/{owner}/{repo}` body — we only need the visibility flag.
+#[derive(Deserialize)]
+struct RepoVisibility {
+    private: bool,
+}
+
 /// Response from the GitHub App Manifest code exchange endpoint.
 #[derive(Debug, Deserialize)]
 pub struct AppFromManifest {
@@ -153,6 +159,40 @@ impl GitHubClient {
         }
 
         Ok(all_repos)
+    }
+
+    /// Probe a repo's visibility with an UNAUTHENTICATED `GET /repos/{owner}/{repo}`.
+    /// GitHub answers 200 for public repos (with a `private: false` body) and 404
+    /// for private *or* nonexistent repos — it deliberately doesn't distinguish the
+    /// two for anonymous callers, so a 404 means "not reachable without auth".
+    ///
+    /// Returns:
+    /// - `Ok(Some(false))` — public repo
+    /// - `Ok(Some(true))` — repo exists but is private (only observable with auth)
+    /// - `Ok(None)` — 404: private or missing (anonymous can't tell which)
+    /// - `Err(_)` — network error or unexpected status (e.g. 403 rate limit)
+    pub async fn repo_visibility(&self, owner: &str, repo: &str) -> Result<Option<bool>, String> {
+        let url = format!("{}/repos/{}/{}", self.api_url, enc(owner), enc(repo));
+        let resp = self
+            .http
+            .get(&url)
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Icefall-PaaS")
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        match resp.status().as_u16() {
+            200 => {
+                let body: RepoVisibility = resp.json().await.map_err(|e| e.to_string())?;
+                Ok(Some(body.private))
+            }
+            404 => Ok(None),
+            other => {
+                let body = resp.text().await.unwrap_or_default();
+                Err(format!("GitHub returned {other}: {body}"))
+            }
+        }
     }
 
     /// List branch names for a repo (installation-token auth, paginated).
