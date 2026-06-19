@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use super::{AstroMode, BuildConfig, DetectError, DetectionResult, Framework, PackageManager};
+use super::{
+    AstroMode, BuildConfig, DetectError, DetectionResult, Framework, PackageManager, RepoHints,
+};
 
 pub fn detect(
     project_dir: &Path,
@@ -239,6 +241,33 @@ pub fn framework_defaults(
     }
 }
 
+/// Enumerate repo-shape hints (AC1/AC2/AC3) at `dir`. Currently surfaces
+/// Dockerfile variants; compose files and workspaces are added alongside.
+pub fn detect_repo_hints(dir: &Path) -> RepoHints {
+    let mut dockerfiles = dockerfile_names(dir);
+    dockerfiles.sort();
+    let has_plain_dockerfile = dockerfiles.iter().any(|n| n == "Dockerfile");
+    RepoHints {
+        dockerfiles,
+        has_plain_dockerfile,
+    }
+}
+
+/// Names of `Dockerfile` and `Dockerfile.*` files directly in `dir`.
+/// `Dockerfile` (exact) and variants like `Dockerfile.api` count; `*.dockerfile`
+/// or `Dockerfile`-prefixed-but-not-dot (e.g. `Dockerfilefoo`) do not.
+fn dockerfile_names(dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|name| name == "Dockerfile" || name.starts_with("Dockerfile."))
+        .collect()
+}
+
 fn apply_overrides(result: &mut DetectionResult, ov: &BuildConfig) {
     if let Some(ref fw) = ov.framework {
         result.framework = fw.clone();
@@ -315,6 +344,64 @@ mod tests {
         let dir = setup_project(&[("package.json", pkg), ("bun.lock", "")]);
         let result = detect(dir.path(), None).unwrap();
         assert_eq!(result.package_manager, PackageManager::Bun);
+    }
+
+    #[test]
+    fn hints_find_plain_dockerfile() {
+        let dir = setup_project(&[("Dockerfile", "FROM node:22")]);
+        let hints = detect_repo_hints(dir.path());
+        assert_eq!(hints.dockerfiles, vec!["Dockerfile".to_string()]);
+        assert!(hints.has_plain_dockerfile);
+    }
+
+    #[test]
+    fn hints_find_variant_dockerfiles_without_plain() {
+        // kaartje case: Dockerfile.api + Dockerfile.web, no plain Dockerfile.
+        let dir = setup_project(&[
+            ("Dockerfile.api", "FROM oven/bun:1"),
+            ("Dockerfile.web", "FROM caddy:2"),
+            ("package.json", r#"{"workspaces": ["packages/*"]}"#),
+        ]);
+        let hints = detect_repo_hints(dir.path());
+        assert_eq!(
+            hints.dockerfiles,
+            vec!["Dockerfile.api".to_string(), "Dockerfile.web".to_string()]
+        );
+        assert!(
+            !hints.has_plain_dockerfile,
+            "variant-only must be flagged ambiguous"
+        );
+    }
+
+    #[test]
+    fn hints_plain_plus_variants() {
+        let dir = setup_project(&[
+            ("Dockerfile", "FROM node:22"),
+            ("Dockerfile.dev", "FROM node:22"),
+        ]);
+        let hints = detect_repo_hints(dir.path());
+        assert_eq!(hints.dockerfiles.len(), 2);
+        assert!(hints.has_plain_dockerfile);
+    }
+
+    #[test]
+    fn hints_ignore_non_dockerfile_names() {
+        let dir = setup_project(&[
+            ("Dockerfilefoo", "x"),
+            ("app.dockerfile", "x"),
+            ("README.md", "x"),
+        ]);
+        let hints = detect_repo_hints(dir.path());
+        assert!(hints.dockerfiles.is_empty());
+        assert!(!hints.has_plain_dockerfile);
+    }
+
+    #[test]
+    fn hints_empty_on_bare_repo() {
+        let dir = setup_project(&[("README.md", "hi")]);
+        let hints = detect_repo_hints(dir.path());
+        assert!(hints.dockerfiles.is_empty());
+        assert!(!hints.has_plain_dockerfile);
     }
 
     #[test]

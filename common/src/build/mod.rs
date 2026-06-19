@@ -78,6 +78,20 @@ pub struct DetectionResult {
     pub astro_mode: Option<AstroMode>,
 }
 
+/// Repo-shape hints surfaced to the create wizard alongside `DetectionResult`.
+/// Kept separate from `DetectionResult` so the core detection contract stays
+/// stable; these drive "how should this deploy" resolution (AC1/AC2/AC3).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoHints {
+    /// Dockerfile names found at the probed directory. Includes the plain
+    /// `Dockerfile` and any `Dockerfile.*` variants (e.g. `Dockerfile.api`).
+    pub dockerfiles: Vec<String>,
+    /// True when a plain `Dockerfile` exists (an unambiguous single build
+    /// target). When false but `dockerfiles` is non-empty, the variants are
+    /// ambiguous and the wizard must ask which to use.
+    pub has_plain_dockerfile: bool,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BuildConfig {
     pub framework: Option<Framework>,
