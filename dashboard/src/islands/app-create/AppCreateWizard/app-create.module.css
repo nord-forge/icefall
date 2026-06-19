@@ -422,6 +422,17 @@
   }
 }
 
+/* Inline spinner for the live repo-status probe. Animates transform only. */
+.spin {
+  animation: appCreateSpin 600ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes appCreateSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .progressBar {
     transition: none;
@@ -433,6 +444,10 @@
 
   .serviceCard {
     transition: none;
+  }
+
+  .spin {
+    animation: none;
   }
 
   .deployingDot {

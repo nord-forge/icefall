@@ -815,6 +815,16 @@ export const api = {
   getGitHubSetup: () =>
     request<{ manifest: Record<string, unknown>; form_action: string }>('/github/setup'),
 
+  // Probe a pasted repo URL's public/private status (server-side, no CORS).
+  // noCache: the user may fix a typo and re-check the same URL immediately.
+  getRepoStatus: (url: string) =>
+    request<{
+      status: 'public' | 'private_or_missing' | 'not_github' | 'unknown';
+      provider: 'GitHub' | 'GitLab' | 'Bitbucket' | 'GitLabSelfHosted' | 'Unknown';
+      github_app_available: boolean;
+      domain_configured: boolean;
+    }>(`/github/repo-status?url=${encodeURIComponent(url)}`, undefined, { noCache: true }),
+
   listGitHubApps: () =>
     request<{ data: Array<{ id: string; name: string; app_id: number; html_url: string; created_at: string }> }>('/github/apps'),
 

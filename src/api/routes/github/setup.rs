@@ -14,10 +14,69 @@ use crate::github::client::GitHubClient;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/github/setup", get(get_manifest))
+        .route("/github/repo-status", get(repo_status))
         .route("/github/callback", get(handle_callback))
         .route("/github/apps", get(list_apps))
         .route("/github/apps/seed-demo", post(seed_demo))
         .route("/github/apps/{id}", delete(delete_app))
+}
+
+#[derive(Deserialize)]
+struct RepoStatusParams {
+    url: String,
+}
+
+/// Probe whether a pasted repo URL points to a *public* repo, so the app wizard
+/// can skip the "connect a provider" prompt for public repos (they deploy with
+/// no credentials). The daemon probes server-side to avoid browser CORS and
+/// anonymous per-IP rate limits, and so it can tell the UI whether a GitHub App
+/// / public domain is available for the private case.
+///
+/// Supports github.com, gitlab.com, and bitbucket.org, plus a guarded heuristic
+/// for self-hosted GitLab on custom domains. See [`crate::git_provider`].
+///
+/// Response `status` is one of:
+/// - `public` — reachable anonymously; no connection needed
+/// - `private_or_missing` — 404 anonymously: private repo (or typo)
+/// - `not_github` — not a recognized git host
+/// - `unknown` — probe failed / unrecognized self-hosted; UI uses generic guidance
+async fn repo_status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<RepoStatusParams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authenticate_from_headers(&state, &headers)
+        .await?
+        .ok_or_else(|| ApiError::Forbidden("Not authenticated".into()))?;
+
+    let trimmed = params.url.trim();
+
+    // Context the UI needs to decide messaging without extra round-trips.
+    let github_app_available = !state
+        .db
+        .list_github_apps()
+        .await
+        .unwrap_or_default()
+        .is_empty();
+    let domain_configured = has_public_domain(&state);
+
+    let (provider, status) = match crate::github::owner_repo(trimmed) {
+        Some((owner, repo)) => {
+            let http = reqwest::Client::new();
+            crate::git_provider::probe(&http, trimmed, &owner, &repo).await
+        }
+        None => (
+            crate::git_provider::Provider::Unknown,
+            crate::git_provider::RepoStatus::NotRecognized,
+        ),
+    };
+
+    Ok(Json(serde_json::json!({
+        "status": status.as_str(),
+        "provider": format!("{provider:?}"),
+        "github_app_available": github_app_available,
+        "domain_configured": domain_configured,
+    })))
 }
 
 /// Returns the GitHub App Manifest and form action URL. The frontend POSTs the manifest
