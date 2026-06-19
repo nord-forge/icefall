@@ -1,6 +1,5 @@
 /**
- * Simple in-memory cache for API GET responses.
- * Entries expire after TTL milliseconds and are lazily evicted on read.
+ * Simple in-memory cache for API GET responses; entries expire after TTL ms.
  */
 
 const store = new Map<string, { data: unknown; timestamp: number }>();
@@ -26,7 +25,6 @@ export function invalidateCache(key: string): void {
 
 /**
  * Remove all cache entries whose key starts with the given prefix.
- * Useful after mutations (e.g. invalidatePrefix('/apps') after creating an app).
  */
 export function invalidatePrefix(prefix: string): void {
   for (const key of store.keys()) {

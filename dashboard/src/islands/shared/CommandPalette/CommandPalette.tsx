@@ -4,9 +4,7 @@ import { api } from '@lib/api';
 import type { App } from '@lib/types';
 import styles from './command-palette.module.css';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+/*  Types  */
 
 type ResultGroup = 'recent' | 'apps' | 'databases' | 'pages' | 'actions';
 
@@ -29,9 +27,7 @@ type RecentEntry = {
   group: ResultGroup;
 };
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
+/*  Constants  */
 
 const RECENT_KEY = 'icefall_recent';
 const MAX_RECENT = 5;
@@ -62,9 +58,7 @@ const STATIC_PAGES: PaletteItem[] = [
   { id: 'page-domains', group: 'pages', label: 'Domains', href: '/domains', icon: Globe },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  localStorage helpers                                               */
-/* ------------------------------------------------------------------ */
+/*  localStorage helpers  */
 
 function loadRecent(): RecentEntry[] {
   try {
@@ -83,17 +77,13 @@ function saveRecent(entry: RecentEntry) {
   localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, MAX_RECENT)));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Fuzzy match (case-insensitive substring)                           */
-/* ------------------------------------------------------------------ */
+/*  Fuzzy match (case-insensitive substring)  */
 
 function fuzzyMatch(query: string, text: string): boolean {
   return text.toLowerCase().includes(query.toLowerCase());
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+/*  Component  */
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -109,9 +99,7 @@ export default function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  /* ---------------------------------------------------------------- */
-  /*  Fetch apps + databases once on first open                        */
-  /* ---------------------------------------------------------------- */
+  /*  Fetch apps + databases once on first open  */
 
   const fetchData = useCallback(async () => {
     if (dataFetched.current) return;
@@ -128,9 +116,7 @@ export default function CommandPalette() {
     }
   }, []);
 
-  /* ---------------------------------------------------------------- */
-  /*  Open / close                                                     */
-  /* ---------------------------------------------------------------- */
+  /*  Open / close  */
 
   const openPalette = useCallback(() => {
     setOpen(true);
@@ -197,16 +183,12 @@ export default function CommandPalette() {
     return () => dialog.removeEventListener('keydown', handleTab);
   }, [open, query, confirm]);
 
-  /* ---------------------------------------------------------------- */
-  /*  Determine mode (search vs action)                                */
-  /* ---------------------------------------------------------------- */
+  /*  Determine mode (search vs action)  */
 
   const isActionMode = query.startsWith('>');
   const searchTerm = isActionMode ? query.slice(1).trim() : query.trim();
 
-  /* ---------------------------------------------------------------- */
-  /*  Build action items from app data                                 */
-  /* ---------------------------------------------------------------- */
+  /*  Build action items from app data  */
 
   const actionItems = useMemo<PaletteItem[]>(() => {
     const items: PaletteItem[] = [];
@@ -268,9 +250,7 @@ export default function CommandPalette() {
     return items;
   }, [apps]);
 
-  /* ---------------------------------------------------------------- */
-  /*  Build filtered results                                           */
-  /* ---------------------------------------------------------------- */
+  /*  Build filtered results  */
 
   const results = useMemo<PaletteItem[]>(() => {
     /* Action mode: only show action items */
@@ -329,9 +309,7 @@ export default function CommandPalette() {
     return matched.slice(0, MAX_RESULTS);
   }, [searchTerm, isActionMode, apps, databases, actionItems]);
 
-  /* ---------------------------------------------------------------- */
-  /*  Grouped results for rendering                                    */
-  /* ---------------------------------------------------------------- */
+  /*  Grouped results for rendering  */
 
   const grouped = useMemo(() => {
     const groups: { group: ResultGroup; label: string; items: PaletteItem[] }[] = [];
@@ -345,9 +323,7 @@ export default function CommandPalette() {
     return groups;
   }, [results]);
 
-  /* ---------------------------------------------------------------- */
-  /*  Selection                                                        */
-  /* ---------------------------------------------------------------- */
+  /*  Selection  */
 
   /* Reset selection when results change */
   useEffect(() => {
@@ -397,9 +373,7 @@ export default function CommandPalette() {
     closePalette();
   }, [confirm, closePalette]);
 
-  /* ---------------------------------------------------------------- */
-  /*  Keyboard navigation inside the palette                           */
-  /* ---------------------------------------------------------------- */
+  /*  Keyboard navigation inside the palette  */
 
   function handleInputKeyDown(e: KeyboardEvent) {
     if (confirm) {
@@ -429,9 +403,7 @@ export default function CommandPalette() {
     }
   }
 
-  /* ---------------------------------------------------------------- */
-  /*  Overlay click = close                                            */
-  /* ---------------------------------------------------------------- */
+  /*  Overlay click = close  */
 
   function handleOverlayClick(e: MouseEvent) {
     if ((e.target as HTMLElement).dataset.overlay === 'true') {
@@ -439,9 +411,7 @@ export default function CommandPalette() {
     }
   }
 
-  /* ---------------------------------------------------------------- */
-  /*  Render                                                           */
-  /* ---------------------------------------------------------------- */
+  /*  Render  */
 
   if (!open) return null;
 

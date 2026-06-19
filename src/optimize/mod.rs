@@ -1,10 +1,5 @@
-//! Smart Resource Packer (IF-191).
-//!
-//! A pure recommendations engine: given each app's current resource limits, its
-//! aggregated usage over an analysis window, and the set of servers, it produces
-//! right-sizing and placement suggestions plus estimated savings. No I/O here —
-//! the caller fetches the inputs and applies the outputs, which keeps the policy
-//! unit-testable.
+//! Smart Resource Packer (IF-191): a pure recommendations engine producing
+//! right-sizing and placement suggestions from limits, usage, and servers.
 
 use serde::{Deserialize, Serialize};
 
@@ -40,8 +35,7 @@ pub struct Recommendation {
     /// Rough monthly cost saving in USD, derived from RAM freed.
     pub estimated_monthly_savings_usd: f64,
     /// Whether "Apply all" may apply this automatically. Under-provisioned and
-    /// co-location recs are advisory (raising limits or moving apps isn't a
-    /// safe blind bulk action), so they're excluded.
+    /// co-location recs are advisory and excluded.
     pub auto_applicable: bool,
 }
 
@@ -222,10 +216,8 @@ pub fn colocation_recommendations(servers: &[ServerCapacity]) -> Vec<Recommendat
     }]
 }
 
-/// Spawn the weekly optimization digest (IF-191). Once a week it analyzes all
-/// apps' persisted usage and, if there's meaningful RAM to reclaim, emits a
-/// notification ("You could save ~X MB by right-sizing N containers"). Reuses
-/// the persisted container metrics, so it needs no Docker access.
+/// Spawn the weekly optimization digest (IF-191): analyzes persisted usage and,
+/// if there's meaningful RAM to reclaim, emits a right-sizing notification.
 pub fn spawn_optimization_digest(
     db: std::sync::Arc<dyn crate::db::Database>,
     caddy_admin_url: String,

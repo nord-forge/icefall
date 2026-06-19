@@ -1,6 +1,5 @@
 //! Runtime quirk detection. Docker and Podman share the `bollard` socket API
-//! but differ in behavior (especially rootless Podman); `RuntimeQuirks` captures
-//! those differences as data resolved once at connect time.
+//! but differ in behavior; `RuntimeQuirks` captures that, resolved at connect.
 
 use crate::config::ContainerRuntime;
 
@@ -21,9 +20,8 @@ pub struct RuntimeQuirks {
     pub runtime: ContainerRuntime,
     /// True for rootless Podman (daemon running as a non-root user).
     pub rootless: bool,
-    /// Host IP to bind published container ports to. Docker and rootful Podman
-    /// can bind `0.0.0.0`; rootless Podman should use loopback — Caddy runs on
-    /// the same host and proxies to it.
+    /// Host IP to bind published container ports to. `0.0.0.0` for Docker/rootful
+    /// Podman; loopback for rootless Podman (Caddy is co-located and proxies).
     pub host_bind_ip: String,
     /// Whether `cpu_shares` / `memory` limits are actually enforced. Rootless
     /// Podman ignores cgroup limits unless cgroups v2 + delegation is set up.
@@ -49,10 +47,8 @@ impl RuntimeQuirks {
         }
     }
 
-    /// Resolve quirks from the socket path (a per-user runtime dir signals
-    /// rootless) and `security_options` (a `name=rootless` entry confirms it).
-    /// Probes the host for cgroups-v2 delegation so rootless limit enforcement
-    /// is detected rather than assumed off.
+    /// Resolve quirks from the socket path and `security_options` (both signal
+    /// rootless), probing the host for cgroups-v2 delegation.
     pub fn detect(
         runtime: ContainerRuntime,
         socket_path: &str,
@@ -66,9 +62,8 @@ impl RuntimeQuirks {
         )
     }
 
-    /// Like [`detect`], but with cgroup delegation passed in (testable seam).
-    ///
-    /// [`detect`]: RuntimeQuirks::detect
+    /// Like [`detect`](RuntimeQuirks::detect), but with cgroup delegation passed
+    /// in (testable seam).
     pub fn detect_with(
         runtime: ContainerRuntime,
         socket_path: &str,
@@ -92,10 +87,8 @@ impl RuntimeQuirks {
             } else {
                 "0.0.0.0".to_string()
             },
-            // Rootful Podman always honors cgroup limits. Rootless does too, but
-            // ONLY when the host has cgroups-v2 with memory/cpu controllers
-            // delegated to the user — which the installer now sets up. We probe
-            // for it rather than blanket-assume rootless can't enforce limits.
+            // Rootful Podman always honors cgroup limits; rootless does too only
+            // with cgroups-v2 delegation, which we probe for.
             supports_cgroup_limits: !rootless || cgroup_delegation,
             // Modern Podman (>= 4, which the installer requires) uses netavark.
             dns_backend: DnsBackend::Netavark,
@@ -104,14 +97,8 @@ impl RuntimeQuirks {
     }
 }
 
-/// Whether the host has cgroups v2 with the `memory` and `cpu` controllers
-/// available for delegation to a rootless user. On a unified-v2 host with
-/// systemd `Delegate=` set up (what the installer configures), the user's
-/// cgroup exposes these controllers; without it, rootless resource limits are
-/// silently ignored by the kernel.
-///
-/// Best-effort filesystem probe — any error is treated as "no delegation" so we
-/// degrade to the conservative warning rather than over-promise enforcement.
+/// Whether the host has cgroups v2 with `memory`/`cpu` controllers delegated to
+/// the rootless user. Best-effort probe; any error is treated as "no delegation".
 fn cgroup_v2_delegation_available() -> bool {
     // cgroups v2 is a single unified hierarchy at /sys/fs/cgroup with a
     // top-level `cgroup.controllers` file. cgroups v1 has no such file.
@@ -123,9 +110,8 @@ fn cgroup_v2_delegation_available() -> bool {
         return false;
     }
 
-    // The controllers must also be delegated down to the user's slice. Check the
-    // running process's own cgroup subtree for the same controllers; if systemd
-    // delegated them, they appear in our subtree_control / controllers file.
+    // The controllers must also be delegated to the user's slice — check the
+    // process's own cgroup subtree for the same controllers.
     for path in [
         "/sys/fs/cgroup/cgroup.subtree_control",
         // Per-user delegated slice (systemd user manager).

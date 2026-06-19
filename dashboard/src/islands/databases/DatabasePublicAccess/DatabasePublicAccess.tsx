@@ -12,8 +12,7 @@ type Props = {
 };
 
 // IF-172: enable/disable raw TCP access to a managed database and show the
-// external connection details. The toggle is the source of truth; the IP
-// whitelist field is editable only while enabling.
+// external connection details. The toggle is the source of truth.
 export default function DatabasePublicAccess({ dbId }: Props) {
   const [access, setAccess] = useState<PublicAccess | null>(null);
   const [loading, setLoading] = useState(true);

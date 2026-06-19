@@ -7,9 +7,8 @@ use crate::api::AppState;
 use crate::db::models::{App, UpdateApp};
 use crate::deploy::raw_compose::RawComposeDeployer;
 
-/// Build a raw-compose deployer for an app, or `None` when the app isn't in raw
-/// compose mode. Raw stacks are owned by the `docker compose` CLI, so their
-/// lifecycle goes through compose commands rather than per-container ops.
+/// Build a raw-compose deployer for an app, or `None` when not in raw mode. Raw
+/// stacks are CLI-owned, so lifecycle goes through compose, not per-container ops.
 fn raw_compose(state: &AppState, app: &App) -> Option<RawComposeDeployer> {
     (app.deploy_mode == "raw-compose").then(|| {
         RawComposeDeployer::new(

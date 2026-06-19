@@ -1,9 +1,5 @@
-//! SSRF protection for user-supplied outbound URLs — rejects metadata endpoints, loopback,
-//! private networks, and the Caddy admin API.
-//!
-//! The guard resolves the host once, pins the connection to that validated IP,
-//! and refuses HTTP redirects — so neither a redirect to an internal host nor a
-//! DNS rebind between validation and connection can reach an internal service.
+//! SSRF protection for user-supplied outbound URLs. Resolves the host once, pins
+//! the connection to that IP, and refuses redirects to block rebind/internal access.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
@@ -23,10 +19,8 @@ pub struct GuardedTarget {
     addr: SocketAddr,
 }
 
-/// Validate that `raw_url` is safe to fetch on behalf of a user. Rejects
-/// non-`http(s)` schemes and hosts resolving to loopback, link-local, private,
-/// or otherwise internal addresses (including the Caddy admin host). On success
-/// returns the parsed URL and the validated address to pin the connection to.
+/// Validate that `raw_url` is safe to fetch. Rejects non-`http(s)` schemes and
+/// internal addresses; returns the parsed URL and the address to pin to.
 pub async fn validate_outbound_url(
     raw_url: &str,
     caddy_admin_url: &str,
@@ -83,9 +77,8 @@ pub async fn validate_outbound_url(
     Ok(GuardedTarget { url, host, addr })
 }
 
-/// Build a reqwest client locked to a validated [`GuardedTarget`]: a 30s
-/// timeout, no redirect following, and DNS overridden so the host can only
-/// resolve to the address the guard already checked.
+/// Build a reqwest client locked to a validated [`GuardedTarget`]: 30s timeout,
+/// no redirects, and DNS pinned to the address the guard already checked.
 pub fn guarded_client(target: &GuardedTarget) -> Result<reqwest::Client, ApiError> {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))

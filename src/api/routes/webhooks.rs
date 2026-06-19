@@ -241,8 +241,7 @@ async fn trigger_deploy(
     let state = state.clone();
 
     // IF-174: report deploy progress to GitHub as a commit status. The watcher
-    // polls the deploy's terminal state, so it works regardless of which spawn
-    // branch runs and reports build failures too (best-effort, no-op if unlinked).
+    // polls terminal state, so it covers all spawn branches (best-effort, no-op if unlinked).
     crate::github::status::watch_deploy(&state, &app, &deploy.id, Some(sha));
 
     tokio::spawn(async move {

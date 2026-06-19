@@ -1,8 +1,5 @@
-//! Deploy commit-status reporting (IF-174): post `icefall/deploy` commit
-//! statuses to GitHub as a deploy moves through pending → success/failure.
-//!
-//! All functions are best-effort: a GitHub failure (no installation, token
-//! error, API error) is logged and swallowed so it never blocks a deploy.
+//! Deploy commit-status reporting (IF-174): post `icefall/deploy` commit statuses
+//! as a deploy moves pending → success/failure. Best-effort; never blocks a deploy.
 
 use crate::api::AppState;
 use crate::db::models::App;
@@ -12,9 +9,8 @@ use crate::github::token::get_valid_installation_token;
 /// GitHub commit-status context shown on the PR/commit.
 const STATUS_CONTEXT: &str = "icefall/deploy";
 
-/// Post a commit status for `app` at `sha`. `state` is pending/success/failure.
-/// No-op (with a debug log) when the app isn't linked to a GitHub installation
-/// or lacks a parseable repo — i.e. manual-webhook apps are unaffected.
+/// Post a commit status for `app` at `sha` (state pending/success/failure). No-op
+/// when the app isn't GitHub-linked or lacks a parseable repo.
 pub async fn report_deploy_status(
     state: &AppState,
     app: &App,
@@ -60,12 +56,8 @@ pub async fn report_deploy_status(
     }
 }
 
-/// Report `pending`, then spawn a watcher that polls the deploy until it reaches
-/// a terminal state and reports `success`/`failure`. This covers every deploy
-/// path (manual API, scheduled, native, image, compose) without threading status
-/// calls through each spawn branch — they all converge on the deploy's DB status.
-///
-/// No-op when the app isn't GitHub-linked or the deploy has no commit SHA.
+/// Report `pending`, then spawn a watcher that polls the deploy's DB status until
+/// terminal and reports it. No-op when not GitHub-linked or the deploy has no SHA.
 pub fn watch_deploy(state: &AppState, app: &App, deploy_id: &str, sha: Option<&str>) {
     // Manual deploys may have no SHA; without one there's nothing to report on.
     let (Some(_), Some(sha)) = (app.github_installation_id.as_deref(), sha) else {

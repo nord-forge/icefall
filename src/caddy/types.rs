@@ -1,15 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-/// Stable Caddy `@id` for the control-plane dashboard route the daemon manages
-/// on boot. Addressable at `/id/icefall-dashboard` so the route is upserted
-/// idempotently and never collides with per-app routes.
+/// Stable Caddy `@id` for the daemon-managed dashboard route, addressable at
+/// `/id/icefall-dashboard` for idempotent upserts.
 pub const DASHBOARD_ROUTE_ID: &str = "icefall-dashboard";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaddyRoute {
-    /// Caddy object id (`@id`). Set only for routes the daemon needs to address
-    /// by id (the dashboard route); omitted from JSON otherwise so per-app
-    /// route payloads are unchanged.
+    /// Caddy object id (`@id`). Set only for routes the daemon addresses by id
+    /// (the dashboard route); omitted from JSON otherwise.
     #[serde(rename = "@id", skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(rename = "match")]
@@ -102,10 +100,8 @@ impl CaddyRoute {
         }
     }
 
-    /// Build the control-plane dashboard route: host-match `domain` →
-    /// reverse_proxy to the locally-served dashboard on `127.0.0.1:{port}`,
-    /// tagged with [`DASHBOARD_ROUTE_ID`]. Caddy auto-provisions HTTPS for the
-    /// matched host (needs public DNS + reachable :80/:443).
+    /// Build the dashboard route: `domain` -> reverse_proxy `127.0.0.1:{port}`,
+    /// tagged [`DASHBOARD_ROUTE_ID`]. Caddy auto-provisions HTTPS for the host.
     pub fn dashboard(domain: &str, listen_port: u16) -> Self {
         let mut route = Self::reverse_proxy(domain, &format!("127.0.0.1:{listen_port}"));
         route.id = Some(DASHBOARD_ROUTE_ID.to_string());

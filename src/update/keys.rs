@@ -1,6 +1,5 @@
-/// A trusted Ed25519 public key for verifying release manifests. To rotate:
-/// add the new key at index 0, release once signed with the old key, switch CI,
-/// then drop the old key after adoption.
+/// A trusted Ed25519 public key for verifying release manifests. To rotate: add
+/// the new key at index 0, re-sign, switch CI, then drop the old key.
 #[derive(Debug, Clone)]
 pub struct TrustedKey {
     pub id: &'static str,

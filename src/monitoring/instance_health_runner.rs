@@ -1,6 +1,5 @@
-//! Per-instance health monitoring for multi-instance (load-balanced) apps.
-//! Checks each instance's container, transitions status, and replaces failed
-//! instances to keep the app at its desired count.
+//! Per-instance health monitoring for multi-instance (load-balanced) apps:
+//! checks containers, transitions status, and replaces failed instances.
 
 use std::collections::HashMap;
 use std::sync::Arc;

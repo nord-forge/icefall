@@ -59,8 +59,7 @@ impl UpdateRollback {
         }
 
         // The dashboard is embedded in the binary (IF-255), so restoring the
-        // rollback binary above already restores the previous UI — nothing
-        // separate to restore here.
+        // rollback binary above already restores the previous UI.
 
         if let Err(e) = std::fs::remove_file(&marker_path) {
             warn!(error = %e, "failed to remove pending update marker");

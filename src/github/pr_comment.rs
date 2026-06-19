@@ -1,6 +1,5 @@
-//! Preview-environment PR comments (IF-174). When a preview env deploys, post
-//! (or edit) a single comment on the matching PR with the preview URL and
-//! status. All functions are best-effort and never block a deploy.
+//! Preview-environment PR comments (IF-174): post or edit a single comment on the
+//! matching PR with the preview URL and status. Best-effort; never blocks a deploy.
 
 use crate::api::AppState;
 use crate::db::models::{App, Environment};
@@ -8,11 +7,8 @@ use crate::deploy::preview::sanitize_branch_for_subdomain;
 use crate::github::client::GitHubClient;
 use crate::github::token::get_valid_installation_token;
 
-/// Post or update the preview-env comment for `app`'s `env`. `status` is a short
-/// label (e.g. "success", "destroyed"). `sha` is the deployed commit, when known
-/// — passing it matches fork PRs too (the branch fallback only matches same-repo
-/// PRs). No-op for non-preview envs, apps with no linked installation, or
-/// branches/commits with no open PR.
+/// Post or update the preview-env comment for `app`'s `env`. Passing `sha` matches
+/// fork PRs too. No-op for non-preview envs, unlinked apps, or PR-less branches.
 pub async fn post_preview_comment(
     state: &AppState,
     app: &App,

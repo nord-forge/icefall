@@ -1,6 +1,5 @@
-//! Installation-token resolution (IF-174): return a valid GitHub App
-//! installation token, minting a fresh one via the App JWT when the cached token
-//! is missing or near expiry, and caching the result (encrypted) in the DB.
+//! Installation-token resolution (IF-174): return a valid GitHub App token,
+//! minting via the App JWT when the cached one is missing or near expiry.
 
 use std::sync::Arc;
 
@@ -20,9 +19,8 @@ pub struct ResolvedToken {
     pub installation_id: i64,
 }
 
-/// Return a usable installation token for `installation_db_id` (the DB id, not
-/// the GitHub numeric id). Uses the cached token when still valid, otherwise
-/// mints and caches a new one.
+/// Return a usable installation token for `installation_db_id` (the DB id).
+/// Uses the cached token when still valid, otherwise mints and caches one.
 pub async fn get_valid_installation_token(
     db: &Arc<dyn Database>,
     installation_db_id: &str,

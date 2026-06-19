@@ -1,6 +1,5 @@
 //! IF-149: data-layer tests for reverse proxy management — preset persistence,
-//! advanced-mode custom config flag transitions, config-history pruning to the
-//! last 10 snapshots, and global proxy settings upsert. Docker/Caddy-independent.
+//! advanced-mode flag transitions, config-history pruning, and settings upsert.
 
 #[cfg(test)]
 mod proxy {

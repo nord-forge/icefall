@@ -51,8 +51,7 @@ pub enum DeployError {
 }
 
 /// Retry a fallible deploy-state write up to three times, logging each failure.
-/// Used for DB updates whose loss would desync the recorded deploy state from
-/// reality (breaking rollbacks and health monitoring) — never swallow them.
+/// Used for DB updates whose loss would desync recorded deploy state from reality.
 pub async fn retry_state_write<F, Fut, T, E>(what: &str, mut op: F) -> Result<T, E>
 where
     F: FnMut() -> Fut,

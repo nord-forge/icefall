@@ -1,11 +1,5 @@
-//! Scheduled-deploy scheduler (IF-179).
-//!
-//! A lightweight background loop that, every 30 seconds, looks for deploys
-//! parked in the `scheduled` state whose trigger time has arrived and fires
-//! them through the normal deploy pipeline. Deploys that came due while the
-//! daemon was offline are still fired if they are within the grace window;
-//! beyond it they are marked `missed` so a stale release never surprises a
-//! team hours later.
+//! Scheduled-deploy scheduler (IF-179): a 30s loop that fires due `scheduled`
+//! deploys, marking them `missed` if they came due past the grace window.
 
 use std::time::Duration;
 

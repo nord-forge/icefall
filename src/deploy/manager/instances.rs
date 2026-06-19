@@ -12,9 +12,8 @@ use crate::events::EventType;
 use super::{DeployManager, ResourceLimits};
 
 impl DeployManager {
-    /// Deploy an app across multiple servers to satisfy `app.desired_instances`,
-    /// reconciling current to desired state. New instances are started one at a
-    /// time (rolling) and old ones torn down only once the new ones are healthy.
+    /// Deploy an app across multiple servers to satisfy `app.desired_instances`.
+    /// Rolling: new instances start one at a time, old ones torn down once healthy.
     pub async fn deploy_instances(
         &self,
         deploy: &Deploy,
@@ -186,9 +185,8 @@ impl DeployManager {
         Ok(())
     }
 
-    /// Choose servers for `desired` instances: the app's primary server first,
-    /// then round-robin across online servers by free capacity. `desired` may
-    /// exceed the server count — a server can host multiple instances.
+    /// Choose servers for `desired` instances: primary server first, then
+    /// round-robin across online servers by free capacity (may exceed count).
     async fn select_instance_targets(
         &self,
         app: &App,
@@ -302,8 +300,7 @@ impl DeployManager {
             }
             Err(e) => {
                 // Best-effort cleanup of any partially-created container, then
-                // delete the row so it does not leak as a stale `failed`
-                // record. The deploy reports degraded/failed via the caller.
+                // delete the row so it does not leak as a stale `failed` record.
                 let refreshed = self.db.get_app_instance(&instance.id).await.ok().flatten();
                 if let Some(inst) = refreshed {
                     let _ = self.destroy_instance_container(&inst).await;
@@ -489,9 +486,8 @@ impl DeployManager {
         Ok(())
     }
 
-    /// Reconcile a multi-instance app back up to `desired_instances` after
-    /// failures: remove failed instances, then fill the shortfall with the image
-    /// from the latest successful deploy (no rebuild) and rebuild Caddy.
+    /// Reconcile a multi-instance app back up to `desired_instances`: remove
+    /// failed ones, fill the shortfall from the latest image, rebuild Caddy.
     pub async fn replace_failed_instances(
         &self,
         app: &App,
@@ -598,9 +594,8 @@ impl DeployManager {
     }
 }
 
-/// Caddy upstream (`host:port`) for a running instance. Local instances use
-/// `localhost`; remote instances use the server's host. Returns `None` if the
-/// instance has no host port or its server host cannot be resolved.
+/// Caddy upstream (`host:port`) for a running instance: `localhost` for local,
+/// server host for remote. `None` if no host port or host can't be resolved.
 fn instance_upstream(
     instance: &AppInstance,
     host_by_id: &HashMap<String, String>,

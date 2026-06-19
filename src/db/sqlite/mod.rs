@@ -83,9 +83,8 @@ impl SqliteDatabase {
         Self::connect_with_cache(database_url, encryptor, 64_000).await
     }
 
-    /// Connect with an explicit SQLite page-cache size (KiB), set as a negative
-    /// `cache_size` pragma. Lower values cut idle RAM at the cost of more disk
-    /// reads — used by low-memory mode on small servers.
+    /// Connect with an explicit SQLite page-cache size (KiB). Lower values cut
+    /// idle RAM at the cost of more disk reads — used by low-memory mode.
     pub async fn connect_with_cache(
         database_url: &str,
         encryptor: Arc<Encryptor>,

@@ -1,9 +1,5 @@
-//! GitHub installation-token refresh scheduler (IF-174).
-//!
-//! Installation tokens expire after ~1 hour. Every 30 minutes this loop mints
-//! fresh tokens for installations whose cached token is missing or expires
-//! within the next ~35 minutes, so a token is always warm when a deploy needs to
-//! report status or comment on a PR.
+//! GitHub installation-token refresh scheduler (IF-174). Tokens expire after ~1h;
+//! every 30 min this loop refreshes any expiring within ~35 min to keep one warm.
 
 use std::sync::Arc;
 use std::time::Duration;

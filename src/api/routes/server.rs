@@ -91,10 +91,8 @@ pub fn spawn_metrics_collector(
 ) {
     tokio::spawn(async move {
         let mut tick: u64 = 0;
-        // Persistent sysinfo handles, reused across cycles (IF-260). Keeping the
-        // `System` alive lets CPU% be computed from the delta between *cycles*
-        // (COLLECT_INTERVAL_SECS apart) instead of an in-cycle 200 ms sleep — and
-        // avoids re-parsing all of /proc via `System::new()` every 2 s.
+        // Persistent sysinfo handles, reused across cycles (IF-260): CPU% comes
+        // from the delta between cycles instead of an in-cycle sleep or reparse.
         let mut sys = sysinfo::System::new();
         let mut disks = sysinfo::Disks::new_with_refreshed_list();
         loop {
@@ -194,8 +192,7 @@ pub fn spawn_metrics_collector(
                                 );
 
                                 // IF-167: disk threshold notification. The state
-                                // machine only fires on transition, which is the
-                                // re-alert cooldown.
+                                // machine only fires on transition (re-alert cooldown).
                                 crate::api::routes::notifications::emit_event(
                                     &db,
                                     &caddy_admin_url,

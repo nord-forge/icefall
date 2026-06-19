@@ -1,11 +1,5 @@
 // Single source of truth for "what timezone does this user work in".
-//
-// The user picks a timezone in their profile preferences (IF-084). Everything
-// that shows or accepts a wall-clock time — currently scheduled deploys
-// (IF-179) — must interpret it in that zone so the value the user types is the
-// value that fires, regardless of the browser's own timezone. UTC is always
-// what we store and send to the API; this module only handles the conversion
-// at the display/input boundary.
+// UTC is stored/sent; this module converts at the display/input boundary.
 
 import { api } from './api';
 
@@ -93,9 +87,8 @@ function offsetMs(date: Date, tz: string): number {
 }
 
 /**
- * A `datetime-local` value (`YYYY-MM-DDTHH:mm`) read as wall-clock time in `tz`,
- * converted to a UTC ISO 8601 string. Two-step offset inversion keeps it correct
- * across DST boundaries (ambiguous DST-fold times resolve to one side).
+ * A `datetime-local` wall-clock value in `tz` converted to a UTC ISO string.
+ * Two-step offset inversion keeps it correct across DST boundaries.
  */
 export function wallTimeToUtcIso(local: string, tz: string): string {
   const [datePart, timePart = '00:00'] = local.split('T');

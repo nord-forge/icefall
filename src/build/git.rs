@@ -156,8 +156,7 @@ async fn resolve_sha(work_dir: &Path) -> Result<String, BuildError> {
 }
 
 /// List remote branch names via `git ls-remote --heads` (IF-166). Works for
-/// public repos and repos the server has ambient credentials for; private
-/// repos without credentials return an error that the caller surfaces.
+/// public repos and those with ambient credentials; otherwise errors to caller.
 pub async fn list_remote_branches(repo_url: &str) -> Result<Vec<String>, BuildError> {
     let output = tokio::process::Command::new("git")
         .args(["ls-remote", "--heads", repo_url])

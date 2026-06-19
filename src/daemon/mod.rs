@@ -59,8 +59,7 @@ impl DaemonRunner {
         info!("Starting Icefall daemon v{}", env!("CARGO_PKG_VERSION"));
 
         // Cancellation token + tracker for daemon-owned background loops, so
-        // SIGTERM lets them finish their current iteration instead of being
-        // killed mid-write.
+        // SIGTERM lets them finish their current iteration instead of dying mid-write.
         let shutdown = tokio_util::sync::CancellationToken::new();
         let tracker = tokio_util::task::TaskTracker::new();
 
@@ -143,10 +142,8 @@ impl DaemonRunner {
             Err(e) => warn!("Caddy unreachable (will retry): {e}"),
         }
 
-        // Ensure the dashboard is reachable over the configured base domain
-        // (Caddy reverse-proxies it to the locally-served dashboard, with
-        // automatic HTTPS). Best-effort and idempotent — no-ops without a
-        // base_domain, and re-ensured on each start if Caddy was down.
+        // Ensure the dashboard is reachable over the configured base domain via
+        // Caddy. Best-effort and idempotent — no-ops without a base_domain.
         let _ = caddy
             .ensure_dashboard_route(config.base_domain.as_deref(), config.listen_port)
             .await;

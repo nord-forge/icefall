@@ -6,11 +6,8 @@ pub mod status;
 pub mod token;
 pub mod webhook_setup;
 
-/// Parse "owner/name" from a git repo URL (https or ssh form). Returns the last
-/// two path segments, which is correct for github.com `owner/repo` URLs.
-///
-/// Note: for nested/enterprise paths this still takes the trailing two segments;
-/// callers use it only for GitHub.com-style repos linked via a GitHub App.
+/// Parse "owner/name" from a git repo URL (https or ssh form) by taking the last
+/// two path segments. Used only for GitHub.com-style repos linked via a GitHub App.
 pub fn owner_repo(git_repo: &str) -> Option<(String, String)> {
     let trimmed = git_repo
         .trim()

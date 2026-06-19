@@ -145,9 +145,7 @@ async fn create_admin(
     });
 
     // Set the session cookie so the rest of onboarding (and the dashboard) is
-    // authenticated. Without this the wizard created the admin but stayed
-    // unauthenticated, bounced back to the admin step, and a re-submit hit the
-    // "admin already exists" guard with a 409. Mirrors auth.rs::setup_admin.
+    // authenticated. Mirrors auth.rs::setup_admin.
     let cookie = session_cookie(&session.id, state.config.base_domain.as_deref());
     let mut headers = HeaderMap::new();
     headers.insert(

@@ -26,8 +26,7 @@ pub(super) async fn record_container_metrics(
 }
 
 /// Aggregated usage per app over the last `days`, for the recommendations
-/// engine. One row per app that has samples in the window. `memory_limit_bytes`
-/// is taken from the most recent sample (limits can change across redeploys).
+/// engine. `memory_limit_bytes` comes from the most recent sample.
 pub(super) async fn container_usage_stats(
     pool: &SqlitePool,
     days: i64,

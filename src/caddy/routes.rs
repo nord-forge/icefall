@@ -127,9 +127,8 @@ impl CaddyClient {
     pub async fn remove_route(&self, domain: &str) -> Result<(), CaddyError> {
         let routes = self.get_routes_raw().await?;
 
-        // Never delete the daemon-managed dashboard route via a host-keyed
-        // removal: if an app ever shares the dashboard's base_domain, removing
-        // that app must not take the dashboard route down with it.
+        // Never delete the daemon-managed dashboard route via host-keyed removal,
+        // so an app sharing its base_domain can't take the dashboard down.
         let index = routes
             .iter()
             .position(|r| {
@@ -157,16 +156,8 @@ impl CaddyClient {
         Ok(())
     }
 
-    /// Ensure the control-plane dashboard is reachable over `base_domain` by
-    /// upserting a Caddy route (`@id` = [`DASHBOARD_ROUTE_ID`]) that
-    /// reverse-proxies the host to the locally-served dashboard on
-    /// `127.0.0.1:{listen_port}`. Idempotent: re-running replaces the same
-    /// object via Caddy's `/id/{id}` endpoint rather than appending a duplicate.
-    ///
-    /// No-ops when `base_domain` is `None`. Best-effort: on any Caddy error
-    /// (e.g. Caddy not yet reachable at boot) it logs and returns `Ok(())` so a
-    /// transient failure never aborts daemon startup — the route is re-ensured
-    /// on the next start.
+    /// Upsert the dashboard route (`@id` = [`DASHBOARD_ROUTE_ID`]) proxying
+    /// `base_domain` -> `127.0.0.1:{listen_port}`. No-op if `None`; best-effort on errors.
     pub async fn ensure_dashboard_route(
         &self,
         base_domain: Option<&str>,

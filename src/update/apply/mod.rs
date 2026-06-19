@@ -24,10 +24,8 @@ pub struct PendingUpdate {
     pub to_version: String,
     pub rollback_binary: String,
     pub db_backup: String,
-    /// Deprecated (IF-255): the dashboard is embedded in the binary, so there's
-    /// no separate dashboard to back up. Retained `#[serde(default)]` so a
-    /// pending marker written by an older binary still deserializes during an
-    /// in-flight upgrade; never written by current code.
+    /// Deprecated (IF-255): dashboard is embedded in the binary. Retained so an
+    /// older binary's pending marker still deserializes; never written now.
     #[serde(default, skip_serializing)]
     pub dashboard_backup: Option<String>,
     pub started_at: String,

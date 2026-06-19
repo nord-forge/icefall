@@ -1,8 +1,5 @@
-//! IF-149 reverse proxy management endpoints.
-//!
-//! App-scoped: read config, toggle presets, advanced raw config (validate/apply),
-//! reset to auto-generated, and undo the last change from history. Role policy:
-//! viewer reads, member toggles presets, admin uses advanced mode + reset.
+//! IF-149 reverse proxy management endpoints. App-scoped config read/toggle/
+//! advanced/reset/undo; viewer reads, member toggles presets, admin advanced+reset.
 
 use axum::extract::{Path, State};
 use axum::Json;
@@ -116,8 +113,7 @@ pub(super) async fn set_custom(
     }
 
     // Validate by wrapping the routes in a throwaway full config — Caddy's
-    // validator only accepts a complete config, and this never touches the live
-    // config or other apps.
+    // validator only accepts a complete config; never touches live config.
     let probe = wrap_routes_for_validation(&body.config);
     state
         .caddy
@@ -204,8 +200,7 @@ pub(super) async fn reset(
 }
 
 /// POST /apps/{id}/proxy/undo — restore the most recent full-config snapshot.
-/// Admin: restoring re-applies the captured server config, so it carries the
-/// same blast radius as advanced apply.
+/// Admin only: re-applies captured server config (same blast radius as apply).
 pub(super) async fn undo(
     State(state): State<AppState>,
     ctx: TeamCtx,
@@ -259,9 +254,8 @@ pub(super) async fn history(
     Ok(Json(serde_json::json!({ "data": entries })))
 }
 
-/// Capture the current full Caddy config as a rollback point. Best-effort: a
-/// snapshot failure must not block the actual config change. The full config
-/// (not just routes) is stored so `undo` can re-apply it via `/load`.
+/// Capture the current full Caddy config as a rollback point. Best-effort; the
+/// full config (not just routes) is stored so `undo` can re-apply it via `/load`.
 async fn snapshot_current_config(state: &AppState, app_id: &str) {
     if let Ok(config) = state.caddy.get_full_config().await {
         let serialized = config.to_string();
@@ -286,9 +280,8 @@ async fn app_domains(state: &AppState, app_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Wrap a user's route object/array in a minimal full Caddy config so it can be
-/// run through Caddy's `/load` validator (which only accepts a complete config).
-/// Used for validation only — never applied.
+/// Wrap a user's route object/array in a minimal full Caddy config for the
+/// `/load` validator (which only accepts a complete config). Validation only.
 fn wrap_routes_for_validation(routes: &serde_json::Value) -> serde_json::Value {
     let routes_array = match routes {
         serde_json::Value::Array(_) => routes.clone(),
@@ -303,9 +296,7 @@ fn wrap_routes_for_validation(routes: &serde_json::Value) -> serde_json::Value {
 }
 
 /// Resolve the basic-auth preset's plaintext `password` into a stored bcrypt
-/// `password_hash`, then clear the plaintext. An empty/absent password keeps the
-/// existing hash from the app's currently-stored presets ("leave blank to keep").
-/// The plaintext is never persisted or returned to the client.
+/// `password_hash`, clearing the plaintext. Empty password keeps the existing hash.
 fn resolve_basic_auth_password(presets: &mut ProxyPresets, app: &App) -> Result<(), ApiError> {
     let existing_hash = app
         .proxy_presets

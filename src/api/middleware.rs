@@ -369,13 +369,8 @@ fn cors_layer(config: &IcefallConfig) -> CorsLayer {
         .allow_credentials(true)
 }
 
-/// `Cache-Control` value for a request path (IF-253).
-///
-/// Astro content-hashes asset filenames (`Alert.CXSNITkF.js`), so anything under
-/// `/_astro/` is immutable and can be cached for a year. HTML shells must NOT be
-/// cached long — they reference the hashed assets, and a deploy changes those
-/// hashes, so the shell has to be re-fetched to discover them. API responses are
-/// dynamic and left uncached. Returns `None` when no header should be set.
+/// `Cache-Control` value for a request path (IF-253). Content-hashed `/_astro/`
+/// assets are immutable; HTML shells must revalidate; API responses are uncached.
 fn cache_control_for_path(path: &str) -> Option<&'static str> {
     if path.starts_with("/api/") {
         return None;
@@ -410,9 +405,8 @@ async fn dashboard_cache_control(req: Request<Body>, next: Next) -> Response {
 pub fn apply_middleware(router: Router<AppState>, config: &IcefallConfig) -> Router<AppState> {
     let mut router = router
         .layer(TraceLayer::new_for_http())
-        // Compress responses (gzip/br) — the dashboard ships ~900 KB of JS that
-        // was previously sent uncompressed (IF-252). Negotiated per
-        // Accept-Encoding; clients that don't ask get identity.
+        // Compress responses (gzip/br) — the dashboard ships ~900 KB of JS
+        // (IF-252). Negotiated per Accept-Encoding; non-asking clients get identity.
         .layer(CompressionLayer::new())
         // Path-based Cache-Control for dashboard assets (IF-253).
         .layer(axum::middleware::from_fn(dashboard_cache_control))

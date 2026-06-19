@@ -85,12 +85,8 @@ pub fn build_router(state: AppState) -> Router {
             middleware::require_auth,
         ))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        // The dashboard is embedded in the binary (IF-255); `assets::serve`
-        // resolves the request to an embedded file, negotiates a precompressed
-        // (.br/.gz) variant, and sets Content-Type/Cache-Control/Content-Encoding.
-        // The IF-252 CompressionLayer skips responses that already carry an
-        // encoding, so precompressed assets aren't re-compressed; it still covers
-        // API JSON and any identity-served (too small) asset.
+        // The dashboard is embedded in the binary (IF-255); `assets::serve` resolves
+        // the file, negotiates a .br/.gz variant, and sets the response headers.
         .fallback(axum::routing::get(assets::serve));
 
     middleware::apply_middleware(router, &state.config).with_state(state)

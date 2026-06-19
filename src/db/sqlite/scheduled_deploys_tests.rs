@@ -1,6 +1,5 @@
 //! IF-179: data-layer tests for scheduled deploys — the `scheduled`/`missed`
-//! status states, the due-query the scheduler polls, and the claim/reschedule
-//! transitions. Docker/Caddy-independent.
+//! states, the scheduler's due-query, and the claim/reschedule transitions.
 
 #[cfg(test)]
 mod scheduled_deploys {

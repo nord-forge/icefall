@@ -27,11 +27,8 @@ pub(super) async fn record_proxy_config_history(
     .execute(pool)
     .await?;
 
-    // Keep only the newest HISTORY_LIMIT rows for this app. Order by the
-    // implicit monotonic rowid, not created_at — millisecond timestamps tie when
-    // snapshots are taken in quick succession, and the random text id is no
-    // tiebreak. rowid reflects true insertion order so "undo" restores the
-    // genuinely-latest snapshot.
+    // Keep only the newest HISTORY_LIMIT rows for this app, ordered by rowid
+    // (true insertion order) since millisecond timestamps can tie.
     sqlx::query(
         "DELETE FROM proxy_config_history
          WHERE app_id = ?
