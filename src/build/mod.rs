@@ -3,8 +3,8 @@ pub mod orchestrator;
 
 // Re-export shared build types and modules from icefall-common
 pub use icefall_common::build::{
-    detect, dockerfile, AstroMode, BuildConfig, BuildResult, BuildStep, BuildStepStatus,
-    DetectError, DetectionResult, Framework, PackageManager,
+    compose_audit, detect, dockerfile, AstroMode, BuildConfig, BuildResult, BuildStep,
+    BuildStepStatus, DetectError, DetectionResult, Framework, PackageManager,
 };
 
 use thiserror::Error;
