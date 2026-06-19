@@ -34,6 +34,35 @@ export type App = {
   updated_at: string;
 }
 
+// Mirrors the JSON from POST /apps/detect (icefall-common build types).
+export type RepoDetection = {
+  detection: {
+    framework: string;
+    package_manager: string;
+    node_version: string;
+    build_command: string | null;
+    output_dir: string | null;
+    start_command: string | null;
+    detected_port: number;
+    astro_mode: string | null;
+  };
+  hints: {
+    dockerfiles: string[];
+    has_plain_dockerfile: boolean;
+    compose_files: string[];
+    is_monorepo: boolean;
+    workspaces: string[];
+  };
+  foreign_coupling: {
+    file: string;
+    coupling: {
+      external_networks: string[];
+      foreign_labels: Array<{ service: string; keys: string[] }>;
+      proxy_sidecars: string[];
+    };
+  } | null;
+};
+
 export type LbPolicy = 'round_robin' | 'least_conn' | 'ip_hash' | 'random';
 
 export type AppInstanceStatus =

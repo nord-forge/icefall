@@ -1,4 +1,4 @@
-import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings, PublicAccess, ServerOptimizations } from './types';
+import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, RepoDetection, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings, PublicAccess, ServerOptimizations } from './types';
 import type { UpdateInfo, UpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
@@ -105,7 +105,24 @@ export const api = {
     port?: number;
     deploy_mode?: string;
     server_id?: string;
+    build_command?: string;
+    output_dir?: string;
+    start_command?: string;
+    base_directory?: string;
   }) => request<{ data: App }>('/apps', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Resolve how a Git repo would deploy (framework, suggested build settings,
+  // repo-shape hints, foreign-platform coupling) before the app is created.
+  detectApp: (body: {
+    git_repo: string;
+    git_branch?: string;
+    github_installation_id?: string;
+    base_directory?: string;
+  }) =>
+    request<{ data: RepoDetection }>('/apps/detect', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   updateApp: (id: string, body: Partial<App>) =>
     request<{ data: App }>(`/apps/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
