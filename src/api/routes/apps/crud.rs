@@ -18,6 +18,28 @@ pub(super) struct ListAppsQuery {
 /// the compose CLI. An unset value defaults to `auto` server-side.
 const VALID_DEPLOY_MODES: &[&str] = &["auto", "compose", "raw-compose"];
 
+/// Build a build_config JSON string from the create request's overrides,
+/// omitting unset/blank fields. Returns None when no override was provided.
+fn build_config_json(body: &CreateAppRequest) -> Option<String> {
+    let mut obj = serde_json::Map::new();
+    let mut put_str = |key: &str, val: &Option<String>| {
+        if let Some(v) = val.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            obj.insert(key.to_string(), serde_json::Value::from(v));
+        }
+    };
+    put_str("build_command", &body.build_command);
+    put_str("output_dir", &body.output_dir);
+    put_str("start_command", &body.start_command);
+    if let Some(port) = body.port {
+        obj.insert("port".to_string(), serde_json::Value::from(port));
+    }
+    if obj.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(obj).to_string())
+    }
+}
+
 fn validate_deploy_mode(mode: Option<&str>) -> Result<(), ApiError> {
     match mode {
         None => Ok(()),
@@ -40,6 +62,12 @@ pub(super) struct CreateAppRequest {
     port: Option<u16>,
     deploy_mode: Option<String>,
     server_id: Option<String>,
+    // Build overrides from the create wizard (AC4). Persisted into build_config;
+    // deploy-time detection still fills any left unset.
+    build_command: Option<String>,
+    output_dir: Option<String>,
+    start_command: Option<String>,
+    base_directory: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -167,6 +195,14 @@ pub(super) async fn create_app(
         None
     };
 
+    // Capture build overrides before `body` is partially moved into NewApp.
+    let build_config = build_config_json(&body);
+    let base_directory = body
+        .base_directory
+        .as_ref()
+        .map(|d| d.trim().to_string())
+        .filter(|d| !d.is_empty());
+
     let app = state
         .db
         .create_app(&NewApp {
@@ -182,14 +218,14 @@ pub(super) async fn create_app(
         })
         .await?;
 
-    if let Some(port) = body.port {
-        let build_config = serde_json::json!({ "port": port }).to_string();
+    if build_config.is_some() || base_directory.is_some() {
         let _ = state
             .db
             .update_app(
                 &app.id,
                 &UpdateApp {
-                    build_config: Some(build_config),
+                    build_config,
+                    base_directory: base_directory.map(Some),
                     ..Default::default()
                 },
             )
