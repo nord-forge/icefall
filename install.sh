@@ -39,6 +39,17 @@ LOW_MEMORY_THRESHOLD_MB="${ICEFALL_LOW_MEMORY_THRESHOLD_MB:-1536}"
 RUNTIME_CHOICE="${ICEFALL_RUNTIME:-auto}"
 NONINTERACTIVE=""
 
+# When the script is run via `curl ... | bash`, stdin is the pipe (the script
+# text), not the user's keyboard — so `read` would hit EOF and every prompt
+# would fall through silently. We instead read from the controlling terminal
+# (/dev/tty) when one is attached. HAVE_TTY records whether that's possible;
+# if there's no tty (true headless / CI), we behave as if --yes was passed.
+HAVE_TTY=""
+if [ -e /dev/tty ] && { exec 3<>/dev/tty; } 2>/dev/null; then
+    HAVE_TTY="1"
+    exec 3>&-
+fi
+
 # Dashboard port and base domain. Env vars seed the defaults; flags override;
 # otherwise we prompt (interactive) or fall back to the default (--yes).
 # LISTEN_PORT_SET / BASE_DOMAIN_SET track whether the value came from a flag/env
@@ -95,9 +106,28 @@ ok()    { echo -e "${GREEN}[ok]${RESET} $*" | tee -a "$ICEFALL_LOG"; }
 
 trap 'error "Install failed at line $LINENO (command: $BASH_COMMAND)"' ERR
 
+# True when we can and should prompt the user: not forced non-interactive, and
+# a controlling terminal is attached (works under `curl | bash`, where stdin is
+# the pipe). Centralizes the check so every prompt site agrees.
+interactive() {
+    [ "$NONINTERACTIVE" != "--yes" ] && [ -n "$HAVE_TTY" ]
+}
+
+# Read a line from the controlling terminal (/dev/tty), not stdin — stdin is the
+# piped script under `curl | bash`. Usage: prompt VAR "Prompt text: "
+# Returns non-zero (and leaves VAR empty) if no tty is available.
+prompt() {
+    local __var="$1" __msg="$2" __reply=""
+    [ -n "$HAVE_TTY" ] || { printf -v "$__var" '%s' ""; return 1; }
+    # -e for the escape codes in the prompt; read from the terminal explicitly.
+    read -r -p "$(printf '%b' "$__msg")" __reply < /dev/tty || true
+    printf -v "$__var" '%s' "$__reply"
+}
+
 confirm() {
-    if [ "$NONINTERACTIVE" = "--yes" ]; then return 0; fi
-    read -rp "$1 [y/N] " response
+    if ! interactive; then return 0; fi
+    local response
+    prompt response "$1 [y/N] "
     [[ "$response" =~ ^[Yy]$ ]]
 }
 
@@ -312,13 +342,13 @@ ensure_podman() {
 # nature of Podman is the deciding factor, so the callout is louder there.
 print_runtime_tradeoffs() {
     echo ""
-    echo "  ${BOLD}Docker${RESET}"
+    echo -e "  ${BOLD}Docker${RESET}"
     echo "    + Widest compatibility — the default most images/tooling assume."
     echo "    + Mature, familiar; easiest to debug with existing docs."
     echo "    - Runs an always-on daemon (dockerd + containerd) that idles at"
     echo "      ~60-100 MB RAM — a real cost on a 1 GB server."
     echo ""
-    echo "  ${BOLD}Podman${RESET} (rootful — what this installer sets up)"
+    echo -e "  ${BOLD}Podman${RESET} (rootful — what this installer sets up)"
     echo "    + Daemonless — no always-on process; ~0 MB idle. The runtime cost"
     echo "      scales with running containers, not a fixed floor."
     echo "    + Drop-in Docker-compatible API; Icefall supports it fully."
@@ -331,7 +361,7 @@ print_runtime_tradeoffs() {
     if [ "$LOW_MEMORY" = "true" ]; then
         echo ""
         warn "This looks like a small server (${TOTAL_RAM_MB} MB RAM)."
-        echo "  ${BOLD}${YELLOW}Recommended: Podman${RESET} — its daemonless design frees ~80 MB"
+        echo -e "  ${BOLD}${YELLOW}Recommended: Podman${RESET} — its daemonless design frees ~80 MB"
         echo "  of RAM for your app containers. Pick Docker only if you specifically"
         echo "  need Docker-only tooling."
     fi
@@ -341,7 +371,7 @@ print_runtime_tradeoffs() {
 prompt_runtime_choice() {
     # Only relevant in interactive auto mode.
     [ "$RUNTIME_CHOICE" = "auto" ] || return 0
-    [ "$NONINTERACTIVE" = "--yes" ] && return 0
+    interactive || return 0
 
     local have_docker=false have_podman=false
     command -v docker &>/dev/null && have_docker=true
@@ -363,7 +393,7 @@ prompt_runtime_choice() {
             default_choice="2"; prompt_hint="[1/2/3, default 2=Podman]"
         fi
         local choice
-        read -rp "Use $prompt_hint: " choice
+        prompt choice "Use $prompt_hint: "
         choice="${choice:-$default_choice}"
         case "$choice" in
             1) RUNTIME_CHOICE="docker" ;;
@@ -454,7 +484,7 @@ install_container_runtime() {
     fi
 
     local choice
-    if [ "$NONINTERACTIVE" = "--yes" ]; then
+    if ! interactive; then
         choice="$default_choice"
         if [ "$LOW_MEMORY" = "true" ]; then
             info "Non-interactive small-server install — choosing Podman (lighter idle RAM)"
@@ -462,7 +492,7 @@ install_container_runtime() {
     else
         local hint="[1/2/3]"
         [ "$LOW_MEMORY" = "true" ] && hint="[1/2/3, default 2=Podman]"
-        read -rp "Install $hint: " choice
+        prompt choice "Install $hint: "
         choice="${choice:-$default_choice}"
     fi
 
@@ -764,9 +794,9 @@ detect_public_ip() {
 # respected and not re-prompted. Under --yes we keep the defaults silently.
 prompt_setup() {
     # Port: only ask when interactive and not already set by flag/env.
-    if [ -z "$LISTEN_PORT_SET" ] && [ "$NONINTERACTIVE" != "--yes" ]; then
+    if [ -z "$LISTEN_PORT_SET" ] && interactive; then
         local answer
-        read -rp "Dashboard port [${LISTEN_PORT}]: " answer
+        prompt answer "Dashboard port [${LISTEN_PORT}]: "
         answer="${answer:-$LISTEN_PORT}"
         case "$answer" in
             ''|*[!0-9]*) warn "Not a number — keeping ${LISTEN_PORT}" ;;
@@ -783,13 +813,13 @@ prompt_setup() {
 
     # Base domain: only ask when interactive and not already set. Empty answer
     # means "no domain" — the dashboard is reached by IP:port for now.
-    if [ -z "$BASE_DOMAIN_SET" ] && [ "$NONINTERACTIVE" != "--yes" ]; then
+    if [ -z "$BASE_DOMAIN_SET" ] && interactive; then
         echo ""
         info "A base domain lets Icefall serve the dashboard and your apps over"
         info "HTTPS (e.g. https://apps.example.com). Leave blank to skip for now"
         info "and reach the dashboard by IP:port — you can set it later."
         local answer
-        read -rp "Base domain (blank to skip): " answer
+        prompt answer "Base domain (blank to skip): "
         BASE_DOMAIN="$(echo "$answer" | tr -d '[:space:]')"
     fi
 }
@@ -807,7 +837,7 @@ guide_dns() {
     esac
 
     echo ""
-    echo "  ${BOLD}DNS records to create for ${BASE_DOMAIN}:${RESET}"
+    echo -e "  ${BOLD}DNS records to create for ${BASE_DOMAIN}:${RESET}"
     echo ""
     echo "    ${record_type}      ${BASE_DOMAIN}        ->  ${SERVER_IP}"
     echo "    ${record_type}      *.${BASE_DOMAIN}      ->  ${SERVER_IP}    (wildcard, for per-app subdomains)"
@@ -817,7 +847,7 @@ guide_dns() {
     echo "  80 and 443 are reachable from the internet."
     echo ""
 
-    if [ "$NONINTERACTIVE" = "--yes" ]; then
+    if ! interactive; then
         return 0
     fi
     if ! confirm "Wait now until ${BASE_DOMAIN} resolves to ${SERVER_IP}?"; then

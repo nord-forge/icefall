@@ -50,7 +50,11 @@ export default function OnboardingWizard() {
         data.current_step = 'completed';
       }
       setStatus(data);
-    } catch {}
+    } catch (e) {
+      // Don't swallow silently — a failed status refresh used to leave the
+      // wizard frozen on the previous step with no feedback.
+      setError(e instanceof ApiError ? e.message : 'Could not load setup status');
+    }
     setLoading(false);
   }
 
@@ -81,7 +85,10 @@ export default function OnboardingWizard() {
     const result = await apiPost('/onboarding/server-check');
     if (result) {
       setChecks(result.checks || []);
-      if (result.all_passed) setTimeout(fetchStatus, 500);
+      // The backend marks server_check complete and advances current_step when
+      // required checks pass. Re-read the (uncached) status to follow it — no
+      // setTimeout race, no dependency on the all_passed flag alone.
+      if (result.all_passed) await fetchStatus();
     }
   }
 
