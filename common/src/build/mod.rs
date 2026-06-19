@@ -1,3 +1,4 @@
+pub mod compose_audit;
 pub mod detect;
 pub mod dockerfile;
 
