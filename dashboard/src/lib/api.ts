@@ -12,11 +12,19 @@ class ApiError extends Error {
   }
 }
 
-export async function request<T>(path: string, options?: RequestInit): Promise<T> {
+export async function request<T>(
+  path: string,
+  options?: RequestInit,
+  opts?: { noCache?: boolean },
+): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase();
 
-  // Serve GET requests from cache when a fresh entry exists
-  if (method === 'GET') {
+  // Serve GET requests from cache when a fresh entry exists. `noCache` opts a
+  // path out entirely — required for live state-machine endpoints like
+  // /onboarding/status, whose value changes via *other* POSTs (server-check,
+  // domain, …) that don't invalidate the /onboarding/status key. Caching it
+  // would serve a stale step and freeze the wizard on the current screen.
+  if (method === 'GET' && !opts?.noCache) {
     const cached = getCached<T>(path);
     if (cached !== null) return cached;
   }
@@ -53,9 +61,9 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   const data: T = await res.json();
 
   // Cache GET responses; invalidate related caches on mutations
-  if (method === 'GET') {
+  if (method === 'GET' && !opts?.noCache) {
     setCache(path, data);
-  } else {
+  } else if (method !== 'GET') {
     // Invalidate the resource path (e.g. /apps/123 invalidates /apps*)
     const basePath = '/' + path.split('/').filter(Boolean).slice(0, 2).join('/');
     invalidatePrefix(basePath);
@@ -678,7 +686,9 @@ export const api = {
   // Onboarding
   getOnboardingStatus: () =>
     request<{ current_step: string; completed_steps: string[]; is_complete: boolean }>(
-      '/onboarding/status'
+      '/onboarding/status',
+      undefined,
+      { noCache: true },
     ),
 
   onboardingAction: <T = any>(path: string, body?: object) =>
