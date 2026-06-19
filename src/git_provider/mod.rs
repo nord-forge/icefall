@@ -133,13 +133,18 @@ pub async fn probe(
     let provider = detect(url);
     let status = match provider {
         Provider::GitHub => probe_github(http, owner, repo).await,
-        Provider::GitLab => probe_gitlab(http, "https://gitlab.com", owner, repo).await,
+        // gitlab.com is a known GitLab host — a 404 there is a real private/missing.
+        Provider::GitLab => probe_gitlab(http, "https://gitlab.com", owner, repo, false).await,
         Provider::Bitbucket => probe_bitbucket(http, owner, repo).await,
         Provider::GitLabSelfHosted => {
-            // Heuristic: only probe https + a safe public host.
+            // Heuristic: only probe https + a safe public host, and in STRICT mode
+            // — the host must actually answer like GitLab (200 + a project JSON)
+            // for us to trust the result. A bare 404 / HTML / non-JSON from an
+            // arbitrary host means "not a GitLab server", reported as Unknown so
+            // the UI shows neutral guidance instead of implying a private repo.
             match host_of(url) {
                 Some(host) if is_safe_public_host(&host) => {
-                    probe_gitlab(http, &format!("https://{host}"), owner, repo).await
+                    probe_gitlab(http, &format!("https://{host}"), owner, repo, true).await
                 }
                 _ => RepoStatus::Unknown,
             }
@@ -179,7 +184,18 @@ async fn probe_github(http: &reqwest::Client, owner: &str, repo: &str) -> RepoSt
     status_from(resp, "github").await
 }
 
-async fn probe_gitlab(http: &reqwest::Client, base: &str, owner: &str, repo: &str) -> RepoStatus {
+/// Probe a GitLab instance. `strict` is for the self-hosted heuristic against an
+/// unverified host: a 200 must parse as a real GitLab project (JSON object with
+/// a numeric `id`), and any non-confirming response → Unknown (so we never label
+/// a non-GitLab host's generic 404 as a private repo). Non-strict (gitlab.com)
+/// trusts the status code directly.
+async fn probe_gitlab(
+    http: &reqwest::Client,
+    base: &str,
+    owner: &str,
+    repo: &str,
+    strict: bool,
+) -> RepoStatus {
     // GitLab identifies a project by URL-encoded "owner/repo".
     let project = format!("{}/{}", owner, repo);
     let url = format!("{base}/api/v4/projects/{}", enc(&project));
@@ -188,7 +204,30 @@ async fn probe_gitlab(http: &reqwest::Client, base: &str, owner: &str, repo: &st
         .header("User-Agent", "Icefall-PaaS")
         .send()
         .await;
-    status_from(resp, "gitlab").await
+
+    if !strict {
+        return status_from(resp, "gitlab").await;
+    }
+
+    // Strict: only a genuine GitLab project JSON counts as public; anything else
+    // (incl. a generic 404 from a non-GitLab host) is Unknown.
+    match resp {
+        Ok(r) if r.status().as_u16() == 200 => match r.json::<serde_json::Value>().await {
+            Ok(v)
+                if v.get("id")
+                    .map(serde_json::Value::is_number)
+                    .unwrap_or(false) =>
+            {
+                RepoStatus::Public
+            }
+            _ => RepoStatus::Unknown,
+        },
+        Ok(_) => RepoStatus::Unknown,
+        Err(e) => {
+            tracing::warn!("self-hosted gitlab probe failed: {e}");
+            RepoStatus::Unknown
+        }
+    }
 }
 
 async fn probe_bitbucket(http: &reqwest::Client, owner: &str, repo: &str) -> RepoStatus {
