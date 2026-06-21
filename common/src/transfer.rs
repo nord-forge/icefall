@@ -1,16 +1,5 @@
 //! Binary chunk framing for transferring large payloads (e.g. Docker image
 //! tarballs) over the agent WebSocket without base64 overhead.
-//!
-//! A chunk frame is a raw binary WebSocket message laid out as:
-//!
-//! ```text
-//! [ magic(4) | transfer_id(16) | chunk_index(4) | total_chunks(4) | sha256(32) | payload(..) ]
-//! ```
-//!
-//! All integers are big-endian. `magic` identifies an Icefall chunk frame so
-//! it can be distinguished from any other binary traffic. `sha256` is the
-//! digest of `payload` only, letting the receiver verify and re-request a
-//! single corrupt chunk.
 
 /// Magic prefix identifying an Icefall image-transfer chunk frame: "IFCK".
 pub const CHUNK_MAGIC: [u8; 4] = *b"IFCK";

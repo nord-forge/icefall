@@ -25,12 +25,9 @@ export default function InvitationAcceptPage() {
         return;
       }
 
-      // Try accepting to get team info; the API may provide a preview endpoint
-      // For now, we show the acceptance page with the token
-      // If the token is valid, the accept/decline buttons will work
+      // Show the acceptance page with the token; accept/decline work if valid.
       try {
-        // Attempt a preview by accepting (some APIs return info)
-        // We'll just show the UI and let the user decide
+        // We'll just show the UI and let the user decide.
         setLoading(false);
       } catch {
         setError('This invitation may have expired or is invalid.');

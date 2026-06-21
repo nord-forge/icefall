@@ -74,9 +74,8 @@ impl MetricsStore {
     }
 }
 
-/// Live metrics are emitted every 10s. Persisting at that rate would write
-/// ~8.6k rows/container/day; once per minute (every 6th tick) is plenty of
-/// resolution for the 7-day right-sizing analysis (IF-191) at 1/6th the rows.
+/// Live metrics emit every 10s; persist only every 6th tick (~once a minute) to
+/// keep enough resolution for the 7-day right-sizing analysis (IF-191).
 const PERSIST_EVERY_N_TICKS: u64 = 6;
 /// Drop persisted samples older than this. The analysis window (7 days) is
 /// shorter, so this keeps a little extra history without unbounded growth.

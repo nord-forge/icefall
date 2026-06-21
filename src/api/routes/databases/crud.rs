@@ -78,9 +78,8 @@ pub(super) async fn create_database(
 
     let memory_bytes = (body.memory_mb.unwrap_or(type_config.default_memory_mb)) * 1024 * 1024;
 
-    // `expose_port` publishes the engine port on the runtime's default host IP
-    // (0.0.0.0 on Docker). Public access (IF-172) is the controlled alternative:
-    // a loopback-only publish fronted by Caddy's L4 proxy.
+    // `expose_port` publishes the engine port on the default host IP (0.0.0.0).
+    // Public access (IF-172) is the controlled loopback-only alternative via Caddy L4.
     let extra_ports = if body.expose_port.unwrap_or(false) {
         vec![PortMapping {
             container_port: type_config.port,
@@ -216,9 +215,8 @@ pub(super) async fn delete_database(
         .ok_or_else(|| ApiError::NotFound(format!("database {id}")))?;
     ctx.verify_team_access(&db.team_id, TeamRole::Admin)?;
 
-    // Tear down public access first so we never leave an orphan L4 route bound
-    // to a port whose container is gone. Best-effort: a missing route/port must
-    // not block the delete.
+    // Tear down public access first so we never orphan an L4 route to a gone
+    // container. Best-effort: a missing route/port must not block the delete.
     if let Ok(Some(public)) = state.db.get_public_port(&db.id).await {
         let _ = state.caddy.remove_tcp_proxy(public.port as u16).await;
         let _ = state.db.release_public_port(&db.id).await;

@@ -330,9 +330,7 @@ pub(super) fn cmd_for(db_type: &str, password: &str) -> Option<Vec<String>> {
 }
 
 /// Inputs needed to (re)build a managed database's container config. Kept in one
-/// place so `create_database` and the public-access toggle (which recreates the
-/// container to add a port binding) produce byte-for-byte identical specs apart
-/// from the deliberately-varied port list.
+/// place so create and the public-access toggle produce identical specs (bar ports).
 pub(super) struct DbContainerSpec<'a> {
     pub name: &'a str,
     pub db_type: &'a str,

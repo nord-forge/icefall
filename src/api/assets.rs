@@ -1,14 +1,5 @@
-//! Embedded dashboard serving (IF-255).
-//!
-//! The built dashboard (`dashboard/dist`, including the `.br`/`.gz` precompressed
-//! variants from IF-254) is compiled into the binary with `include_dir!`. There
-//! is no `dashboard/dist` to install, copy, or locate on the server — the binary
-//! IS the dashboard, so a binary swap (incl. self-update) updates the UI
-//! atomically.
-//!
-//! For local UI development, setting `ICEFALL_DASHBOARD_DIR` makes the server
-//! read from that directory on disk instead, so you can iterate without
-//! rebuilding the (slow, LTO) release binary.
+//! Embedded dashboard serving (IF-255). The built dashboard is compiled into the
+//! binary with `include_dir!`; `ICEFALL_DASHBOARD_DIR` reads from disk for local dev.
 
 use std::sync::LazyLock;
 
@@ -18,8 +9,7 @@ use axum::response::{IntoResponse, Response};
 use include_dir::{include_dir, Dir};
 
 /// The built dashboard, embedded at compile time. Empty if `dashboard/dist`
-/// didn't exist at build time (the build is expected to run `bun run build`
-/// first; the release/CI pipeline does).
+/// didn't exist at build time (run `bun run build` first).
 static DASHBOARD: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/dashboard/dist");
 
 /// Optional on-disk override for local development. When set, assets are served
@@ -47,11 +37,8 @@ pub fn csp_hashes_json() -> Option<String> {
         .and_then(|f| f.contents_utf8().map(str::to_string))
 }
 
-/// Map a request path to the dashboard file that should answer it:
-/// - exact file if it exists,
-/// - `<path>/index.html` for a directory,
-/// - the dynamic-route shell for known SPA prefixes,
-/// - the root `index.html` otherwise (SPA fallback).
+/// Map a request path to the dashboard file that should answer it: exact file,
+/// directory index, dynamic-route SPA shell, or root `index.html` fallback.
 fn resolve_logical_path(req_path: &str) -> String {
     // Strip the leading slash — embedded paths are relative.
     let trimmed = req_path.trim_start_matches('/');

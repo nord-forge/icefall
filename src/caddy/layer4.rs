@@ -1,18 +1,5 @@
-//! Layer 4 (raw TCP) proxying via the caddy-l4 module (IF-172).
-//!
-//! Public database access exposes a managed container on a host port so external
-//! tools (pgAdmin, TablePlus, DBeaver, …) can connect. Caddy's `layer4` app
-//! binds `0.0.0.0:{public_port}` and proxies the raw TCP stream to the
-//! container's host-published loopback port (`127.0.0.1:{host_port}`).
-//!
-//! Why loopback and not the container name: Caddy runs on the host (and, in
-//! multi-server setups, the agent's Caddy lives on the container's host), so it
-//! is not attached to each database's Docker network and cannot resolve a
-//! container by name. A host-published port works in every topology — single
-//! server, standalone database with no app network, and multi-server.
-//!
-//! Each public port becomes one `layer4` server, keyed `l4-{port}`, so add and
-//! remove are independent and never disturb another database's route.
+//! Layer 4 (raw TCP) proxying via the caddy-l4 module (IF-172). Binds
+//! `0.0.0.0:{public_port}` to a container's loopback host port; one server per port.
 
 use crate::caddy::{CaddyClient, CaddyError};
 
@@ -27,11 +14,7 @@ fn server_name(public_port: u16) -> String {
 
 impl CaddyClient {
     /// Whether this Caddy build includes the `layer4` app (caddy-l4 plugin).
-    /// Probed by validating a minimal config that references it — the same
-    /// approach as [`has_rate_limit_module`]. Builds without the plugin reject
-    /// the config with an "unknown"/"not registered" message.
-    ///
-    /// [`has_rate_limit_module`]: CaddyClient::has_rate_limit_module
+    /// Probed by validating a minimal config; builds without it reject as "unknown".
     pub async fn has_layer4_module(&self) -> bool {
         let probe = serde_json::json!({
             "apps": { "layer4": { "servers": { "_probe": {
@@ -52,15 +35,8 @@ impl CaddyClient {
         }
     }
 
-    /// Create (or replace) an L4 TCP route exposing `public_port` on all
-    /// interfaces and proxying to `127.0.0.1:{host_port}`.
-    ///
-    /// `allowed_ips` is an optional list of source IPs/CIDRs; when non-empty the
-    /// route only matches connections from those sources, so anything else is
-    /// dropped at the proxy before reaching the database. An empty list means
-    /// open to the internet (the UI shows the exposure warning in that case).
-    ///
-    /// Idempotent: writing the whole `l4-{port}` server replaces any prior one.
+    /// Create (or replace) an L4 TCP route exposing `public_port` -> `127.0.0.1:{host_port}`.
+    /// Non-empty `allowed_ips` restricts sources; empty = open. Idempotent per `l4-{port}`.
     pub async fn set_tcp_proxy(
         &self,
         public_port: u16,
@@ -86,9 +62,8 @@ impl CaddyClient {
             "routes": [route]
         });
 
-        // Ensure the layer4 app and its servers map exist before adding our
-        // server. PUT on the leaf server path 404s if `apps/layer4` is absent,
-        // so create the app shell first (idempotent — ignore "already exists").
+        // Ensure the layer4 app shell exists first; a PUT on the leaf server
+        // path 404s if `apps/layer4` is absent (idempotent).
         self.ensure_layer4_app().await?;
 
         let url = format!(
@@ -107,9 +82,7 @@ impl CaddyClient {
     }
 
     /// Remove the L4 route for `public_port`. Not-found is treated as success so
-    /// disabling public access (or deleting a database) is idempotent even if the
-    /// route was already gone — e.g. after a Caddy restart that lost transient L4
-    /// state.
+    /// disabling/deleting is idempotent even if the route was already gone.
     pub async fn remove_tcp_proxy(&self, public_port: u16) -> Result<(), CaddyError> {
         let url = format!(
             "{}/{}/servers/{}",
@@ -126,10 +99,8 @@ impl CaddyClient {
         Err(CaddyError::ApiError { status, body })
     }
 
-    /// Create the `apps/layer4` shell (`{ "servers": {} }`) if it does not yet
-    /// exist, so a later PUT on a specific server path succeeds. POST to the app
-    /// path on a fresh Caddy creates it; if it already exists Caddy returns an
-    /// error we deliberately ignore.
+    /// Create the `apps/layer4` shell (`{ "servers": {} }`) if absent, so a later
+    /// PUT on a specific server path succeeds. Idempotent.
     async fn ensure_layer4_app(&self) -> Result<(), CaddyError> {
         // GET first — cheap, and avoids a noisy error path on the common case
         // where the app already exists.

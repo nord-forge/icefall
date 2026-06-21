@@ -44,9 +44,8 @@ pub enum VolumeEntry {
     },
 }
 
-/// Parse the volumes JSON string from the app model into typed entries.
-/// Falls back to treating entries without a `type` field as local volumes
-/// for backward compatibility.
+/// Parse the volumes JSON string into typed entries. Untyped entries fall back
+/// to local volumes for backward compatibility.
 pub fn parse_volume_entries(raw: Option<&str>) -> Vec<VolumeEntry> {
     let Some(raw) = raw else { return Vec::new() };
     if raw.is_empty() {
@@ -135,9 +134,8 @@ fn sidecar_container_name(app_name: &str, index: usize) -> String {
     format!("icefall-{app_name}-s3-sidecar-{index}")
 }
 
-/// Create an rclone sidecar container that FUSE-mounts an S3 bucket into a
-/// shared Docker volume (the app container mounts the same volume at
-/// `config.target`). Returns the started sidecar's container ID.
+/// Create an rclone sidecar that FUSE-mounts an S3 bucket into a shared Docker
+/// volume (the app mounts the same volume). Returns the sidecar's container ID.
 pub async fn create_s3_sidecar(
     docker: &DockerClient,
     app_id: &str,

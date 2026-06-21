@@ -324,9 +324,8 @@ impl DeployManager {
 
         match &remote {
             Some(exec) => {
-                // Remote Caddy routing: two modes
-                // - Wildcard (*.base_domain): CP Caddy proxies to worker_host:host_port
-                // - Direct (custom domain): worker Caddy handles TLS + routing
+                // Remote Caddy routing: wildcard (*.base_domain) proxies via CP
+                // Caddy; direct (custom domain) lets worker Caddy handle TLS + routing.
                 let host_port = self
                     .get_remote_host_port(exec, &container_id, detected_port)
                     .await?;

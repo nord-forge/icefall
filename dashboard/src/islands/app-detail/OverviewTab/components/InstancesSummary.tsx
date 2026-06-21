@@ -10,8 +10,7 @@ type Props = {
 };
 
 /**
- * Compact instance health summary for the app overview. Renders nothing for
- * single-instance apps (desiredInstances <= 1).
+ * Compact instance health summary; renders nothing for single-instance apps.
  */
 export default function InstancesSummary({ appId, desiredInstances }: Props) {
   const [instances, setInstances] = useState<AppInstance[] | null>(null);

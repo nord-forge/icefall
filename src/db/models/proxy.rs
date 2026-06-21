@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A snapshot of an app's full Caddy proxy config, captured before any change so
-/// a broken edit can be rolled back. Kept to the last 10 per app (see
-/// `record_proxy_config_history`).
+/// a broken edit can be rolled back. Kept to the last 10 per app.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ProxyConfigHistory {
     pub id: String,

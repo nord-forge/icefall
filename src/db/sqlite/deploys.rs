@@ -41,8 +41,7 @@ pub(super) async fn create_deploy(
 }
 
 /// Scheduled deploys whose trigger time has arrived (`scheduled_at <= now`),
-/// oldest first. The scheduler decides per-deploy whether to fire or mark it
-/// missed (IF-179).
+/// oldest first. The scheduler decides whether to fire or mark missed (IF-179).
 pub(super) async fn list_due_scheduled_deploys(pool: &SqlitePool) -> Result<Vec<Deploy>, DbError> {
     let now = now_iso8601();
     let deploys = sqlx::query_as::<_, Deploy>(
@@ -54,9 +53,8 @@ pub(super) async fn list_due_scheduled_deploys(pool: &SqlitePool) -> Result<Vec<
     Ok(deploys)
 }
 
-/// Move a scheduled deploy into the active pipeline: 'pending' with a start
-/// time stamped. Returns whether a row actually transitioned, so concurrent
-/// scheduler ticks don't double-fire the same deploy.
+/// Move a scheduled deploy into the active pipeline. Returns whether a row
+/// transitioned, so concurrent scheduler ticks don't double-fire it.
 pub(super) async fn start_scheduled_deploy(
     pool: &SqlitePool,
     deploy_id: &str,

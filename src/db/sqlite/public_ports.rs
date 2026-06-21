@@ -43,12 +43,7 @@ pub(super) async fn allocate_public_port(
 }
 
 /// Allocate the lowest free port in `[range_start, range_end]` for a resource.
-///
-/// The allocator picks the lowest unused port and inserts it; the `UNIQUE(port)`
-/// constraint is the source of truth. If two requests race onto the same port,
-/// the loser hits the unique violation and retries with the next free port, so
-/// concurrent enables never double-allocate. Returns [`DbError::Conflict`] only
-/// when the entire range is exhausted.
+/// `UNIQUE(port)` is the source of truth; racers retry the next free port.
 pub(super) async fn allocate_free_public_port(
     pool: &SqlitePool,
     resource_type: &str,
@@ -64,8 +59,7 @@ pub(super) async fn allocate_free_public_port(
     }
 
     // Bound the retry loop by the range size: each iteration claims a distinct
-    // port, so after at most (range_end - range_start + 1) attempts every port
-    // has been tried and the range is genuinely full.
+    // port, so after that many attempts the range is genuinely full.
     let max_attempts = (range_end - range_start + 1) as usize;
     for _ in 0..max_attempts {
         // Lowest port in range not already present in public_ports.

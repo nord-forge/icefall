@@ -2,8 +2,7 @@ import Button from '@islands/shared/Button/Button';
 import styles from './token-ability-picker.module.css';
 
 // IF-168: granular API token ability scoping. Single source of truth for the
-// ability list, presets, picker, and badges — used by both the profile and
-// admin token UIs so they never drift apart.
+// ability list, presets, picker, and badges.
 
 // Keep in sync with ALL_ABILITIES in src/api/abilities.rs.
 export const ALL_ABILITIES = [

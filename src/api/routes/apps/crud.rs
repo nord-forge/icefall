@@ -13,9 +13,8 @@ pub(super) struct ListAppsQuery {
     project_id: Option<String>,
 }
 
-/// Recognised app deploy modes. `auto` lets Icefall pick (managed); `compose`
-/// is the managed per-service pipeline; `raw-compose` (IF-173) hands the file to
-/// the compose CLI. An unset value defaults to `auto` server-side.
+/// Recognised app deploy modes: `auto` (managed pick), `compose` (managed
+/// per-service), `raw-compose` (IF-173, file to CLI). Unset defaults to `auto`.
 const VALID_DEPLOY_MODES: &[&str] = &["auto", "compose", "raw-compose"];
 
 /// Build a build_config JSON string from the create request's overrides,
@@ -154,10 +153,8 @@ pub(super) async fn create_app(
     validate_deploy_mode(body.deploy_mode.as_deref())?;
 
     if let Some(ref yaml) = body.compose_content {
-        // Raw Compose (IF-173) hands the file straight to the compose CLI, so we
-        // must NOT reject files that use features Icefall's managed parser can't
-        // model (build, profiles, extends). Only sanity-check that it's YAML;
-        // the CLI surfaces any real schema errors at deploy time.
+        // Raw Compose (IF-173) hands the file straight to the compose CLI, so
+        // only sanity-check that it's YAML; the CLI surfaces schema errors later.
         let is_raw = body.deploy_mode.as_deref() == Some("raw-compose");
         if is_raw {
             if serde_yaml::from_str::<serde_yaml::Value>(yaml).is_err() {
@@ -331,9 +328,8 @@ pub(super) async fn update_app(
         )
         .await?;
 
-    // IF-174: once an app is linked to a GitHub installation and a repo, create
-    // its repo webhook automatically (no manual URL/secret copying). Best-effort
-    // and only when not already provisioned — never fail the update over it.
+    // IF-174: once an app has a GitHub installation and repo, auto-create its
+    // webhook. Best-effort, only when not already provisioned — never fail over it.
     if app.github_installation_id.is_some()
         && app.git_repo.is_some()
         && app.webhook_secret.is_none()
@@ -364,9 +360,8 @@ pub(super) async fn delete_app(
         .ok_or_else(|| ApiError::NotFound(format!("App '{id}' not found")))?;
     ctx.verify_team_access(&app.team_id, TeamRole::Admin)?;
 
-    // Raw compose stacks aren't labelled `icefall.app`, so label-based container
-    // cleanup won't catch them. Tear the stack down via `compose down` first
-    // (best-effort) so deleting the app doesn't orphan its containers/networks.
+    // Raw compose stacks aren't labelled `icefall.app`, so tear them down via
+    // `compose down` first (best-effort) to avoid orphaning containers/networks.
     if app.deploy_mode == "raw-compose" {
         let deployer = crate::deploy::raw_compose::RawComposeDeployer::new(
             state.db.clone(),

@@ -20,10 +20,7 @@ export async function request<T>(
   const method = (options?.method ?? 'GET').toUpperCase();
 
   // Serve GET requests from cache when a fresh entry exists. `noCache` opts a
-  // path out entirely — required for live state-machine endpoints like
-  // /onboarding/status, whose value changes via *other* POSTs (server-check,
-  // domain, …) that don't invalidate the /onboarding/status key. Caching it
-  // would serve a stale step and freeze the wizard on the current screen.
+  // path out entirely — required for live state-machine endpoints.
   if (method === 'GET' && !opts?.noCache) {
     const cached = getCached<T>(path);
     if (cached !== null) return cached;
@@ -31,8 +28,7 @@ export async function request<T>(
 
   const headers: Record<string, string> = {
     // CSRF defence: the server requires this header on mutating requests.
-    // A cross-site form/image cannot set custom headers; only same-origin
-    // fetch/XHR can. Sent on every request for simplicity.
+    // A cross-site form/image cannot set custom headers; only same-origin can.
     'X-Icefall-Request': '1',
   };
   if (options?.body) {

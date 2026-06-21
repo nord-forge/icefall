@@ -20,10 +20,8 @@ pub(super) struct CreateDeployRequest {
     pub scheduled_at: Option<String>,
 }
 
-/// Validate a caller-supplied schedule time: must parse as RFC 3339 and be in
-/// the future. Returns the normalized UTC string in the *same* format as
-/// `now_iso8601()` (`…Z`, millisecond precision) — the scheduler's due query
-/// compares `scheduled_at <= now` lexically, so the formats must match.
+/// Validate a caller-supplied schedule time (RFC 3339, in the future). Returns the
+/// normalized UTC string matching `now_iso8601()` so lexical comparison stays correct.
 fn validate_scheduled_at(raw: &str) -> Result<String, ApiError> {
     let parsed = chrono::DateTime::parse_from_rfc3339(raw).map_err(|_| {
         ApiError::BadRequest("scheduled_at must be an ISO 8601 / RFC 3339 timestamp".into())
@@ -112,12 +110,8 @@ pub(super) async fn create_deploy(
     Ok(Json(serde_json::json!({ "data": deploy })))
 }
 
-/// Spawn the appropriate deploy pipeline for an already-created deploy record.
-///
-/// This is the shared trigger used by both the immediate deploy route and the
-/// scheduled-deploy scheduler (IF-179): given a `pending` deploy, it picks the
-/// compose / image / native / auto path from the app config and runs it in a
-/// background task. Failures are recorded on the deploy row, never propagated.
+/// Spawn the deploy pipeline for an already-created deploy record (IF-179). Picks
+/// the compose/image/native/auto path and runs it in a background task.
 pub(crate) async fn trigger_deploy(
     state: AppState,
     app: App,
@@ -125,9 +119,8 @@ pub(crate) async fn trigger_deploy(
     deploy_id: String,
     no_cache: bool,
 ) {
-    // IF-174: report GitHub commit status across all deploy paths (manual API,
-    // scheduled, native/image/compose). The watcher tracks the deploy's terminal
-    // DB state, so it doesn't need to hook each spawn branch. Best-effort.
+    // IF-174: report GitHub commit status across all deploy paths. The watcher
+    // tracks the deploy's terminal DB state, so it needn't hook each branch.
     if let Ok(Some(d)) = state.db.get_deploy(&deploy_id).await {
         crate::github::status::watch_deploy(&state, &app, &deploy_id, d.git_sha.as_deref());
     }

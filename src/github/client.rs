@@ -356,10 +356,8 @@ impl GitHubClient {
         Ok(())
     }
 
-    /// Find the open PR number for a branch, if any. Filters the pulls list by
-    /// `head` (`owner:branch`), so it matches same-repo PRs only — fork PRs have
-    /// a different head owner. Prefer `find_pr_for_commit` when a SHA is known;
-    /// this is the fallback for cases with no SHA (e.g. branch-delete teardown).
+    /// Find the open PR number for a branch (same-repo only; fork PRs differ in
+    /// head owner). Fallback for when no SHA is known; else `find_pr_for_commit`.
     pub async fn find_pr_for_branch(
         &self,
         token: &str,
@@ -393,9 +391,8 @@ impl GitHubClient {
         Ok(pulls.first().map(|p| p.number))
     }
 
-    /// Find the open PR associated with a commit SHA, if any. Unlike
-    /// `find_pr_for_branch`, this matches PRs opened from forks too (it keys on
-    /// the commit, not on `head-owner:branch`). Prefer this when a SHA is known.
+    /// Find the open PR associated with a commit SHA, if any. Matches fork PRs
+    /// too (keys on the commit). Prefer this when a SHA is known.
     pub async fn find_pr_for_commit(
         &self,
         token: &str,

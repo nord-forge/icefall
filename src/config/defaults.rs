@@ -114,16 +114,14 @@ pub fn image_transfer_chunk_bytes() -> usize {
     8 * 1024 * 1024
 }
 
-/// Low-memory mode off by default. When enabled it shrinks the SQLite page
-/// cache and a few in-memory buffers so the daemon fits comfortably on a
-/// 1 vCPU / 1 GB server.
+/// Low-memory mode off by default. When enabled it shrinks the SQLite page cache
+/// and in-memory buffers to fit a 1 vCPU / 1 GB server.
 pub fn low_memory() -> bool {
     false
 }
 
-/// SQLite page-cache size in KiB (mapped to a negative `cache_size` pragma).
-/// `None` means "derive from `low_memory`": ~62 MB normally, ~16 MB in
-/// low-memory mode. An explicit value always wins.
+/// SQLite page-cache size in KiB (negative `cache_size` pragma). `None` derives
+/// from `low_memory` (~62 MB / ~16 MB); an explicit value wins.
 pub fn sqlite_cache_kib() -> Option<u32> {
     None
 }

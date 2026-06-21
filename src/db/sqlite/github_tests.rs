@@ -1,6 +1,5 @@
-//! IF-174: data-layer tests for GitHub App integration — installation token
-//! storage/encryption, the refresh-due query, PR comment upsert, and the
-//! app↔installation link. Docker/network-independent.
+//! IF-174: data-layer tests for GitHub App integration — token storage, the
+//! refresh-due query, PR comment upsert, and the app↔installation link.
 
 #[cfg(test)]
 mod github {

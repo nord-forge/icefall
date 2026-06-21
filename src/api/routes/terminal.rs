@@ -73,9 +73,8 @@ async fn terminal_ws(
     }))
 }
 
-/// Open a terminal into a managed database container (IF-165). Reuses the same
-/// exec/WebSocket machinery as the app terminal, but resolves the database
-/// container and launches the engine's native client instead of a plain shell.
+/// Open a terminal into a managed database container (IF-165). Reuses the app
+/// terminal's exec/WebSocket machinery but launches the engine's native client.
 async fn database_terminal_ws(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -147,8 +146,7 @@ async fn database_terminal_ws(
 }
 
 /// The native client command for each engine, with credentials injected from the
-/// stored admin account. Falls back to a plain shell for engines without a known
-/// client. The password is passed via the CLI/env the engine expects.
+/// stored admin account. Falls back to a plain shell for engines without a client.
 fn db_terminal_command(db_type: &str, creds: &serde_json::Value) -> Vec<String> {
     let user = creds["user"].as_str().unwrap_or("icefall");
     let password = creds["password"].as_str().unwrap_or_default();

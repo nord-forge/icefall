@@ -33,10 +33,7 @@ pub struct PortMapping {
     pub host_port: Option<u16>,
     pub protocol: String,
     /// Host interface to bind the published port to. `None` uses the runtime
-    /// default (`0.0.0.0` on Docker, loopback on rootless Podman). Set to
-    /// `127.0.0.1` to publish on loopback only — used by public-port access
-    /// (IF-172) so the database is reachable solely through Caddy's L4 proxy
-    /// (which enforces the IP whitelist) and never directly from the internet.
+    /// default; `127.0.0.1` publishes on loopback only (public-port access, IF-172).
     #[serde(default)]
     pub host_ip: Option<String>,
 }
@@ -83,10 +80,8 @@ impl DockerClient {
             port_bindings.insert(
                 key,
                 Some(vec![PortBinding {
-                    // A per-mapping host_ip override wins (public-port access
-                    // forces 127.0.0.1 so only Caddy's L4 proxy reaches the DB).
-                    // Otherwise: Docker / rootful Podman bind 0.0.0.0; rootless
-                    // Podman uses loopback (Caddy is co-located and proxies to it).
+                    // A per-mapping host_ip override wins; otherwise the runtime
+                    // default applies (0.0.0.0, or loopback for rootless Podman).
                     host_ip: Some(
                         port.host_ip
                             .clone()

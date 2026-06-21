@@ -1,6 +1,5 @@
-//! Runtime compatibility tests. Layer 1 is pure `RuntimeQuirks` detection logic
-//! (always runs); layer 2 exercises a live runtime and skips (not fails) when no
-//! Docker/Podman socket is reachable. The full runtime matrix runs in CI.
+//! Runtime compatibility tests. Layer 1 is pure `RuntimeQuirks` detection (always
+//! runs); layer 2 exercises a live runtime and skips when no socket is reachable.
 
 #[cfg(test)]
 mod runtime_compat {
@@ -89,8 +88,7 @@ mod runtime_compat {
         let q = client.quirks();
 
         // host_bind_ip and min_unprivileged_port must agree with rootless-ness.
-        // (cgroup-limit support varies by host delegation, so it's not asserted
-        // here — it's covered deterministically by the unit tests.)
+        // (cgroup-limit support varies by host, so it's covered by unit tests.)
         if q.rootless {
             assert_eq!(q.host_bind_ip, "127.0.0.1");
             assert_eq!(q.min_unprivileged_port, 1024);

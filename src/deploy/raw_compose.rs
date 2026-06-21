@@ -1,17 +1,5 @@
-//! Raw Compose mode (IF-173).
-//!
-//! Unlike the managed [`ComposeDeployer`](crate::deploy::compose::ComposeDeployer),
-//! which parses the compose file and recreates each service as an individual
-//! container, raw mode hands the file straight to the host's `docker compose`
-//! (or `podman compose`) CLI with no parsing or rewriting. Advanced users get
-//! the full Compose feature set (build args, profiles, extends, custom
-//! networking); Icefall still owns domain routing, deploy history, log capture,
-//! and start/stop/restart — but not networking, health endpoints, or blue-green.
-//!
-//! Containers are namespaced under the Compose project `icefall-{app-slug}`, so
-//! lifecycle commands (`stop`/`restart`/`down`) target the same project the
-//! deploy created. The compose file and a generated `.env` live in a stable
-//! per-app directory under the data root so those later commands find them.
+//! Raw Compose mode (IF-173): hands the compose file straight to the host's
+//! `docker compose` / `podman compose` CLI, namespaced under `icefall-{app-slug}`.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -71,9 +59,7 @@ impl RawComposeDeployer {
     }
 
     /// Verify the compose CLI is installed before attempting a deploy. Returns a
-    /// user-facing error if `{runtime} compose version` can't be run, so the
-    /// deploy log explains the missing dependency rather than a cryptic spawn
-    /// failure mid-run.
+    /// user-facing error if `{runtime} compose version` can't be run.
     async fn preflight(&self) -> Result<(), DeployError> {
         let (program, base) = self.compose_argv();
         let output = Command::new(&program)
@@ -95,8 +81,7 @@ impl RawComposeDeployer {
     }
 
     /// Run a raw `compose up -d`, streaming output into the deploy log and
-    /// recording the final status. The compose YAML is written verbatim — no
-    /// interpolation or rewriting. App env vars are passed via `--env-file`.
+    /// recording the final status. Env vars are passed via `--env-file`.
     pub async fn deploy(
         &self,
         app: &App,
@@ -182,8 +167,7 @@ impl RawComposeDeployer {
         self.lifecycle(app, &["down"]).await
     }
 
-    /// Whether the stack's containers are running, by Compose project name.
-    /// Raw mode can't probe individual health endpoints, so "running" means
+    /// Whether the stack's containers are running, by Compose project name:
     /// `compose ps` reports at least one service in the running state.
     pub async fn is_running(&self, app: &App) -> bool {
         let project = Self::project_name(app);
@@ -298,9 +282,8 @@ fn emit_log(bus: &EventBus, deploy_id: &str, line: &str) {
     );
 }
 
-/// Render an env map as `KEY=value` lines for `--env-file`. Compose reads this
-/// file literally — values are not shell-evaluated, so no quoting is needed, but
-/// newlines in a value would corrupt the file, so they are stripped.
+/// Render an env map as `KEY=value` lines for `--env-file`. Values are read
+/// literally (no quoting); newlines in a value are stripped to avoid corruption.
 fn render_env_file(env_vars: &HashMap<String, String>) -> String {
     let mut keys: Vec<&String> = env_vars.keys().collect();
     keys.sort(); // Deterministic output so the file (and its drift) is stable.
@@ -315,9 +298,8 @@ fn render_env_file(env_vars: &HashMap<String, String>) -> String {
     out
 }
 
-/// Lowercase, hyphenated slug of an app name for project/dir naming. Mirrors the
-/// `icefall-{name}` convention used elsewhere but sanitizes to compose-safe
-/// characters.
+/// Lowercase, hyphenated slug of an app name for project/dir naming, sanitized
+/// to compose-safe characters.
 fn slug(name: &str) -> String {
     name.trim()
         .to_lowercase()

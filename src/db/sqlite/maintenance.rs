@@ -91,9 +91,8 @@ pub(super) async fn prune_server_metrics_history(
 // --- Backup (VACUUM) ---
 
 pub(super) async fn vacuum_into(pool: &SqlitePool, path: &str) -> Result<(), DbError> {
-    // VACUUM INTO interpolates a path into SQL. The target file must not yet
-    // exist, so canonicalize its parent dir and require the resolved path to
-    // stay inside it — defence in depth if `path` ever takes user input.
+    // VACUUM INTO interpolates a path into SQL. Canonicalize the parent dir and
+    // require the resolved path to stay inside it — defence in depth.
     let target = std::path::Path::new(path);
     let parent = target
         .parent()

@@ -127,9 +127,8 @@ impl RemoteExecutor {
 
     // --- Image transfer ---
 
-    /// Transfer a built image to the remote server and load it. The tar is
-    /// gzip-compressed, split into chunks, and streamed as binary WS frames; each
-    /// chunk carries a verified SHA-256 and is retried individually on failure.
+    /// Transfer a built image to the remote server and load it: gzip-compressed,
+    /// chunked over binary WS frames, each chunk SHA-256-verified and retried.
     pub async fn load_image(
         &self,
         image_tar: &[u8],

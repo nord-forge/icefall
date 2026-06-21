@@ -38,9 +38,8 @@ pub(super) async fn list_branches(
 const NO_DEPLOY_DAYS: i64 = 90;
 const NO_REQUEST_DAYS: i64 = 30;
 
-/// IF-189: list apps with no recent activity (no deploy in 90d and/or no
-/// inbound request in 30d), so the dashboard can surface an "inactive apps"
-/// badge. Apps flagged `exempt_from_inactivity` are skipped.
+/// IF-189: list apps with no recent activity (no deploy in 90d and/or no inbound
+/// request in 30d). Apps flagged `exempt_from_inactivity` are skipped.
 pub(super) async fn list_inactive(
     State(state): State<AppState>,
     ctx: TeamCtx,

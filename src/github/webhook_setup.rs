@@ -1,6 +1,5 @@
-//! Automatic webhook provisioning (IF-174): when an app is connected to a repo
-//! through a GitHub App installation, create the repo webhook via the API instead
-//! of asking the user to copy a URL and secret by hand.
+//! Automatic webhook provisioning (IF-174): create the repo webhook via the API
+//! through a GitHub App installation, rather than manual URL/secret entry.
 
 use crate::api::AppState;
 use crate::db::models::{new_id, App};
@@ -22,10 +21,8 @@ fn instance_base_url(state: &AppState) -> String {
     }
 }
 
-/// Create the GitHub webhook for `app` via its linked installation. Generates and
-/// stores a fresh webhook secret on the app. Best-effort: returns an error string
-/// the caller can log/surface, but callers treat failure as non-fatal (the app is
-/// still created; the user can retry).
+/// Create the GitHub webhook for `app` via its linked installation, storing a
+/// fresh secret. Best-effort: callers treat failure as non-fatal.
 pub async fn provision_webhook(state: &AppState, app: &App) -> Result<i64, String> {
     let installation_id = app
         .github_installation_id
@@ -40,9 +37,8 @@ pub async fn provision_webhook(state: &AppState, app: &App) -> Result<i64, Strin
     let (owner, repo) = crate::github::owner_repo(git_repo)
         .ok_or_else(|| format!("cannot parse repo from {git_repo}"))?;
 
-    // GitHub must be able to reach the webhook target. Without a public
-    // base_domain the URL is localhost — unreachable — so skip rather than
-    // create a webhook that can never deliver (S3).
+    // GitHub must reach the webhook target. Without a public base_domain the URL
+    // is localhost (unreachable), so skip rather than create a dead webhook (S3).
     if state.config.base_domain.is_none() {
         return Err(
             "no base_domain configured; GitHub cannot reach a localhost webhook URL".to_string(),

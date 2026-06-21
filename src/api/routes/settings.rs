@@ -267,9 +267,8 @@ async fn update_proxy_settings(
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
 
-    // Validate the port range up front: a non-positive bound or an inverted
-    // range would let the allocator hand out unusable ports. Use the stored
-    // value for any side the caller didn't send so we validate the resulting pair.
+    // Validate the port range up front: a non-positive bound or an inverted range
+    // would let the allocator hand out unusable ports. Missing sides use stored values.
     if body.public_port_range_start.is_some() || body.public_port_range_end.is_some() {
         let existing = state.db.get_proxy_settings().await?;
         let start = body

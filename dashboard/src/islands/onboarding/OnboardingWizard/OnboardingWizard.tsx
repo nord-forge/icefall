@@ -86,8 +86,7 @@ export default function OnboardingWizard() {
     if (result) {
       setChecks(result.checks || []);
       // The backend marks server_check complete and advances current_step when
-      // required checks pass. Re-read the (uncached) status to follow it — no
-      // setTimeout race, no dependency on the all_passed flag alone.
+      // required checks pass. Re-read the (uncached) status to follow it.
       if (result.all_passed) await fetchStatus();
     }
   }

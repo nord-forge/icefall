@@ -1,9 +1,5 @@
-//! API token ability scoping (IF-168).
-//!
-//! Tokens may carry a JSON array of granted ability scopes. A `None`/null
-//! abilities value means full access (the token inherits the user's
-//! permissions). When a token IS scoped, every request it makes is checked
-//! against the ability required by the route it targets.
+//! API token ability scoping (IF-168). Tokens may carry granted scopes;
+//! a null abilities value means full access. Scoped tokens are checked per route.
 
 use axum::http::Method;
 
@@ -35,10 +31,7 @@ fn is_write(method: &Method) -> bool {
 }
 
 /// Determine the ability required to access `path` with `method`. Returns
-/// `None` for routes that are not ability-gated (e.g. the caller's own profile,
-/// auth, health) — those remain accessible to any authenticated token.
-///
-/// `path` is the full request path, e.g. `/api/v1/apps/abc/deploy`.
+/// `None` for routes that are not ability-gated (auth, health, own profile).
 pub fn required_ability(method: &Method, path: &str) -> Option<String> {
     let rest = path
         .strip_prefix("/api/v1/")
@@ -47,9 +40,8 @@ pub fn required_ability(method: &Method, path: &str) -> Option<String> {
     let resource = *segments.first()?;
     let write = is_write(method);
 
-    // Deploy/rollback actions on apps need the dedicated deploy ability. These
-    // are always writes (POST), so a read-only token can still GET deploy
-    // history under apps:read.
+    // Deploy/rollback actions need the dedicated deploy ability. Always writes,
+    // so a read-only token can still GET deploy history under apps:read.
     let is_deploy_action = segments.iter().any(|s| {
         matches!(
             *s,

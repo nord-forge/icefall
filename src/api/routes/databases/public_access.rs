@@ -1,18 +1,5 @@
-//! Public TCP access for managed databases (IF-172).
-//!
-//! Enabling public access exposes a database on an allocated host port so
-//! external tools (pgAdmin, TablePlus, DBeaver, …) can connect. The flow:
-//!
-//! 1. Allocate a port `P` from the admin-configured range (`proxy_settings`).
-//! 2. Recreate the container so it publishes its engine port to a loopback host
-//!    port `127.0.0.1:<auto>` (Docker assigns it). Loopback-only means the
-//!    database is never reachable directly from the internet — only via Caddy.
-//! 3. Add a Caddy L4 route binding `0.0.0.0:P` → `127.0.0.1:<auto>`, applying the
-//!    optional IP whitelist as a `remote_ip` matcher.
-//!
-//! Disabling reverses it: remove the L4 route, release `P`, recreate the
-//! container without the loopback publish. The data volume is reused throughout,
-//! so a toggle never loses data — only ~seconds of downtime per recreate.
+//! Public TCP access for managed databases (IF-172). Allocates a port, recreates
+//! the container with a loopback publish, and adds a Caddy L4 route fronting it.
 
 use axum::extract::{Path, State};
 use axum::Json;
@@ -69,9 +56,7 @@ fn parse_ip_whitelist(raw: Option<&str>) -> Option<String> {
 }
 
 /// Build the external connection string a user pastes into their DB tool. Reuses
-/// the engine's connection-string template but swaps host/port for the public
-/// `host:port`. Falls back to a bare `host:port` for engines without a template
-/// match.
+/// the engine's template but swaps host/port for the public `host:port`.
 fn public_connection_string(
     db: &ManagedDatabase,
     host: &str,
@@ -129,8 +114,7 @@ async fn assigned_loopback_port(
 }
 
 /// Recreate the database container, optionally publishing its engine port to a
-/// loopback host port. Reuses the data volume so no data is lost. `with_public`
-/// = true adds the `127.0.0.1:<auto>` mapping; false recreates without it.
+/// loopback host port. Reuses the data volume so no data is lost.
 async fn recreate_db_container(
     state: &AppState,
     db: &ManagedDatabase,
@@ -259,9 +243,8 @@ pub(super) async fn enable_public_access(
         ApiError::BadRequest(format!("unsupported database type '{}'", db.db_type))
     })?;
 
-    // Reject up front if this Caddy build can't do L4 — allocating a port and
-    // recreating the container only to fail at the proxy step would leave the DB
-    // needlessly exposed on loopback.
+    // Reject up front if this Caddy build can't do L4, to avoid allocating and
+    // recreating only to fail at the proxy step.
     if !state.caddy.has_layer4_module().await {
         return Err(ApiError::BadRequest(
             "This Caddy build does not include the layer4 (caddy-l4) module, \
@@ -326,8 +309,7 @@ pub(super) async fn enable_public_access(
         };
 
     // Wire the L4 route. On failure, unwind everything so we don't leave a port
-    // allocated with no working proxy.
-    // `ip_whitelist` is already normalized (trimmed, blanks dropped, comma-joined).
+    // allocated with no working proxy. `ip_whitelist` is already normalized.
     let allowed: Vec<String> = ip_whitelist
         .as_deref()
         .map(|s| s.split(',').map(|x| x.to_string()).collect())
@@ -392,10 +374,8 @@ pub(super) async fn disable_public_access(
     })))
 }
 
-/// Rewrite an engine connection-string template so the host:port pair points at
-/// the public endpoint instead of the internal container port. Split out from
-/// [`public_connection_string`] so the (fragile) rewrite is unit-testable
-/// without constructing a full database row.
+/// Rewrite an engine connection-string template so host:port points at the public
+/// endpoint, not the internal port. Split out for unit-testing without a DB row.
 fn rewrite_endpoint(template_url: &str, endpoint: &str, internal_port: u16) -> String {
     template_url.replacen(&format!("{endpoint}:{internal_port}"), endpoint, 1)
 }

@@ -19,8 +19,8 @@ export function isTabVisible(): boolean {
 }
 
 /**
- * Creates an interval that automatically pauses when the tab is hidden
- * and resumes when visible. Returns a cleanup function.
+ * Interval that pauses when the tab is hidden and resumes when visible.
+ * Returns a cleanup function.
  */
 export function createVisibleInterval(
   callback: () => void,

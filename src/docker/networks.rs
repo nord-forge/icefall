@@ -27,9 +27,8 @@ impl DockerClient {
     }
 
     pub async fn create_network(&self, name: &str) -> Result<String, DockerError> {
-        // The `bridge` driver provides container DNS on both runtimes: Docker
-        // has built-in DNS on user networks, and Podman 4+ uses netavark +
-        // aardvark-dns. No explicit DNS flag exists in the Docker API.
+        // The `bridge` driver provides container DNS on both runtimes (Docker
+        // built-in DNS; Podman 4+ netavark + aardvark-dns).
         let config = NetworkCreateRequest {
             name: name.to_string(),
             driver: Some("bridge".to_string()),
@@ -45,8 +44,7 @@ impl DockerClient {
     }
 
     /// Verify container-to-container DNS via a throwaway network, logging a
-    /// remediation hint if names don't resolve (e.g. Podman without `aardvark-dns`).
-    /// Best-effort: never fails the caller.
+    /// remediation hint if names don't resolve. Best-effort: never fails.
     pub async fn check_network_dns(&self) {
         use crate::config::ContainerRuntime;
 

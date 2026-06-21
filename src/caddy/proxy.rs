@@ -1,6 +1,5 @@
-//! Proxy-management extensions to the Caddy client (IF-149): reading the full
-//! config, validating/loading raw config via the admin API, module detection,
-//! and translating Icefall middleware presets into Caddy handler config.
+//! Proxy-management extensions to the Caddy client (IF-149): config read/load,
+//! module detection, and translating middleware presets into Caddy handlers.
 
 use serde::{Deserialize, Serialize};
 
@@ -49,13 +48,11 @@ pub struct BasicAuthPreset {
     pub enabled: bool,
     pub username: String,
     /// bcrypt hash of the password — never the plaintext. Populated server-side
-    /// from the transient `password` field; the plaintext is never persisted or
-    /// returned to the client.
+    /// from the transient `password` field.
     #[serde(default)]
     pub password_hash: String,
-    /// Plaintext password from the client on update only. Hashed into
-    /// `password_hash` server-side, then cleared before storage. An empty value
-    /// means "keep the existing password".
+    /// Plaintext password from the client on update only; hashed then cleared.
+    /// Empty means "keep the existing password".
     #[serde(default, skip_serializing)]
     pub password: Option<String>,
     /// Optional path prefix the auth applies to; None = whole app.
@@ -96,14 +93,8 @@ impl CaddyClient {
         Ok(response.json().await.unwrap_or(serde_json::Value::Null))
     }
 
-    /// Apply a custom set of routes for a single app, scoped to its domains.
-    /// Removes the app's existing routes (matched by host) and appends the
-    /// supplied ones, leaving every other app's routes untouched. This is the
-    /// tenant-safe alternative to `load_config`, which would replace the whole
-    /// server config.
-    ///
-    /// `routes` is the user's custom config: either a JSON array of Caddy route
-    /// objects, or a single route object.
+    /// Apply custom routes for one app, scoped to its domains: removes its
+    /// host-matched routes and appends `routes` (a route object or array), leaving others.
     pub async fn apply_scoped_routes(
         &self,
         domains: &[String],
@@ -198,10 +189,7 @@ impl CaddyClient {
     }
 
     /// Whether this Caddy build includes the `http.handlers.rate_limit` module.
-    /// Queried from `GET /config/` is not enough — we ask the loaded modules via
-    /// the `/reverse_proxy/` introspection isn't reliable, so we probe by listing
-    /// the admin `/config/apps/http` and assume absence on any error. Callers use
-    /// this to choose between the real module and the respond-429 fallback.
+    /// Probed by validating a tiny config; callers pick the module or 429 fallback.
     pub async fn has_rate_limit_module(&self) -> bool {
         // The most reliable probe is validating a tiny config that uses the module.
         let probe = serde_json::json!({
@@ -222,11 +210,8 @@ impl CaddyClient {
     }
 }
 
-/// Build the ordered list of Caddy handler objects for an app's presets. The
-/// caller wraps these in a route alongside the reverse_proxy handler.
-///
-/// `has_rate_limit_module` selects between the native `rate_limit` handler and a
-/// `respond 429` fallback keyed on client IP for builds without the plugin.
+/// Build the ordered Caddy handler objects for an app's presets (wrapped by the
+/// caller alongside reverse_proxy). `has_rate_limit_module` picks module vs 429 fallback.
 pub fn presets_to_handlers(
     presets: &ProxyPresets,
     has_rate_limit_module: bool,
@@ -294,9 +279,8 @@ fn rate_limit_handler(rl: &RateLimitPreset, has_module: bool) -> serde_json::Val
             }
         })
     } else {
-        // Fallback: respond 429. Without the plugin Caddy can't actually count
-        // requests, so this documents the intent and blocks via an explicit
-        // handler the operator can recognize. Real enforcement requires the plugin.
+        // Fallback: respond 429. Without the plugin Caddy can't count requests;
+        // this documents intent and blocks. Real enforcement requires the plugin.
         serde_json::json!({
             "handler": "static_response",
             "status_code": 429,

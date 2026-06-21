@@ -1,9 +1,5 @@
-//! Event → rules → channels dispatch pipeline (IF-167).
-//!
-//! `emit_event` is the single fan-out point: given an event type and scope, it
-//! finds every subscribed notification rule, resolves each rule's channel, and
-//! delivers the message. Failures are logged, never propagated — a broken
-//! channel must not break the caller (a backup run, a heartbeat check, etc.).
+//! Event → rules → channels dispatch pipeline (IF-167). `emit_event` is the single
+//! fan-out point; failures are logged, never propagated to the caller.
 
 use std::sync::Arc;
 
@@ -15,11 +11,8 @@ use super::dispatch::dispatch_notification;
 /// (server reachability, disk, backups) that aren't tied to a single app.
 pub const GLOBAL_SCOPE: &str = "*";
 
-/// Fan an event out to all subscribed notification channels.
-///
-/// `app_id` is `Some` for app-scoped events (deploy/health) and `None` for
-/// system events (server/disk/backup). App events also match global rules so a
-/// catch-all subscription receives everything.
+/// Fan an event out to all subscribed notification channels. `app_id` is `Some`
+/// for app-scoped events and `None` for system events; app events also match global rules.
 pub async fn emit_event(
     db: &Arc<dyn Database>,
     caddy_admin_url: &str,
