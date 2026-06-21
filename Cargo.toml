@@ -105,7 +105,7 @@ icefall-common = { path = "common" }
 
 [package]
 name = "icefall"
-version = "0.1.0-beta.7"
+version = "0.1.0-beta.8"
 edition = "2021"
 rust-version = "1.85"
 description = "A fast, simple, self-hosted deployment platform"
