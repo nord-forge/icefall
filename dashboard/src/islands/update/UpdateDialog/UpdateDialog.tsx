@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { useStore } from '@nanostores/preact';
 import {
   CheckCircle2,
@@ -211,7 +212,9 @@ export default function UpdateDialog() {
   const showPreUpdate = !isUpdating && !isCompleted && !isFailed;
   const failedStep = status?.steps?.find((s) => s.status === 'failed');
 
-  return (
+  // Portal to body: the sidebar (where this island mounts) has a transform,
+  // which would otherwise trap our position:fixed backdrop inside the sidebar.
+  return createPortal(
     <div
       class={styles.backdrop}
       onClick={isUpdating ? undefined : handleClose}
@@ -405,6 +408,7 @@ export default function UpdateDialog() {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
