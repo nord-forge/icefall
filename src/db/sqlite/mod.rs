@@ -40,6 +40,7 @@ mod restore;
 mod scheduled_deploys_tests;
 mod scheduled_tasks;
 mod search;
+mod server_bug_regression_tests;
 mod servers;
 mod sessions;
 mod shared_variables;
@@ -121,6 +122,11 @@ impl SqliteDatabase {
     #[cfg(test)]
     pub fn new_with_pool(pool: SqlitePool, encryptor: Arc<Encryptor>) -> Self {
         Self { pool, encryptor }
+    }
+
+    #[cfg(test)]
+    pub fn pool_for_test(&self) -> &SqlitePool {
+        &self.pool
     }
 }
 
@@ -1686,19 +1692,19 @@ impl Database for SqliteDatabase {
     // --- Log Drains ---
 
     async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
-        log_drains::create_log_drain(&self.pool, drain).await
+        log_drains::create_log_drain(&self.pool, &self.encryptor, drain).await
     }
 
     async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError> {
-        log_drains::list_log_drains_for_app(&self.pool, app_id).await
+        log_drains::list_log_drains_for_app(&self.pool, &self.encryptor, app_id).await
     }
 
     async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError> {
-        log_drains::list_global_log_drains(&self.pool).await
+        log_drains::list_global_log_drains(&self.pool, &self.encryptor).await
     }
 
     async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
-        log_drains::update_log_drain(&self.pool, id, drain).await
+        log_drains::update_log_drain(&self.pool, &self.encryptor, id, drain).await
     }
 
     async fn delete_log_drain(&self, id: &str) -> Result<(), DbError> {
@@ -1706,7 +1712,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError> {
-        log_drains::get_log_drain(&self.pool, id).await
+        log_drains::get_log_drain(&self.pool, &self.encryptor, id).await
     }
 
     // --- Project Environments ---
