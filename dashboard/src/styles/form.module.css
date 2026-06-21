@@ -6,6 +6,13 @@
   margin-bottom: var(--space-2);
 }
 
+/* Matches Input's help text so standalone fields (e.g. Select) align with Input fields */
+.helpText {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
 .input {
   width: 100%;
   height: var(--input-height, 40px);

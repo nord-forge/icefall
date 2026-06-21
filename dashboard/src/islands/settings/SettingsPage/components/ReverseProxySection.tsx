@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'preact/hooks';
-import { RefreshCw, Plus, Trash2 } from 'lucide-preact';
+import { RefreshCw, Plus, Trash2, Network, Save } from 'lucide-preact';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
 import type { GlobalProxySettings } from '@lib/types';
-import Card from '@islands/shared/Card/Card';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
+import Select from '@islands/shared/Select/Select';
 import Toggle from '@islands/shared/Toggle/Toggle';
 import Badge from '@islands/shared/Badge/Badge';
 import CodeBlock from '@islands/shared/CodeBlock/CodeBlock';
-import styles from './reverse-proxy-section.module.css';
+import styles from '../settings-page.module.css';
+import formStyles from '@styles/form.module.css';
+import proxyStyles from './reverse-proxy-section.module.css';
 
 type Props = {
   onSaveMessage: (msg: string) => void;
@@ -117,19 +119,29 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
     }
   };
 
-  if (loading) return <Card title="Reverse proxy"><p>Loading reverse proxy settings…</p></Card>;
+  if (loading) {
+    return (
+      <div class={styles.section}>
+        <h2 class={styles.sectionHeading}><Network size={18} aria-hidden="true" /> Reverse Proxy</h2>
+        <p class={styles.hint} style={{ marginTop: 0 }}>Loading reverse proxy settings…</p>
+      </div>
+    );
+  }
 
   return (
-    <Card title="Reverse proxy">
-      <div class={styles.sectionHeader}>
-        <p class={styles.muted}>Global Caddy defaults applied across every app's routes.</p>
-        <span>
+    <div class={styles.section}>
+      <div class={styles.sectionHeaderRow}>
+        <h2 class={styles.sectionHeading}><Network size={18} aria-hidden="true" /> Reverse Proxy</h2>
+        <span class={proxyStyles.statusPill}>
           {settings?.caddy_running
             ? <Badge variant="success" label="Caddy running" />
             : <Badge variant="error" label="Caddy stopped" />}
-          {settings?.caddy_version && <span class={styles.muted}> v{settings.caddy_version}</span>}
+          {settings?.caddy_version && <span class={styles.hint}> v{settings.caddy_version}</span>}
         </span>
       </div>
+      <p class={styles.hint} style={{ marginTop: 0, marginBottom: 'var(--space-4)' }}>
+        Global Caddy defaults applied across every app's routes.
+      </p>
 
       <Toggle
         label="Force HTTPS"
@@ -138,52 +150,53 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
         description="Redirect all HTTP traffic to HTTPS across all apps."
       />
 
-      <fieldset class={styles.fieldset}>
-        <legend class={styles.legend}>Global rate limit default</legend>
-        <div class={styles.inlineFields}>
-          <Input
-            label="Requests" name="global-rate-requests" type="number" min={0}
-            value={rateRequests}
-            helpText="Leave blank to disable the global default."
-            onChange={setRateRequests}
-          />
-          <label class={styles.selectLabel}>
-            Window
-            <select class={styles.select} value={rateWindow}
-              onChange={(e) => setRateWindow((e.target as HTMLSelectElement).value as 'minute' | 'second')}>
-              <option value="minute">Per minute</option>
-              <option value="second">Per second</option>
-            </select>
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset class={styles.fieldset}>
-        <legend class={styles.legend}>Public database port range</legend>
-        <p class={styles.muted}>
-          Ports handed out when a database is exposed for public TCP access. Each public
-          database uses one port from this range.
-        </p>
-        <div class={styles.inlineFields}>
-          <Input
-            label="Range start" name="public-port-range-start" type="number" min={1024} max={65535}
-            value={portRangeStart}
-            onChange={setPortRangeStart}
-          />
-          <Input
-            label="Range end" name="public-port-range-end" type="number" min={1024} max={65535}
-            value={portRangeEnd}
-            onChange={setPortRangeEnd}
+      <h3 class={styles.subHeading} style={{ marginTop: 'var(--space-5)' }}>Global rate limit default</h3>
+      <div class={formStyles.fieldRow}>
+        <Input
+          label="Requests" name="global-rate-requests" type="number" min={0}
+          value={rateRequests}
+          helpText="Leave blank to disable the global default."
+          onChange={setRateRequests}
+        />
+        <div>
+          <label htmlFor="global-rate-window" class={formStyles.label}>Window</label>
+          <Select
+            id="global-rate-window"
+            options={[
+              { value: 'minute', label: 'Per minute' },
+              { value: 'second', label: 'Per second' },
+            ]}
+            value={rateWindow}
+            onChange={(v) => setRateWindow(v as 'minute' | 'second')}
+            fullWidth
           />
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset class={styles.fieldset}>
-        <legend class={styles.legend}>Global default headers</legend>
-        {headers.map((h, i) => (
-          <div class={styles.inlineFields} key={i}>
-            <Input label="Name" name={`gh-name-${i}`} value={h.name}
-              onChange={(v) => setHeaders(headers.map((x, idx) => idx === i ? { ...x, name: v } : x))} />
+      <h3 class={styles.subHeading} style={{ marginTop: 'var(--space-5)' }}>Public database port range</h3>
+      <p class={styles.hint} style={{ marginTop: 0, marginBottom: 'var(--space-3)' }}>
+        Ports handed out when a database is exposed for public TCP access. Each public
+        database uses one port from this range.
+      </p>
+      <div class={formStyles.fieldRow}>
+        <Input
+          label="Range start" name="public-port-range-start" type="number" min={1024} max={65535}
+          value={portRangeStart}
+          onChange={setPortRangeStart}
+        />
+        <Input
+          label="Range end" name="public-port-range-end" type="number" min={1024} max={65535}
+          value={portRangeEnd}
+          onChange={setPortRangeEnd}
+        />
+      </div>
+
+      <h3 class={styles.subHeading} style={{ marginTop: 'var(--space-5)' }}>Global default headers</h3>
+      {headers.map((h, i) => (
+        <div class={formStyles.fieldRow} key={i} style={{ marginBottom: 'var(--space-3)', alignItems: 'end' }}>
+          <Input label="Name" name={`gh-name-${i}`} value={h.name}
+            onChange={(v) => setHeaders(headers.map((x, idx) => idx === i ? { ...x, name: v } : x))} />
+          <div class={proxyStyles.headerValueRow}>
             <Input label="Value" name={`gh-value-${i}`} value={h.value}
               onChange={(v) => setHeaders(headers.map((x, idx) => idx === i ? { ...x, value: v } : x))} />
             <Button variant="ghost" size="sm" aria-label={`Remove header ${i + 1}`}
@@ -191,14 +204,16 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
               <Trash2 size={14} aria-hidden="true" />
             </Button>
           </div>
-        ))}
-        <Button variant="secondary" size="sm" onClick={() => setHeaders([...headers, { name: '', value: '' }])}>
-          <Plus size={14} aria-hidden="true" /> Add header
-        </Button>
-      </fieldset>
+        </div>
+      ))}
+      <Button variant="secondary" size="sm" onClick={() => setHeaders([...headers, { name: '', value: '' }])}>
+        <Plus size={14} aria-hidden="true" /> Add header
+      </Button>
 
-      <div class={styles.actions}>
-        <Button onClick={save} loading={saving}>Save proxy settings</Button>
+      <div class={styles.saveRow} style={{ gap: 'var(--space-3)', justifyContent: 'flex-start' }}>
+        <Button variant="primary" onClick={save} loading={saving}>
+          <Save size={14} aria-hidden="true" /> Save proxy settings
+        </Button>
         <Button variant="secondary" onClick={reload} loading={reloading}>
           <RefreshCw size={14} aria-hidden="true" /> Reload Caddy
         </Button>
@@ -207,7 +222,11 @@ export default function ReverseProxySection({ onSaveMessage }: Props) {
         </Button>
       </div>
 
-      {fullConfig !== null && <CodeBlock code={fullConfig} language="json" />}
-    </Card>
+      {fullConfig !== null && (
+        <div style={{ marginTop: 'var(--space-4)' }}>
+          <CodeBlock code={fullConfig} language="json" />
+        </div>
+      )}
+    </div>
   );
 }

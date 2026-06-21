@@ -19,3 +19,4 @@ target/
 # Signing keys — private keys must never be committed (keep .pub tracked)
 *.pem
 keys/*.pem
+.DS_Store

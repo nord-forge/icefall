@@ -78,6 +78,8 @@ export default function GeneralSection({ onSaveMessage }: Props) {
           helpText="Receives password reset links if the admin account is locked out."
         />
         <div>
+          {/* a11y [1.3.1]: label explicitly associated with the timezone select */}
+          <label htmlFor="sp-timezone" class={formStyles.label}>Timezone</label>
           <Select
             id="sp-timezone"
             options={TIMEZONES.map(tz => ({ value: tz, label: tz.replace(/_/g, ' ') }))}
@@ -85,6 +87,7 @@ export default function GeneralSection({ onSaveMessage }: Props) {
             onChange={setTimezone}
             fullWidth
           />
+          <p class={formStyles.helpText}>Used for schedules and timestamps shown in the dashboard.</p>
         </div>
       </div>
       <div class={styles.saveRow}>
