@@ -75,7 +75,7 @@ impl UpdateChecker {
         );
 
         // 3. Download manifest JSON from release assets
-        let Some(manifest_url) = Self::find_asset(&release.assets, "manifest.json") else {
+        let Some(manifest_url) = Self::find_asset(&release.assets, "-manifest.json") else {
             warn!("release {} has no manifest.json asset", release.tag_name);
             return Ok(None);
         };
@@ -92,7 +92,7 @@ impl UpdateChecker {
         let manifest = ReleaseManifest::from_bytes(&manifest_bytes)?;
 
         // 4. Download manifest signature from release assets
-        let Some(signature_url) = Self::find_asset(&release.assets, "manifest.json.sig") else {
+        let Some(signature_url) = Self::find_asset(&release.assets, "-manifest.json.sig") else {
             warn!(
                 "release {} has no manifest.json.sig asset",
                 release.tag_name
@@ -179,11 +179,15 @@ impl UpdateChecker {
         })
     }
 
-    /// Find an asset by filename in the release assets list.
-    fn find_asset(assets: &[GitHubAsset], filename: &str) -> Option<String> {
+    /// Find an asset whose name ends with `suffix`. Release assets are prefixed
+    /// with the package + version (e.g. `icefall-v0.1.0-beta.5-manifest.json`),
+    /// so we match by suffix rather than exact name. Callers pass a distinctive
+    /// suffix like `-manifest.json` / `-manifest.json.sig` to stay unambiguous
+    /// (note `-manifest.json` is NOT a suffix of `...-manifest.json.sig`).
+    fn find_asset(assets: &[GitHubAsset], suffix: &str) -> Option<String> {
         assets
             .iter()
-            .find(|a| a.name == filename)
+            .find(|a| a.name == suffix || a.name.ends_with(suffix))
             .map(|a| a.browser_download_url.clone())
     }
 
@@ -287,27 +291,31 @@ mod tests {
 
     #[test]
     fn find_asset_by_name() {
+        // Real release assets are prefixed with the package + version — the
+        // suffix match must handle that (regression for the bug where exact
+        // "manifest.json" never matched real assets).
         let assets = vec![
             GitHubAsset {
-                name: "icefall-v0.2.0-x86_64-linux.tar.gz".into(),
+                name: "icefall-v0.1.0-beta.5-x86_64-linux.tar.gz".into(),
                 browser_download_url: "https://example.com/tarball".into(),
             },
             GitHubAsset {
-                name: "manifest.json".into(),
+                name: "icefall-v0.1.0-beta.5-manifest.json".into(),
                 browser_download_url: "https://example.com/manifest".into(),
             },
             GitHubAsset {
-                name: "manifest.json.sig".into(),
+                name: "icefall-v0.1.0-beta.5-manifest.json.sig".into(),
                 browser_download_url: "https://example.com/sig".into(),
             },
         ];
 
         assert_eq!(
-            UpdateChecker::find_asset(&assets, "manifest.json"),
+            UpdateChecker::find_asset(&assets, "-manifest.json"),
             Some("https://example.com/manifest".into())
         );
+        // -manifest.json must NOT accidentally pick the .sig asset.
         assert_eq!(
-            UpdateChecker::find_asset(&assets, "manifest.json.sig"),
+            UpdateChecker::find_asset(&assets, "-manifest.json.sig"),
             Some("https://example.com/sig".into())
         );
         assert_eq!(UpdateChecker::find_asset(&assets, "missing.txt"), None);
