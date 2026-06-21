@@ -90,6 +90,11 @@
   .grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
 }
 
+/* On very wide screens use a larger gap; auto-fill adds more equal-width columns */
+@media (min-width: 1600px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-5); }
+}
+
 .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);

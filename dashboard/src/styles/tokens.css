@@ -98,6 +98,15 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Widen the content measure on large displays so 4k screens aren't mostly empty */
+@media (min-width: 1600px) {
+  :root { --content-max-width: 1600px; }
+}
+
+@media (min-width: 2200px) {
+  :root { --content-max-width: 2000px; }
+}
+
 :root[data-theme="dark"] {
   --color-bg: oklch(0.14 0.015 250);
   --color-surface: oklch(0.18 0.015 250);
