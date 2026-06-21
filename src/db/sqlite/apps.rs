@@ -311,13 +311,14 @@ pub(super) async fn clone_app(
     let project_id = target_project_id.or(source.project_id.as_deref());
 
     sqlx::query(
-        "INSERT INTO apps (id, name, git_repo, git_branch, framework, build_config, resource_limits,
+        "INSERT INTO apps (id, name, team_id, git_repo, git_branch, framework, build_config, resource_limits,
          preview_enabled, preview_branch_pattern, volumes, image_ref, compose_content,
          project_id, deploy_mode, server_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(new_name)
+    .bind(&source.team_id)
     .bind(&source.git_repo)
     .bind(&source.git_branch)
     .bind(&source.framework)
