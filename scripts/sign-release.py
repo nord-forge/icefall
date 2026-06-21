@@ -159,7 +159,10 @@ def main():
         "signature_timestamp": now,
     }
 
-    # Canonicalize: sorted keys, no trailing whitespace, consistent formatting
+    # Canonicalize: sorted keys, no trailing whitespace, consistent formatting.
+    # The verifier checks the signature against the manifest file bytes verbatim,
+    # so the bytes we sign MUST be the exact bytes we write to disk — do not
+    # pretty-print the file separately (that mismatch breaks verification).
     manifest_json = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
     manifest_bytes = manifest_json.encode("utf-8")
 
@@ -167,15 +170,27 @@ def main():
     signed = signing_key.sign(manifest_bytes)
     signature_b64 = base64.b64encode(signed.signature).decode("ascii")
 
-    # Write manifest (pretty-printed for readability)
+    # Write the SAME canonical bytes that were signed.
     manifest_file = f"icefall-v{version}-manifest.json"
-    with open(manifest_file, "w") as f:
-        json.dump(manifest, f, indent=2, sort_keys=True)
+    with open(manifest_file, "wb") as f:
+        f.write(manifest_bytes)
 
     # Write signature
     sig_file = f"icefall-v{version}-manifest.json.sig"
     with open(sig_file, "w") as f:
         f.write(signature_b64)
+
+    # Self-check: verify the signature against the bytes actually written to the
+    # manifest file. The client verifies the downloaded file verbatim, so if the
+    # written bytes differ from the signed bytes the release is unverifiable.
+    # Fail the build here rather than ship a manifest no client can trust.
+    written_bytes = Path(manifest_file).read_bytes()
+    try:
+        signing_key.verify_key.verify(written_bytes, signed.signature)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: self-verification failed — written manifest bytes do not "
+              f"match signed bytes: {exc}")
+        sys.exit(1)
 
     print(f"Manifest written to {manifest_file}")
     print(f"Signature written to {sig_file}")
