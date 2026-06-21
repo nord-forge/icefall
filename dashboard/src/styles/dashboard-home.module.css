@@ -1,0 +1,41 @@
+.section {
+  margin-top: var(--space-6);
+}
+
+/*
+ * Flex (not grid) so when Housekeeping renders nothing, Deploy activity fills
+ * the full width. Astro wraps each island in <astro-island display:contents>,
+ * which can't be a flex item — so we force the island elements to be blocks and
+ * flex them directly. An island that renders null collapses to zero width.
+ */
+.twoCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.twoCol > :global(astro-island) {
+  display: block;
+  min-width: 0;
+}
+
+.twoCol > :global(astro-island):first-child {
+  flex: 2 1 0;
+}
+
+.twoCol > :global(astro-island):last-child {
+  flex: 1 1 0;
+}
+
+/* Empty island (component returned null) leaves the row so the sibling fills it */
+.twoCol > :global(astro-island):empty {
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .twoCol {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}

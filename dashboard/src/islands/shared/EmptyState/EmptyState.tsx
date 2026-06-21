@@ -1,9 +1,9 @@
-import type { ComponentType } from 'preact';
+import type { LucideIcon } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
 import styles from './empty-state.module.css';
 
 type EmptyStateProps = {
-  icon?: ComponentType<{ size?: number }>;
+  icon?: LucideIcon;
   title: string;
   description?: string;
   action?: { label: string; onClick: () => void };

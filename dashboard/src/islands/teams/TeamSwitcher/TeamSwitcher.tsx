@@ -131,8 +131,17 @@ export default function TeamSwitcher() {
     }
   }
 
-  if (loading || teams.length === 0) {
-    return null;
+  // Reserve the same vertical space while loading / when empty to avoid sidebar reflow
+  if (loading) {
+    return (
+      <div class={styles.wrapper} aria-hidden="true">
+        <div class={styles.skeleton} />
+      </div>
+    );
+  }
+
+  if (teams.length === 0) {
+    return <div class={styles.wrapper} aria-hidden="true" />;
   }
 
   const activeTeam = teams.find(t => t.id === activeTeamId);

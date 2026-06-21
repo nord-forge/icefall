@@ -4,6 +4,17 @@
   margin-bottom: var(--space-3);
 }
 
+/* Same box model as .trigger so the sidebar reserves space and doesn't reflow */
+.skeleton {
+  width: 100%;
+  font-size: var(--text-sm);
+  height: calc(var(--space-2) * 2 + 1lh + 2px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+
 .trigger {
   width: 100%;
   display: flex;

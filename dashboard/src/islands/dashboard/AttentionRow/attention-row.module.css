@@ -1,0 +1,110 @@
+.row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 641px) {
+  .row {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+a.card:hover {
+  border-color: var(--color-primary);
+}
+
+a.card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.critical {
+  border-left-color: var(--color-error);
+  background: color-mix(in oklch, var(--color-error) 6%, var(--color-surface));
+}
+
+.critical .cardIcon {
+  color: var(--color-error);
+}
+
+.warning {
+  border-left-color: var(--color-warning);
+  background: color-mix(in oklch, var(--color-warning) 6%, var(--color-surface));
+}
+
+.warning .cardIcon {
+  color: var(--color-warning);
+}
+
+.allClear {
+  border-left-color: var(--color-success);
+  align-items: center;
+}
+
+.allClearIcon {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.cardIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cardText {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.detail {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.skeleton {
+  height: 64px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-surface-alt) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+}

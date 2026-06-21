@@ -1,7 +1,12 @@
 ---
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import layoutStyles from '@styles/layout.module.css';
+import dashStyles from '@styles/dashboard-home.module.css';
+import CountsStrip from '@islands/dashboard/CountsStrip/CountsStrip';
+import AttentionRow from '@islands/dashboard/AttentionRow/AttentionRow';
 import ServerStats from '@islands/dashboard/ServerStats/ServerStats';
+import DeployActivity from '@islands/dashboard/DeployActivity/DeployActivity';
+import Housekeeping from '@islands/dashboard/Housekeeping/Housekeeping';
 import AppGrid from '@islands/dashboard/AppGrid/AppGrid';
 ---
 
@@ -9,8 +14,23 @@ import AppGrid from '@islands/dashboard/AppGrid/AppGrid';
   <div class={layoutStyles.pageHeader}>
     <h1 class={layoutStyles.pageTitle}>Dashboard</h1>
   </div>
-  <ServerStats client:only="preact" />
-  <div style="margin-top: var(--space-6);">
+
+  <CountsStrip client:only="preact" />
+
+  <section class={dashStyles.section} aria-label="Needs attention">
+    <AttentionRow client:only="preact" />
+  </section>
+
+  <section class={dashStyles.section} aria-label="Resource usage">
+    <ServerStats client:only="preact" />
+  </section>
+
+  <section class={`${dashStyles.section} ${dashStyles.twoCol}`}>
+    <DeployActivity client:only="preact" />
+    <Housekeeping client:only="preact" />
+  </section>
+
+  <section class={dashStyles.section} aria-label="Apps">
     <AppGrid client:only="preact" />
-  </div>
+  </section>
 </DashboardLayout>
