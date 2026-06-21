@@ -2,6 +2,7 @@ import type { RegistrationSettings as RegistrationSettingsType } from '@lib/type
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
+import Toggle from '@islands/shared/Toggle/Toggle';
 import styles from '../users-page.module.css';
 
 const ROLE_OPTIONS = [
@@ -44,26 +45,15 @@ export default function RegistrationSettings({
               <label htmlFor="allow-registration" class={styles.regLabel}>
                 Allow public registration
               </label>
-              <button
+              <Toggle
                 id="allow-registration"
-                type="button"
-                role="switch"
-                aria-checked={settings.allow_registration}
-                class={`${styles.toggle} ${settings.allow_registration ? styles.toggleOn : ''}`}
-                onClick={() =>
-                  onSettingsChange({
-                    ...settings,
-                    allow_registration: !settings.allow_registration,
-                  })
+                label="Allow public registration"
+                hideLabel
+                checked={settings.allow_registration}
+                onChange={(v) =>
+                  onSettingsChange({ ...settings, allow_registration: v })
                 }
-              >
-                <span class={styles.toggleThumb}>
-                  <svg class={styles.toggleIcon} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                    <path class={styles.toggleCheck} d="M2.5 5 L4.5 7 L7.5 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path class={styles.toggleCross} d="M3 3 L7 7 M7 3 L3 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                  </svg>
-                </span>
-              </button>
+              />
             </div>
 
             {settings.allow_registration && (

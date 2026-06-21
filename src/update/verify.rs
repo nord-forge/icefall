@@ -148,7 +148,11 @@ pub fn check_monotonicity(
     let highest = semver::Version::parse(highest_seen)?;
     let new = semver::Version::parse(&manifest.version)?;
 
-    if new <= highest {
+    // Reject only versions strictly OLDER than the highest we've seen (anti-
+    // downgrade). The same version must still pass: highest_seen is bumped when
+    // an update is detected, so re-checking an available-but-not-yet-applied
+    // update would otherwise fail and wrongly report "no update available".
+    if new < highest {
         return Err(VerifyError::MonotonicityViolation {
             highest: highest_seen.to_string(),
             new: manifest.version.clone(),
@@ -223,9 +227,12 @@ mod tests {
             signature_timestamp: String::new(),
         };
 
-        assert!(check_monotonicity(&manifest, "0.2.0").is_ok());
-        assert!(check_monotonicity(&manifest, "0.3.0").is_err());
-        assert!(check_monotonicity(&manifest, "0.4.0").is_err());
+        assert!(check_monotonicity(&manifest, "0.2.0").is_ok()); // newer than seen
+                                                                 // Same version must pass so a detected-but-unapplied update keeps showing
+                                                                 // (highest_seen is bumped on detection). Regression for the bug where a
+                                                                 // second check reported "no update available".
+        assert!(check_monotonicity(&manifest, "0.3.0").is_ok());
+        assert!(check_monotonicity(&manifest, "0.4.0").is_err()); // older than seen
     }
 
     #[test]

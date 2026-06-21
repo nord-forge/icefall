@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
+import Toggle from '@islands/shared/Toggle/Toggle';
 import { Save, HardDrive, Play, CheckCircle, XCircle, Clock } from 'lucide-preact';
 import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
@@ -112,29 +113,11 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
         Full instance backup including database, config, volumes, and managed database dumps. Uploaded to your configured S3 location or stored locally.
       </p>
 
-      <div>
-        {/* a11y [1.3.1]: label explicitly associated with toggle via htmlFor */}
-        <label htmlFor="ib-enabled" class={formStyles.label}>Enable Scheduled Backups</label>
-        <div class={styles.toggleRow}>
-          <button
-            id="ib-enabled"
-            type="button"
-            role="switch"
-            aria-checked={ibEnabled}
-            class={`${styles.toggle} ${ibEnabled ? styles.toggleOn : ''}`}
-            onClick={() => setIbEnabled(!ibEnabled)}
-          >
-            <span class={styles.toggleKnob}>
-              {/* a11y [WCAG 1.4.1]: shape cue inside knob — not color alone */}
-              <svg class={styles.toggleIcon} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <path class={styles.toggleCheck} d="M2.5 5 L4.5 7 L7.5 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                <path class={styles.toggleCross} d="M3 3 L7 7 M7 3 L3 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
-            </span>
-          </button>
-          <span class={styles.toggleLabel}>{ibEnabled ? 'On' : 'Off'}</span>
-        </div>
-      </div>
+      <Toggle
+        label="Enable Scheduled Backups"
+        checked={ibEnabled}
+        onChange={setIbEnabled}
+      />
 
       {/* Schedule + Retention share a row so the two inputs align with each other */}
       <div class={formStyles.fieldRow} style={{ marginTop: 'var(--space-4)' }}>

@@ -13,7 +13,14 @@
 .thumb {
   position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
   border-radius: 50%; background: white;
+  display: flex; align-items: center; justify-content: center;
   transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .on .thumb { transform: translateX(20px); }
+.icon { display: block; }
+/* off = cross (muted), on = check (green) */
+.check { color: var(--color-primary); display: none; }
+.cross { color: var(--color-text-muted); }
+.on .check { display: block; }
+.on .cross { display: none; }
 @media (prefers-reduced-motion: reduce) { .switch, .thumb { transition: none; } }

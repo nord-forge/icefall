@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { RefreshCw, Save, CheckCircle2, XCircle } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
+import Toggle from '@islands/shared/Toggle/Toggle';
 import { api } from '@lib/api';
 import { $updateInfo, $updateDialogOpen } from '@stores/update';
 import { addToast } from '@stores/toast';
@@ -180,30 +181,12 @@ export default function UpdateSettings() {
 
       {/* Auto-update toggle */}
       <div style={{ marginTop: 'var(--space-5)' }}>
-        <label htmlFor="auto-update-toggle" class={formStyles.label}>Automatic Updates</label>
-        <div class={styles.toggleRow}>
-          <button
-            id="auto-update-toggle"
-            type="button"
-            role="switch"
-            aria-checked={prefs.auto_update_enabled}
-            class={`${styles.toggle} ${prefs.auto_update_enabled ? styles.toggleOn : ''}`}
-            onClick={() => setPrefs((p) => ({ ...p, auto_update_enabled: !p.auto_update_enabled }))}
-          >
-            <span class={styles.toggleKnob}>
-              <svg class={styles.toggleIcon} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <path class={styles.toggleCheck} d="M2.5 5 L4.5 7 L7.5 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                <path class={styles.toggleCross} d="M3 3 L7 7 M7 3 L3 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
-            </span>
-          </button>
-          <span class={styles.toggleLabel}>
-            {prefs.auto_update_enabled ? 'On' : 'Off'}
-          </span>
-        </div>
-        <p class={formStyles.hint}>
-          When enabled, updates are applied automatically during the maintenance window.
-        </p>
+        <Toggle
+          label="Automatic Updates"
+          checked={prefs.auto_update_enabled}
+          onChange={(v) => setPrefs((p) => ({ ...p, auto_update_enabled: v }))}
+          description="When enabled, updates are applied automatically during the maintenance window."
+        />
 
         {prefs.auto_update_enabled && (
           <div class={styles.windowRow}>
@@ -240,12 +223,6 @@ export default function UpdateSettings() {
             <p class={styles.windowHint}>Server local time</p>
           </div>
         )}
-      </div>
-
-      <div class={styles.saveRow}>
-        <Button variant="primary" onClick={handleSavePrefs} loading={saving}>
-          <Save size={14} aria-hidden="true" /> Save Preferences
-        </Button>
       </div>
 
       {/* Update history */}
@@ -292,6 +269,12 @@ export default function UpdateSettings() {
           </tbody>
         </table>
       )}
+
+      <div class={styles.saveRow}>
+        <Button variant="primary" onClick={handleSavePrefs} loading={saving}>
+          <Save size={14} aria-hidden="true" /> Save Preferences
+        </Button>
+      </div>
     </div>
   );
 }

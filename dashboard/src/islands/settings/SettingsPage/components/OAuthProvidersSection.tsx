@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
+import Toggle from '@islands/shared/Toggle/Toggle';
 import { Save, Key, CheckCircle, Copy } from 'lucide-preact';
 import { api } from '@lib/api';
 import styles from '../settings-page.module.css';
@@ -81,22 +82,12 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
       <div style={{ marginBottom: 'var(--space-5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
           <h3 class={styles.subHeading} style={{ margin: 0 }}>GitHub</h3>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={githubEnabled}
-            aria-label="Enable GitHub OAuth"
-            class={`${styles.toggle} ${githubEnabled ? styles.toggleOn : ''}`}
-            onClick={() => setGithubEnabled(!githubEnabled)}
-          >
-            <span class={styles.toggleKnob}>
-                {/* a11y [WCAG 1.4.1]: shape cue inside knob — not color alone */}
-                <svg class={styles.toggleIcon} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                  <path class={styles.toggleCheck} d="M2.5 5 L4.5 7 L7.5 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  <path class={styles.toggleCross} d="M3 3 L7 7 M7 3 L3 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
-              </span>
-          </button>
+          <Toggle
+            label="Enable GitHub OAuth"
+            hideLabel
+            checked={githubEnabled}
+            onChange={setGithubEnabled}
+          />
         </div>
         <div class={formStyles.fieldRow}>
           <Input
@@ -144,22 +135,12 @@ export default function OAuthProvidersSection({ onSaveMessage }: Props) {
       <div style={{ marginBottom: 'var(--space-3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
           <h3 class={styles.subHeading} style={{ margin: 0 }}>Google</h3>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={googleEnabled}
-            aria-label="Enable Google OAuth"
-            class={`${styles.toggle} ${googleEnabled ? styles.toggleOn : ''}`}
-            onClick={() => setGoogleEnabled(!googleEnabled)}
-          >
-            <span class={styles.toggleKnob}>
-                {/* a11y [WCAG 1.4.1]: shape cue inside knob — not color alone */}
-                <svg class={styles.toggleIcon} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                  <path class={styles.toggleCheck} d="M2.5 5 L4.5 7 L7.5 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  <path class={styles.toggleCross} d="M3 3 L7 7 M7 3 L3 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
-              </span>
-          </button>
+          <Toggle
+            label="Enable Google OAuth"
+            hideLabel
+            checked={googleEnabled}
+            onChange={setGoogleEnabled}
+          />
         </div>
         <div class={formStyles.fieldRow}>
           <Input
