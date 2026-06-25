@@ -137,11 +137,21 @@ async fn readonly_creds_work(
         // No read-only account for other engines — nothing to validate.
         _ => return true,
     };
-    state
-        .docker
-        .exec_in_container(container_name, &probe)
-        .await
-        .is_ok()
+    // exec_in_container returns Ok as long as the client process ran — it does
+    // NOT reflect the SQL exit status — so a failed auth still comes back Ok with
+    // the engine's error in the captured output. Inspect the output: treat any
+    // access/auth error text as failure so stale cached creds trigger
+    // re-provisioning instead of being trusted.
+    match state.docker.exec_in_container(container_name, &probe).await {
+        Ok(out) => {
+            let lower = out.to_ascii_lowercase();
+            !(lower.contains("access denied")
+                || lower.contains("error 1045")
+                || lower.contains("authentication failed")
+                || lower.contains("password authentication failed"))
+        }
+        Err(_) => false,
+    }
 }
 
 pub(crate) async fn ensure_readonly_user(
