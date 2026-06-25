@@ -324,8 +324,8 @@ export default function DatabasesPage() {
               onChange={(v) => setNewDb({ ...newDb, name: v })}
               placeholder="my-database"
             />
-            <div>
-              <label htmlFor="db-create-type" class={formStyles.label}>Type</label>
+            <div class={formStyles.field}>
+              <label htmlFor="db-create-type" class={formStyles.fieldLabel}>Type</label>
               <Select
                 id="db-create-type"
                 options={[

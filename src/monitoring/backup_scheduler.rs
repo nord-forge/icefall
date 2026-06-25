@@ -147,6 +147,19 @@ impl BackupStore {
             None
         }
     }
+
+    /// Delete a single backup file. Returns Ok(false) if it didn't exist.
+    /// backup_id is the bare id (no extension); we join it to the db's own
+    /// backup dir so a caller can't traverse out of it.
+    pub fn delete_backup(&self, db_id: &str, backup_id: &str) -> std::io::Result<bool> {
+        match self.get_backup_path(db_id, backup_id) {
+            Some(path) => {
+                std::fs::remove_file(path)?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
 }
 
 #[derive(Clone, serde::Serialize)]

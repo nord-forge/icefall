@@ -198,6 +198,9 @@ pub(super) async fn create_database(
             "container_id": container_id,
             "connection_string": connection_string,
             "credentials": credentials,
+            // Without this the dashboard card formats `undefined` and shows
+            // "date is invalid" right after creation instead of "just now".
+            "created_at": managed_db.created_at,
         }
     })))
 }

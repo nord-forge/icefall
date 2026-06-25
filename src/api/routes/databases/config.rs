@@ -89,15 +89,31 @@ pub(super) fn db_configs() -> HashMap<&'static str, DbTypeConfig> {
             env_var_name: "DATABASE_URL",
             // `CREATE USER IF NOT EXISTS` + `GRANT SELECT` is idempotent.
             // The managed database is named after `db`.
-            readonly_setup: Some(|admin_user, admin_pass, ro_user, ro_pass, db| {
+            readonly_setup: Some(|_admin_user, admin_pass, ro_user, ro_pass, db| {
+                // The query browser execs `mysql` INSIDE the container, so it
+                // connects as host 'localhost' (socket) — which '@%' does NOT
+                // match in MySQL. Create/grant for BOTH '%' and 'localhost' so
+                // the read-only account is usable however the browser connects.
+                // ALTER USER after CREATE ... IF NOT EXISTS makes this idempotent
+                // on the password too: a lingering RO user from an earlier failed
+                // run gets its password reset to the freshly generated one, so the
+                // cached creds and the actual account never drift.
                 let sql = format!(
                     "CREATE USER IF NOT EXISTS '{ro_user}'@'%' IDENTIFIED BY '{ro_pass}'; \
+                     ALTER USER '{ro_user}'@'%' IDENTIFIED BY '{ro_pass}'; \
+                     CREATE USER IF NOT EXISTS '{ro_user}'@'localhost' IDENTIFIED BY '{ro_pass}'; \
+                     ALTER USER '{ro_user}'@'localhost' IDENTIFIED BY '{ro_pass}'; \
                      GRANT SELECT ON `{db}`.* TO '{ro_user}'@'%'; \
+                     GRANT SELECT ON `{db}`.* TO '{ro_user}'@'localhost'; \
                      FLUSH PRIVILEGES;"
                 );
+                // Connect as root, not the app's MYSQL_USER ('icefall'): the
+                // image grants that user privileges only on its own database, so
+                // it CANNOT CREATE USER. root has the same password as the admin
+                // user (MYSQL_ROOT_PASSWORD = MYSQL_PASSWORD, see env_vars above).
                 vec![vec![
                     "mysql".to_string(),
-                    format!("-u{admin_user}"),
+                    "-uroot".to_string(),
                     format!("-p{admin_pass}"),
                     "-e".to_string(),
                     sql,

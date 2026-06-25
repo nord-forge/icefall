@@ -110,22 +110,69 @@ async fn wait_for_ready(
 
 /// Return the read-only credentials for a managed database, lazily provisioning them
 /// on first use (persisted, so done at most once). `None` for engines without one.
+/// Probe whether the given read-only creds can authenticate, by running a no-op
+/// query as that user inside the container. Engines without a RO account return
+/// true (nothing to validate). Any failure → false, triggering re-provisioning.
+async fn readonly_creds_work(
+    state: &AppState,
+    container_name: &str,
+    db_type: &str,
+    user: &str,
+    password: &str,
+) -> bool {
+    let probe: Vec<String> = match db_type {
+        "postgres" => vec![
+            "psql".into(),
+            format!("postgresql://{user}:{password}@localhost:5432/{user}"),
+            "-tAc".into(),
+            "SELECT 1".into(),
+        ],
+        "mysql" | "mariadb" => vec![
+            "mysql".into(),
+            format!("-u{user}"),
+            format!("-p{password}"),
+            "-e".into(),
+            "SELECT 1".into(),
+        ],
+        // No read-only account for other engines — nothing to validate.
+        _ => return true,
+    };
+    state
+        .docker
+        .exec_in_container(container_name, &probe)
+        .await
+        .is_ok()
+}
+
 pub(crate) async fn ensure_readonly_user(
     state: &AppState,
     db: &ManagedDatabase,
 ) -> Result<Option<ReadonlyCreds>, ApiError> {
     let mut creds: Value = serde_json::from_str(&db.credentials).unwrap_or_default();
 
-    // Already provisioned — return the stored read-only credentials.
+    let cached_container = creds
+        .get("host")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    // Already provisioned — return the stored read-only credentials, but only if
+    // they still actually authenticate. They can go stale if the container was
+    // recreated (wiping users) or provisioning previously cached creds for a user
+    // that was never created. In that case, fall through and re-provision.
     if let Some(ro) = creds.get("readonly") {
         if let (Some(user), Some(password)) = (
             ro.get("user").and_then(Value::as_str),
             ro.get("password").and_then(Value::as_str),
         ) {
-            return Ok(Some(ReadonlyCreds {
-                user: user.to_string(),
-                password: password.to_string(),
-            }));
+            if cached_container.is_empty()
+                || readonly_creds_work(state, &cached_container, &db.db_type, user, password).await
+            {
+                return Ok(Some(ReadonlyCreds {
+                    user: user.to_string(),
+                    password: password.to_string(),
+                }));
+            }
         }
     }
 
@@ -160,6 +207,17 @@ pub(crate) async fn ensure_readonly_user(
     else {
         return Ok(None);
     };
+
+    // Validate before caching. exec_in_container reports Ok as long as the client
+    // process ran, even if the CREATE USER/GRANT SQL failed inside the engine
+    // (e.g. the admin user lacks CREATE USER privilege). Caching phantom creds
+    // here is what produced the silent "Access denied for 'icefall_ro'" — so we
+    // only persist creds we've confirmed actually authenticate.
+    if !readonly_creds_work(state, &container_name, &db.db_type, &ro.user, &ro.password).await {
+        return Err(ApiError::Internal(
+            "read-only database user could not be provisioned (admin lacks privileges?)".into(),
+        ));
+    }
 
     // Persist the merged credentials so this runs at most once per database.
     if let Some(obj) = creds.as_object_mut() {
