@@ -1447,7 +1447,7 @@ dependencies = [
 
 [[package]]
 name = "icefall"
-version = "0.1.0-beta.8"
+version = "0.1.0-beta.8-dev"
 dependencies = [
  "aes-gcm",
  "argon2",
