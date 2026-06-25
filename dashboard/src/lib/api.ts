@@ -1,5 +1,5 @@
 import type { App, AppInstance, Deploy, Domain, EnvVar, LbPolicy, Project, RepoDetection, Server, ServerAppInstance, ServerStatus, ServerMetricsSnapshot, User, ApiToken, HealthCheckResult, ProjectEnvironment, EnvironmentVariable, LogDrain, GitHubInstallation, GitHubRepo, CleanupSchedule, CleanupRun, ServerForecast, DeployApproval, CanaryResult, Team, TeamMember, TeamInvitation, ProxyConfig, ProxyPresets, ProxyConfigHistoryEntry, GlobalProxySettings, PublicAccess, ServerOptimizations } from './types';
-import type { UpdateInfo, UpdateStatus } from '@stores/update';
+import type { UpdateInfo, RawUpdateStatus } from '@stores/update';
 import { getCached, setCache, invalidatePrefix } from './cache';
 
 const API_BASE = '/api/v1';
@@ -51,7 +51,9 @@ export async function request<T>(
       }
     }
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new ApiError(res.status, body.error || 'Unknown error');
+    // Prefer `message` (human reason, e.g. "test failed: discord config missing
+    // 'webhook_url'") over `error` (machine code like "service_unavailable").
+    throw new ApiError(res.status, body.message || body.error || 'Unknown error');
   }
 
   const data: T = await res.json();
@@ -517,10 +519,12 @@ export const api = {
       github_client_id: string | null;
       github_has_secret: boolean;
       github_enabled: boolean;
+      github_configured_at: string | null;
       github_callback_url: string;
       google_client_id: string | null;
       google_has_secret: boolean;
       google_enabled: boolean;
+      google_configured_at: string | null;
       google_callback_url: string;
     } }>('/settings/oauth'),
 
@@ -715,13 +719,18 @@ export const api = {
     request<{ data: UpdateInfo }>('/system/update/check'),
 
   getUpdateStatus: () =>
-    request<{ data: UpdateStatus }>('/system/update/status'),
+    request<{ data: RawUpdateStatus }>('/system/update/status'),
 
   applyUpdate: () =>
-    request<{ data: UpdateStatus }>('/system/update/apply', { method: 'POST' }),
+    request<{ data: { status: string; version: string; message?: string } }>(
+      '/system/update/apply',
+      { method: 'POST' }
+    ),
 
   downloadUpdate: () =>
-    request<{ data: any }>('/system/update/download', { method: 'POST' }),
+    request<{ data: { status: string; version: string } }>('/system/update/download', {
+      method: 'POST',
+    }),
 
   skipUpdateVersion: (version: string) =>
     request<{ message: string }>('/system/update/skip', {
