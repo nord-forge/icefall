@@ -317,6 +317,64 @@
   vertical-align: middle;
 }
 
+/* OAuth provider rows — concise connected status + manage */
+.oauthProviderList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.oauthProviderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.oauthProviderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--color-text);
+}
+
+.oauthGoogleMark {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.oauthProviderInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.oauthProviderName {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.oauthProviderMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.oauthProviderActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .statusIconError {
   color: var(--color-error);
   vertical-align: middle;

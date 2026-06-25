@@ -36,9 +36,12 @@ pub struct OAuthSettings {
     pub github_client_id: Option<String>,
     pub github_client_secret: Option<String>,
     pub github_enabled: bool,
+    /// When GitHub first became fully configured + enabled (ISO 8601); None if never.
+    pub github_configured_at: Option<String>,
     pub google_client_id: Option<String>,
     pub google_client_secret: Option<String>,
     pub google_enabled: bool,
+    pub google_configured_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
