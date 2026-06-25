@@ -6,6 +6,7 @@ import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
 import { Bell, Plus, Trash2, Send } from 'lucide-preact';
 import { api } from '@lib/api';
+import { formatRelativeTime } from '@lib/format';
 import styles from '../settings-page.module.css';
 import formStyles from '@styles/form.module.css';
 
@@ -14,6 +15,7 @@ export type NotificationChannel = {
   channel_type: string;
   config: Record<string, string>;
   created_at: string;
+  created_by?: string | null;
 };
 
 const CHANNEL_TYPES = [
@@ -36,8 +38,10 @@ function configFieldsForType(type: string) {
       { key: 'from', label: 'From Address', placeholder: 'alerts@example.com' },
       { key: 'to', label: 'To Address', placeholder: 'team@example.com' },
     ];
-    case 'slack': return [{ key: 'url', label: 'Slack Webhook URL', placeholder: 'https://hooks.slack.com/services/...' }];
-    case 'discord': return [{ key: 'url', label: 'Discord Webhook URL', placeholder: 'https://discord.com/api/webhooks/...' }];
+    // key must be 'webhook_url' to match dispatch_slack / dispatch_discord; the
+    // backend reads config['webhook_url'], so 'url' here produced "missing 'webhook_url'".
+    case 'slack': return [{ key: 'webhook_url', label: 'Slack Webhook URL', placeholder: 'https://hooks.slack.com/services/...' }];
+    case 'discord': return [{ key: 'webhook_url', label: 'Discord Webhook URL', placeholder: 'https://discord.com/api/webhooks/...' }];
     case 'ntfy': return [
       { key: 'topic', label: 'Topic', placeholder: 'my-alerts', required: true },
       { key: 'server', label: 'Server', placeholder: 'https://ntfy.sh' },
@@ -59,8 +63,8 @@ export function channelLabel(ch: NotificationChannel) {
 function channelSummary(ch: NotificationChannel) {
   if (ch.channel_type === 'webhook') return ch.config.url || '';
   if (ch.channel_type === 'smtp') return ch.config.host ? `${ch.config.host}:${ch.config.port || '587'}` : '';
-  if (ch.channel_type === 'slack') return ch.config.channel || ch.config.url || '';
-  if (ch.channel_type === 'discord') return ch.config.url || '';
+  if (ch.channel_type === 'slack') return ch.config.channel || ch.config.webhook_url || ch.config.url || '';
+  if (ch.channel_type === 'discord') return ch.config.webhook_url || ch.config.url || '';
   if (ch.channel_type === 'ntfy') return ch.config.topic ? `${ch.config.server || 'https://ntfy.sh'}/${ch.config.topic}` : '';
   if (ch.channel_type === 'plunk') return ch.config.to_email || '';
   return JSON.stringify(ch.config);
@@ -121,7 +125,9 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
     try {
       await api.testNotificationChannel(id);
       onSaveMessage('Test notification sent');
-    } catch { onSaveMessage('Test failed'); }
+    } catch (e) {
+      onSaveMessage(e instanceof Error ? e.message : 'Test failed');
+    }
     setTesting('');
   }
 
@@ -178,6 +184,9 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
               <div class={styles.itemInfo}>
                 <span class={styles.itemLabel}>{channelLabel(ch)}</span>
                 <span class={styles.itemMeta}>{channelSummary(ch)}</span>
+                <span class={styles.itemMeta}>
+                  Added {formatRelativeTime(ch.created_at)} by {ch.created_by || 'unknown'}
+                </span>
               </div>
               <div class={styles.itemActions}>
                 <Button variant="ghost" size="sm" onClick={() => testChannel(ch.id)} loading={testing === ch.id}>

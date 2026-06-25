@@ -204,7 +204,7 @@ pub(super) async fn list_notification_channels_by_team(
     team_id: &str,
 ) -> Result<Vec<Notification>, DbError> {
     let rows = sqlx::query(
-        "SELECT id, channel_type, config_encrypted, created_at FROM notifications WHERE team_id = ? ORDER BY created_at",
+        "SELECT id, channel_type, config_encrypted, created_at, created_by FROM notifications WHERE team_id = ? ORDER BY created_at",
     )
     .bind(team_id)
     .fetch_all(pool)
@@ -221,6 +221,7 @@ pub(super) async fn list_notification_channels_by_team(
             channel_type: row.get("channel_type"),
             config,
             created_at: row.get("created_at"),
+            created_by: row.get("created_by"),
         });
     }
     Ok(channels)

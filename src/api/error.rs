@@ -82,9 +82,21 @@ impl From<DbError> for ApiError {
         match err {
             DbError::NotFound(msg) => ApiError::NotFound(msg),
             DbError::Duplicate(msg) => ApiError::Conflict(msg),
+            DbError::InvalidInput(msg) => ApiError::BadRequest(msg),
+            // A CHECK/constraint failure means the caller sent a value the schema
+            // rejects (e.g. an unknown channel_type). That's a client error, not a
+            // server fault — return 400 without leaking the raw DB message.
+            DbError::Sqlx(sqlx::Error::Database(db)) if is_check_violation(&*db) => {
+                ApiError::BadRequest("Request rejected by a database constraint".into())
+            }
             other => ApiError::internal(other),
         }
     }
+}
+
+/// True for a SQLite CHECK-constraint violation (extended result code 275).
+fn is_check_violation(db: &dyn sqlx::error::DatabaseError) -> bool {
+    db.code().as_deref() == Some("275")
 }
 
 impl From<DockerError> for ApiError {
