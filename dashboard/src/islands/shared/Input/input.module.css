@@ -3,7 +3,9 @@
 .required { color: var(--color-error); margin-left: var(--space-1); }
 .inputWrapper { position: relative; display: flex; }
 .input {
-  width: 100%; padding: var(--space-2) var(--space-3);
+  /* Fixed height + horizontal-only padding so inputs match the Select trigger
+     (same --input-height, --radius-md, --text-sm) exactly. */
+  width: 100%; height: var(--input-height); padding: 0 var(--space-3);
   border: 1px solid var(--color-border); border-radius: var(--radius-md);
   background: var(--color-surface); color: var(--color-text);
   font-size: var(--text-sm); font-family: inherit;
