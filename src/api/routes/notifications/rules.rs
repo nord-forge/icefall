@@ -111,9 +111,9 @@ pub(super) async fn create_global_rule(
 }
 
 pub(super) async fn delete_rule(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path((_app_id, rule_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let _ = rule_id;
+    state.db.delete_notification_rule(&rule_id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }

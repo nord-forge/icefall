@@ -111,13 +111,18 @@ pub fn spawn_metrics_collector(
                     disks.refresh(true);
                 }
 
-                let (disk_used, disk_total) =
-                    disks.iter().fold((0u64, 0u64), |(used, total), disk| {
-                        (
-                            used + (disk.total_space() - disk.available_space()),
-                            total + disk.total_space(),
-                        )
-                    });
+                // Report the root filesystem only. Summing every mount
+                // double-counts the same underlying device (container overlay
+                // mounts, bind mounts, tmpfs) and inflates totals — and worse,
+                // the number drifts as containers come and go. Pick the disk
+                // mounted at `/`; if absent, fall back to the largest device.
+                let root_disk = disks
+                    .iter()
+                    .find(|d| d.mount_point() == std::path::Path::new("/"))
+                    .or_else(|| disks.iter().max_by_key(|d| d.total_space()));
+                let (disk_used, disk_total) = root_disk
+                    .map(|d| (d.total_space() - d.available_space(), d.total_space()))
+                    .unwrap_or((0, 0));
 
                 let snapshot = ServerMetrics {
                     // First cycle has no prior CPU sample, so this reads 0%; it's

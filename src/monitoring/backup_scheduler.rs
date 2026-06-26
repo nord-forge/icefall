@@ -5,6 +5,13 @@ use std::time::Duration;
 use crate::db::Database;
 use crate::docker::DockerClient;
 
+/// Engines we can both dump AND restore. Backups are only offered for these —
+/// a backup we can't restore is misleading, so e.g. redis (no clean restore
+/// path) is excluded.
+pub fn backup_supported(db_type: &str) -> bool {
+    matches!(db_type, "postgres" | "mysql" | "mariadb" | "mongo")
+}
+
 pub struct BackupStore {
     base_dir: PathBuf,
 }
@@ -29,6 +36,9 @@ impl BackupStore {
         db_type: &str,
         container_name: &str,
     ) -> Result<BackupInfo, String> {
+        if !backup_supported(db_type) {
+            return Err(format!("backups are not supported for {db_type} databases"));
+        }
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
         let filename = format!("{db_id}_{timestamp}.sql.gz");
         let backup_dir = self.db_backup_dir(db_id);
@@ -187,6 +197,11 @@ pub fn spawn_backup_scheduler(
 
             for mdb in &managed_dbs {
                 if mdb.backup_schedule.is_none() {
+                    continue;
+                }
+                // Skip engines we can't restore — no point scheduling backups
+                // for them (and avoids failure-notification spam).
+                if !backup_supported(&mdb.db_type) {
                     continue;
                 }
 
