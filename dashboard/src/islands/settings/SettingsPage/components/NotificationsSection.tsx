@@ -4,6 +4,7 @@ import { $channels, $settingsLoaded } from '@stores/settings';
 import Button from '@islands/shared/Button/Button';
 import Input from '@islands/shared/Input/Input';
 import Select from '@islands/shared/Select/Select';
+import ConfirmDialog from '@islands/shared/ConfirmDialog/ConfirmDialog';
 import { Bell, Plus, Trash2, Send } from 'lucide-preact';
 import { api } from '@lib/api';
 import { formatRelativeTime } from '@lib/format';
@@ -83,6 +84,8 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
   const [newChannelConfig, setNewChannelConfig] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api.listNotificationChannels().then(d => {
@@ -114,10 +117,21 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
   }
 
   async function deleteChannel(id: string) {
+    setDeleting(true);
     try {
       await api.deleteNotificationChannel(id);
-      updateChannels(channels.filter(c => c.id !== id));
-    } catch {}
+      // Re-list from the server so the row only disappears once it's actually
+      // gone from the DB (prevents the "deleted channel reappears" bug).
+      const d = await api.listNotificationChannels();
+      updateChannels(d.data || []);
+      $channels.set(d.data || []);
+      onSaveMessage('Channel deleted');
+    } catch {
+      onSaveMessage('Failed to delete channel');
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
+    }
   }
 
   async function testChannel(id: string) {
@@ -192,7 +206,7 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
                 <Button variant="ghost" size="sm" onClick={() => testChannel(ch.id)} loading={testing === ch.id}>
                   <Send size={12} aria-hidden="true" /> Test
                 </Button>
-                <button type="button" class={styles.iconButton} onClick={() => deleteChannel(ch.id)} aria-label={`Delete ${channelLabel(ch)} channel`}>
+                <button type="button" class={styles.iconButton} onClick={() => setConfirmDeleteId(ch.id)} aria-label={`Delete ${channelLabel(ch)} channel`}>
                   <Trash2 size={14} aria-hidden="true" />
                 </button>
               </div>
@@ -200,6 +214,21 @@ export default function NotificationsSection({ onSaveMessage, onChannelsChange }
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete notification channel?"
+        description={`This permanently removes the ${
+          confirmDeleteId
+            ? channelLabel(channels.find(c => c.id === confirmDeleteId) ?? ({ channel_type: 'this' } as NotificationChannel))
+            : 'this'
+        } channel and stops all notifications sent through it. This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={() => { if (confirmDeleteId) deleteChannel(confirmDeleteId); }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

@@ -539,6 +539,8 @@ pub trait Database: Send + Sync + 'static {
         channel: &NewNotification,
     ) -> Result<Notification, DbError>;
     async fn list_notification_channels(&self) -> Result<Vec<Notification>, DbError>;
+    /// Permanently delete a channel and (via FK cascade) its subscription rules.
+    async fn delete_notification_channel(&self, id: &str) -> Result<(), DbError>;
     async fn create_notification_rule(
         &self,
         rule: &NewNotificationRule,

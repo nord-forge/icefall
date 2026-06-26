@@ -61,6 +61,24 @@ pub(super) async fn list_notification_channels(
     Ok(channels)
 }
 
+pub(super) async fn delete_notification_channel(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<(), DbError> {
+    // Remove dependent rules first, then the channel. The FK is ON DELETE
+    // CASCADE, but we delete rules explicitly so the channel is gone even if
+    // foreign_keys enforcement is off on this connection.
+    sqlx::query("DELETE FROM notification_rules WHERE notification_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM notifications WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub(super) async fn create_notification_rule(
     pool: &SqlitePool,
     rule: &NewNotificationRule,

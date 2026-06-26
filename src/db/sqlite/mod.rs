@@ -1143,6 +1143,10 @@ impl Database for SqliteDatabase {
         notifications::list_notification_channels(&self.pool, &self.encryptor).await
     }
 
+    async fn delete_notification_channel(&self, id: &str) -> Result<(), DbError> {
+        notifications::delete_notification_channel(&self.pool, id).await
+    }
+
     async fn create_notification_rule(
         &self,
         rule: &NewNotificationRule,

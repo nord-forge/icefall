@@ -88,7 +88,7 @@ pub(super) async fn delete_channel(
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
 
-    let _ = id;
+    state.db.delete_notification_channel(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }
 
