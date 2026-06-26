@@ -16,7 +16,7 @@ use crate::db::models::App;
 use crate::db::Database;
 use crate::docker::DockerClient;
 
-use context::{create_build_context, finish_step, new_step, redact_secrets};
+use context::{create_build_context, finish_step, new_step, redact_secrets, sanitize_image_name};
 
 pub struct BuildOrchestrator {
     docker: Arc<DockerClient>,
@@ -199,7 +199,11 @@ impl BuildOrchestrator {
 
         // Step 4: Build image
         let mut step = new_step("Building container image");
-        let image_tag = format!("icefall/{}:{}", app.name, deploy_id);
+        // Sanitize the name for the image reference — names are validated at
+        // create time, but defend against legacy/edge values producing an
+        // "invalid reference format" error here.
+        let image_name = sanitize_image_name(&app.name);
+        let image_tag = format!("icefall/{image_name}:{deploy_id}");
 
         let context = match create_build_context(&effective_dir) {
             Ok(ctx) => ctx,
@@ -260,11 +264,11 @@ impl BuildOrchestrator {
 
         // Step 5: Tag
         let mut step = new_step("Tagging image");
-        let latest_tag = format!("icefall/{}:latest", app.name);
+        let latest_tag = format!("icefall/{image_name}:latest");
 
         if let Err(e) = self
             .docker
-            .tag_image(&image_tag, &format!("icefall/{}", app.name), "latest")
+            .tag_image(&image_tag, &format!("icefall/{image_name}"), "latest")
             .await
         {
             let msg = format!("Tagging failed: {e}");

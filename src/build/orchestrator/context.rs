@@ -86,3 +86,39 @@ pub(super) fn redact_secrets(line: &str, secrets: &[String]) -> String {
     }
     result
 }
+
+/// Coerce an app name into a valid Docker image-name component (lowercase
+/// alphanumerics and `-_.`, trimmed at the edges). Falls back to "app" if
+/// nothing usable remains.
+pub(super) fn sanitize_image_name(name: &str) -> String {
+    let mapped: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = mapped.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+    if trimmed.is_empty() {
+        "app".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_image_name;
+
+    #[test]
+    fn sanitizes_bad_names() {
+        assert_eq!(sanitize_image_name("My App"), "my-app");
+        assert_eq!(sanitize_image_name("webgl-portfolio"), "webgl-portfolio");
+        assert_eq!(sanitize_image_name("  weird:name!! "), "weird-name");
+        assert_eq!(sanitize_image_name("***"), "app");
+    }
+}
