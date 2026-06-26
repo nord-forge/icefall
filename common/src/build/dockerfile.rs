@@ -70,18 +70,23 @@ fn lockfile_name(pm: &PackageManager) -> &'static str {
     }
 }
 
-fn install_cmd(pm: &PackageManager) -> &'static str {
+fn install_cmd(pm: &PackageManager, yarn_berry: bool) -> &'static str {
     match pm {
         PackageManager::Npm => "npm ci",
+        // Yarn Berry (2+): enable Corepack to get the pinned yarn, then install
+        // with --immutable (Berry's --frozen-lockfile equivalent).
+        PackageManager::Yarn if yarn_berry => "corepack enable && yarn install --immutable",
         PackageManager::Yarn => "yarn install --frozen-lockfile",
         PackageManager::Pnpm => "corepack enable && pnpm install --frozen-lockfile",
         PackageManager::Bun => "bun install --frozen-lockfile",
     }
 }
 
-fn install_prod_cmd(pm: &PackageManager) -> &'static str {
+fn install_prod_cmd(pm: &PackageManager, yarn_berry: bool) -> &'static str {
     match pm {
         PackageManager::Npm => "npm ci --omit=dev",
+        // Berry has no install-time --production; immutable install is correct.
+        PackageManager::Yarn if yarn_berry => "corepack enable && yarn install --immutable",
         PackageManager::Yarn => "yarn install --frozen-lockfile --production",
         PackageManager::Pnpm => "corepack enable && pnpm install --frozen-lockfile --prod",
         PackageManager::Bun => "bun install --frozen-lockfile --production",
@@ -104,7 +109,7 @@ fn dockerfile_static_build(detection: &DetectionResult, base_override: Option<&s
     let pm = &detection.package_manager;
     let base = base_image_for(pm, &detection.node_version, base_override);
     let lockfile = lockfile_name(pm);
-    let install = install_cmd(pm);
+    let install = install_cmd(pm, detection.yarn_berry);
     let build_cmd = detection
         .build_command
         .as_deref()
@@ -133,7 +138,7 @@ fn dockerfile_nextjs(detection: &DetectionResult, base_override: Option<&str>) -
     let base = base_image_for(pm, &detection.node_version, base_override);
     let runtime_base = base_image_for(&PackageManager::Npm, &detection.node_version, None);
     let lockfile = lockfile_name(pm);
-    let install = install_cmd(pm);
+    let install = install_cmd(pm, detection.yarn_berry);
     let build_cmd = detection
         .build_command
         .as_deref()
@@ -170,7 +175,7 @@ fn dockerfile_nuxt(detection: &DetectionResult, base_override: Option<&str>) -> 
     let base = base_image_for(pm, &detection.node_version, base_override);
     let runtime_base = base_image_for(&PackageManager::Npm, &detection.node_version, None);
     let lockfile = lockfile_name(pm);
-    let install = install_cmd(pm);
+    let install = install_cmd(pm, detection.yarn_berry);
     let build_cmd = detection
         .build_command
         .as_deref()
@@ -204,7 +209,7 @@ fn dockerfile_astro_ssr(detection: &DetectionResult, base_override: Option<&str>
     let base = base_image_for(pm, &detection.node_version, base_override);
     let runtime_base = base_image_for(&PackageManager::Npm, &detection.node_version, None);
     let lockfile = lockfile_name(pm);
-    let install = install_cmd(pm);
+    let install = install_cmd(pm, detection.yarn_berry);
     let build_cmd = detection
         .build_command
         .as_deref()
@@ -244,7 +249,7 @@ fn dockerfile_node_app(detection: &DetectionResult, base_override: Option<&str>)
     let pm = &detection.package_manager;
     let base = base_image_for(pm, &detection.node_version, base_override);
     let lockfile = lockfile_name(pm);
-    let install = install_prod_cmd(pm);
+    let install = install_prod_cmd(pm, detection.yarn_berry);
     let port = detection.detected_port;
     let start_cmd = detection
         .start_command
@@ -291,6 +296,7 @@ mod tests {
             start_command,
             detected_port,
             astro_mode: None,
+            yarn_berry: false,
         }
     }
 
@@ -310,6 +316,22 @@ mod tests {
     }
 
     #[test]
+    fn yarn_berry_uses_corepack_and_immutable() {
+        let mut det = make_detection(Framework::ViteReact, PackageManager::Yarn);
+        det.yarn_berry = true;
+        let result = generate_dockerfile(&det, None).unwrap();
+        assert!(result.contains("corepack enable && yarn install --immutable"));
+        assert!(!result.contains("--frozen-lockfile"));
+    }
+
+    #[test]
+    fn yarn_classic_still_uses_frozen_lockfile() {
+        let det = make_detection(Framework::ViteReact, PackageManager::Yarn);
+        let result = generate_dockerfile(&det, None).unwrap();
+        assert!(result.contains("yarn install --frozen-lockfile"));
+    }
+
+    #[test]
     fn generates_node_app() {
         let det = DetectionResult {
             framework: Framework::NodeApp,
@@ -320,6 +342,7 @@ mod tests {
             start_command: Some("node server.js".to_string()),
             detected_port: 3000,
             astro_mode: None,
+            yarn_berry: false,
         };
         let result = generate_dockerfile(&det, None).unwrap();
         assert!(result.contains("FROM node:20-slim"));

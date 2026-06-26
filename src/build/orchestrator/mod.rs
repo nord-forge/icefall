@@ -230,19 +230,21 @@ impl BuildOrchestrator {
         .await;
 
         match build_result {
-            Ok(Ok(lines)) => {
+            // Always fold in the streamed build output, success or failure, so
+            // the failing step's logs reach the deploy log.
+            Ok((lines, outcome)) => {
                 step.output.extend(lines.iter().cloned());
                 all_output.extend(lines);
+                if let Err(e) = outcome {
+                    let msg = format!("Build failed: {e}");
+                    step.output.push(msg.clone());
+                    all_output.push(msg);
+                    finish_step(&mut step, BuildStepStatus::Failed);
+                    steps.push(step);
+                    self.fail_deploy(deploy_id, &all_output).await;
+                    return Err(e);
+                }
                 finish_step(&mut step, BuildStepStatus::Done);
-            }
-            Ok(Err(e)) => {
-                let msg = format!("Build failed: {e}");
-                step.output.push(msg.clone());
-                all_output.push(msg);
-                finish_step(&mut step, BuildStepStatus::Failed);
-                steps.push(step);
-                self.fail_deploy(deploy_id, &all_output).await;
-                return Err(e);
             }
             Err(_) => {
                 let msg = format!("Build timed out after {timeout_secs}s");
@@ -321,6 +323,10 @@ impl BuildOrchestrator {
         })
     }
 
+    /// Stream the image build, collecting every output line. Returns the lines
+    /// collected so far ALONGSIDE the outcome — so on failure the caller can
+    /// still persist the build output (e.g. the failing `RUN` step) to the
+    /// deploy log instead of losing it and showing "No build output available".
     async fn stream_build(
         &self,
         tag: &str,
@@ -328,13 +334,16 @@ impl BuildOrchestrator {
         secrets: &[String],
         no_cache: bool,
         deploy_id: &str,
-    ) -> Result<Vec<String>, BuildError> {
+    ) -> (Vec<String>, Result<(), BuildError>) {
         let mut lines = Vec::with_capacity(256);
         let mut stream = self.docker.build_image(tag, context, no_cache);
         let mut line_count = 0u32;
 
         while let Some(result) = stream.next().await {
-            let info = result?;
+            let info = match result {
+                Ok(info) => info,
+                Err(e) => return (lines, Err(e.into())),
+            };
 
             if let Some(stream_msg) = &info.stream {
                 let line = stream_msg.trim_end();
@@ -348,16 +357,16 @@ impl BuildOrchestrator {
                     .message
                     .clone()
                     .unwrap_or_else(|| "unknown build error".to_string());
-                return Err(BuildError::DockerBuild(msg));
+                return (lines, Err(BuildError::DockerBuild(msg)));
             }
 
             line_count += 1;
             if line_count % 50 == 0 && self.is_cancelled(deploy_id).await {
-                return Err(BuildError::Cancelled);
+                return (lines, Err(BuildError::Cancelled));
             }
         }
 
-        Ok(lines)
+        (lines, Ok(()))
     }
 
     async fn is_cancelled(&self, deploy_id: &str) -> bool {

@@ -10,6 +10,7 @@ pub fn detect(
 ) -> Result<DetectionResult, DetectError> {
     let framework = detect_framework(project_dir);
     let package_manager = detect_package_manager(project_dir);
+    let yarn_berry = package_manager == PackageManager::Yarn && detect_yarn_berry(project_dir);
     let node_version = detect_node_version(project_dir);
     let astro_mode = if framework == Framework::Astro {
         Some(detect_astro_mode(project_dir))
@@ -29,6 +30,7 @@ pub fn detect(
         start_command,
         detected_port,
         astro_mode,
+        yarn_berry,
     };
 
     if let Some(ov) = overrides {
@@ -130,6 +132,25 @@ fn detect_package_manager(dir: &Path) -> PackageManager {
         return PackageManager::Yarn;
     }
     PackageManager::Npm
+}
+
+/// Detect Yarn 2+ (Berry). Two reliable signals: a `packageManager: "yarn@2|3|4..."`
+/// field in package.json (Corepack pin), or the Berry-only `__metadata:` block in
+/// yarn.lock (Yarn 1 lockfiles never contain it).
+fn detect_yarn_berry(dir: &Path) -> bool {
+    if let Some(pkg) = read_file_string(dir, "package.json") {
+        if let Some(idx) = pkg.find("\"packageManager\"") {
+            let tail = &pkg[idx..];
+            if let Some(at) = tail.find("yarn@") {
+                let ver = &tail[at + 5..];
+                // First version digit > 1 means Berry.
+                if let Some(major) = ver.chars().find(|c| c.is_ascii_digit()) {
+                    return major != '1';
+                }
+            }
+        }
+    }
+    read_file_string(dir, "yarn.lock").is_some_and(|lock| lock.contains("__metadata:"))
 }
 
 fn detect_node_version(dir: &Path) -> String {

@@ -77,6 +77,11 @@ pub struct DetectionResult {
     pub start_command: Option<String>,
     pub detected_port: u16,
     pub astro_mode: Option<AstroMode>,
+    /// True when the project uses Yarn 2+ (Berry). Berry lockfiles can't be read
+    /// by the image's bundled Yarn 1, and the install flag differs (`--immutable`
+    /// vs `--frozen-lockfile`), so the Dockerfile must enable Corepack first.
+    #[serde(default)]
+    pub yarn_berry: bool,
 }
 
 /// Repo-shape hints surfaced to the create wizard alongside `DetectionResult`.

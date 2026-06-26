@@ -13,6 +13,7 @@ fn static_frameworks_are_native() {
         start_command: None,
         detected_port: 80,
         astro_mode: astro,
+        yarn_berry: false,
     };
 
     assert!(should_use_native(&make(Framework::StaticSite, None)));
