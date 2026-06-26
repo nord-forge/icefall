@@ -27,6 +27,28 @@ pub(super) async fn list_deploys(
     Ok(Json(serde_json::json!({ "data": deploys })))
 }
 
+pub(super) async fn get_deploy(
+    State(state): State<AppState>,
+    ctx: TeamCtx,
+    Path((id, deploy_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // The app must belong to the caller's team.
+    state
+        .db
+        .get_app_for_team(&ctx.team_id, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("app {id}")))?;
+
+    let deploy = state
+        .db
+        .get_deploy(&deploy_id)
+        .await?
+        .filter(|d| d.app_id == id)
+        .ok_or_else(|| ApiError::NotFound(format!("deploy {deploy_id}")))?;
+
+    Ok(Json(serde_json::json!({ "data": deploy })))
+}
+
 pub(super) async fn get_latest_deploys(
     State(state): State<AppState>,
     ctx: TeamCtx,

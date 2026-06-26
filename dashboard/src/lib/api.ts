@@ -147,6 +147,11 @@ export const api = {
   listDeploys: (appId: string) =>
     request<{ data: Deploy[] }>(`/apps/${appId}/deploys`),
 
+  // Fetch a single deploy directly — avoids the race where a just-created
+  // deploy isn't yet in the (latest-50) list on the detail page.
+  getDeploy: (appId: string, deployId: string) =>
+    request<{ data: Deploy }>(`/apps/${appId}/deploys/${deployId}`, undefined, { noCache: true }),
+
   getLatestDeploys: (appIds: string[]) =>
     request<{ data: Deploy[] }>(`/deploys/latest?app_ids=${appIds.join(',')}`),
 
