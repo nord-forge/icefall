@@ -1535,6 +1535,10 @@ impl NotificationStore for SqliteDatabase {
         notifications::create_notification_rule(&self.pool, rule).await
     }
 
+    async fn delete_notification_rule(&self, id: &str) -> Result<(), DbError> {
+        notifications::delete_notification_rule(&self.pool, id).await
+    }
+
     async fn get_notification_rules(&self, app_id: &str) -> Result<Vec<NotificationRule>, DbError> {
         notifications::get_notification_rules(&self.pool, app_id).await
     }

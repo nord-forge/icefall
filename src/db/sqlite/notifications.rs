@@ -79,6 +79,14 @@ pub(super) async fn delete_notification_channel(
     Ok(())
 }
 
+pub(super) async fn delete_notification_rule(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
+    sqlx::query("DELETE FROM notification_rules WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub(super) async fn create_notification_rule(
     pool: &SqlitePool,
     rule: &NewNotificationRule,

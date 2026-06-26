@@ -17,6 +17,8 @@ pub trait NotificationStore: Send + Sync {
         &self,
         rule: &NewNotificationRule,
     ) -> Result<NotificationRule, DbError>;
+    /// Permanently delete a single subscription rule by id.
+    async fn delete_notification_rule(&self, id: &str) -> Result<(), DbError>;
     async fn get_notification_rules(&self, app_id: &str) -> Result<Vec<NotificationRule>, DbError>;
     /// All rules subscribed to `event_type`, across scopes (IF-167 dispatch).
     async fn get_notification_rules_by_event(
