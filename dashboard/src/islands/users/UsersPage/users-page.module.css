@@ -253,8 +253,8 @@
 }
 
 .toggleOn {
-  background: var(--color-ice);
-  border-color: var(--color-ice);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .toggleThumb {

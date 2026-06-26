@@ -38,6 +38,9 @@ body {
   line-height: var(--leading-normal);
   color: var(--color-text);
   background: var(--color-bg);
+  /* Native checkboxes/radios/range sliders default to the green brand color
+     instead of the browser's blue. Custom-styled controls set their own. */
+  accent-color: var(--color-primary);
 }
 
 a {

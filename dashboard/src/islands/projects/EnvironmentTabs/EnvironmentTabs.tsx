@@ -19,7 +19,7 @@ export default function EnvironmentTabs({ projectId, onFilterChange }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newColor, setNewColor] = useState('#3b82f6');
+  const [newColor, setNewColor] = useState('#1f8a5b');
   const [adding, setAdding] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -45,7 +45,7 @@ export default function EnvironmentTabs({ projectId, onFilterChange }: Props) {
       });
       setEnvironments((prev) => [...prev, data]);
       setNewName('');
-      setNewColor('#3b82f6');
+      setNewColor('#1f8a5b');
       setShowAddForm(false);
       addToast('success', `Environment "${data.name}" created`);
     } catch {
