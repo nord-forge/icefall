@@ -120,6 +120,8 @@ fn dockerfile_static_build(detection: &DetectionResult, base_override: Option<&s
         r#"# Build stage
 FROM {base} AS builder
 WORKDIR /app
+# Cap the Node build heap so a heavy build is bounded, not OOM-killed.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 COPY package.json {lockfile} ./
 RUN {install}
 COPY . .
@@ -149,6 +151,8 @@ fn dockerfile_nextjs(detection: &DetectionResult, base_override: Option<&str>) -
         r#"# Build stage
 FROM {base} AS builder
 WORKDIR /app
+# Cap the Node build heap so a heavy build is bounded, not OOM-killed.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 COPY package.json {lockfile} ./
 RUN {install}
 COPY . .
@@ -186,6 +190,8 @@ fn dockerfile_nuxt(detection: &DetectionResult, base_override: Option<&str>) -> 
         r#"# Build stage
 FROM {base} AS builder
 WORKDIR /app
+# Cap the Node build heap so a heavy build is bounded, not OOM-killed.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 COPY package.json {lockfile} ./
 RUN {install}
 COPY . .
@@ -224,6 +230,8 @@ fn dockerfile_astro_ssr(detection: &DetectionResult, base_override: Option<&str>
         r#"# Build stage
 FROM {base} AS builder
 WORKDIR /app
+# Cap the Node build heap so a heavy build is bounded, not OOM-killed.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 COPY package.json {lockfile} ./
 RUN {install}
 COPY . .
@@ -313,6 +321,13 @@ mod tests {
         assert!(result.contains("FROM node:22-slim AS builder"));
         assert!(result.contains(".next/standalone"));
         assert!(result.contains("USER nextjs"));
+    }
+
+    #[test]
+    fn build_stage_caps_node_heap() {
+        let det = make_detection(Framework::NextJs, PackageManager::Npm);
+        let result = generate_dockerfile(&det, None).unwrap();
+        assert!(result.contains("ENV NODE_OPTIONS=--max-old-space-size=2048"));
     }
 
     #[test]
