@@ -314,9 +314,12 @@ pub(crate) async fn trigger_deploy(
                 }
 
                 let detection = crate::build::detect::detect(&work_dir, build_config.as_ref());
+                // Use native only when the framework is eligible AND the host
+                // has the node toolchain; otherwise fall back to the container
+                // build (which ships node in the image).
                 let use_native = detection
                     .as_ref()
-                    .is_ok_and(crate::deploy::native::should_use_native);
+                    .is_ok_and(crate::deploy::native::can_use_native);
 
                 let _ = tokio::fs::remove_dir_all(&work_dir).await;
 

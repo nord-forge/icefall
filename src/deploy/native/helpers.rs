@@ -12,6 +12,31 @@ pub(super) fn install_command(pm: &PackageManager) -> String {
     }
 }
 
+/// Whether the package manager's binary is on PATH. The native pipeline shells
+/// out to the host's node toolchain, so if it isn't installed we must NOT use
+/// native (the build would fail with "npm: not found") — fall back to the
+/// container build, which provides node inside the image.
+pub(super) fn toolchain_available(pm: &PackageManager) -> bool {
+    let bin = match pm {
+        PackageManager::Npm => "npm",
+        PackageManager::Yarn => "yarn",
+        PackageManager::Pnpm => "pnpm",
+        PackageManager::Bun => "bun",
+    };
+    binary_on_path(bin)
+}
+
+/// Look up an executable on PATH (like `which`), without spawning a process.
+fn binary_on_path(bin: &str) -> bool {
+    let Some(paths) = std::env::var_os("PATH") else {
+        return false;
+    };
+    std::env::split_paths(&paths).any(|dir| {
+        let candidate = dir.join(bin);
+        candidate.is_file() || std::fs::metadata(&candidate).is_ok()
+    })
+}
+
 /// Run a shell command in a directory, returning an error if it fails.
 pub(super) async fn run_command(cmd: &str, dir: &Path) -> Result<String, String> {
     let output = tokio::process::Command::new("sh")
