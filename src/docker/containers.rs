@@ -335,16 +335,35 @@ impl DockerClient {
         container: &str,
         cmd: &[String],
     ) -> Result<String, DockerError> {
+        self.exec_in_container_with_env(container, cmd, &[]).await
+    }
+
+    /// Like `exec_in_container`, but sets environment variables for the exec.
+    /// Used to pass DB passwords via `MYSQL_PWD` so they neither appear in the
+    /// container process list nor trigger the mysql CLI's insecure-password
+    /// warning (which otherwise pollutes parsed stdout).
+    pub async fn exec_in_container_with_env(
+        &self,
+        container: &str,
+        cmd: &[String],
+        env: &[String],
+    ) -> Result<String, DockerError> {
         use bollard::container::LogOutput;
         use bollard::exec::{CreateExecOptions, StartExecResults};
         use futures_util::StreamExt;
 
+        let env = if env.is_empty() {
+            None
+        } else {
+            Some(env.to_vec())
+        };
         let exec = self
             .inner()
             .create_exec(
                 container,
                 CreateExecOptions {
                     cmd: Some(cmd.to_vec()),
+                    env,
                     attach_stdout: Some(true),
                     attach_stderr: Some(true),
                     ..Default::default()
