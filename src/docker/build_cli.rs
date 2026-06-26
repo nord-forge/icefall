@@ -57,9 +57,13 @@ impl DockerClient {
 
         // Merge stdout and stderr into a single ordered stream of lines. Build
         // tools write progress to stderr and program output to stdout; the user
-        // wants both interleaved as the terminal would show them.
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
+        // wants both interleaved as the terminal would show them. The handles are
+        // always present (both were configured `piped` above), but surface a
+        // proper error rather than panic if the runtime somehow withholds one.
+        let pipe_missing =
+            || DockerError::BuildFailed(format!("`{bin} build` did not expose its output pipes"));
+        let stdout = child.stdout.take().ok_or_else(pipe_missing)?;
+        let stderr = child.stderr.take().ok_or_else(pipe_missing)?;
 
         let mut tail: Vec<String> = Vec::with_capacity(20);
         let push_tail = |line: &str, tail: &mut Vec<String>| {
@@ -69,12 +73,8 @@ impl DockerClient {
             }
         };
 
-        let mut out_lines = stdout
-            .map(|s| BufReader::new(s).lines())
-            .expect("stdout piped");
-        let mut err_lines = stderr
-            .map(|s| BufReader::new(s).lines())
-            .expect("stderr piped");
+        let mut out_lines = BufReader::new(stdout).lines();
+        let mut err_lines = BufReader::new(stderr).lines();
 
         let mut out_open = true;
         let mut err_open = true;

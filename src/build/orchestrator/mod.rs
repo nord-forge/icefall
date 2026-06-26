@@ -408,7 +408,10 @@ impl BuildOrchestrator {
     /// step (and emitting it live + persisting periodically) as it arrives. The
     /// CLI path is used because Podman's REST build endpoint does not stream
     /// per-step `RUN` output — only the CLI surfaces the real npm/compiler logs.
-    #[allow(clippy::too_many_arguments)]
+    // Streaming a build needs the tag, context, secrets, cache flag, both ids,
+    // a timeout, and the step accumulator — splitting into a struct would only
+    // scatter this one call site's locals.
+    #[expect(clippy::too_many_arguments)]
     async fn stream_build_cli(
         &self,
         tag: &str,

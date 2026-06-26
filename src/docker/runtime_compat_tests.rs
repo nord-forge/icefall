@@ -73,10 +73,7 @@ mod runtime_compat {
     /// Connect to whatever runtime is on the host, or return `None` to skip.
     async fn live_client() -> Option<DockerClient> {
         let socket = crate::config::defaults::detect_socket();
-        match DockerClient::connect(&socket).await {
-            Ok(client) => Some(client),
-            Err(_) => None,
-        }
+        DockerClient::connect(&socket).await.ok()
     }
 
     #[tokio::test]
