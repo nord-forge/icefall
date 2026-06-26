@@ -299,7 +299,9 @@ export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props
               Reconnect
             </button>
           )}
-          {status === 'connected' && (
+          {/* After a session ends the xterm panel lingers; offer Close to tear it
+              back down to the Connect screen, not just Reconnect. */}
+          {(status === 'connected' || (status === 'disconnected' && xtermRef.current)) && (
             <button
               type="button"
               class={styles.ghostButton}
