@@ -150,7 +150,10 @@ async fn dispatch_discord(
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
 
+    // Override the webhook's own bot name so the message is clearly identified
+    // as Icefall instead of the webhook's default identity ("Captain Hook").
     let payload = serde_json::json!({
+        "username": "Icefall",
         "embeds": [{
             "title": summary,
             "description": format!(
