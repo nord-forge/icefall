@@ -107,6 +107,29 @@ fn local_conn_string(info: &DbInfo) -> String {
     }
 }
 
+/// Run a browser command in the container, passing the MySQL/MariaDB password via
+/// `MYSQL_PWD` so the `mysql` CLI doesn't print its insecure-password warning to
+/// stdout (which would otherwise be parsed as a table name or column header).
+/// Other engines take the password on the command line as before.
+async fn exec_db(
+    state: &AppState,
+    info: &DbInfo,
+    cmd: &[String],
+) -> Result<String, crate::docker::DockerError> {
+    if matches!(info.db_type.as_str(), "mysql" | "mariadb") {
+        let env = vec![format!("MYSQL_PWD={}", info.password)];
+        state
+            .docker
+            .exec_in_container_with_env(&info.container_name, cmd, &env)
+            .await
+    } else {
+        state
+            .docker
+            .exec_in_container(&info.container_name, cmd)
+            .await
+    }
+}
+
 /// Build a mongodb:// URI for the browser's account. The read-only user's `authSource`
 /// is the managed database; the primary account authenticates against `admin`.
 fn mongo_conn_string(info: &DbInfo) -> String {
@@ -135,8 +158,10 @@ async fn list_tables(
             "-t".into(), "-A".into(), "-c".into(),
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name".into(),
         ],
+        // Password via MYSQL_PWD env (see exec below) — keeps the "insecure
+        // password" warning off stdout so it isn't parsed as a table name.
         "mysql" => vec![
-            "mysql".into(), format!("-u{}", info.user), format!("-p{}", info.password),
+            "mysql".into(), format!("-u{}", info.user), info.db_name.clone(),
             "-e".into(), "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name".into(),
             "--batch".into(), "--skip-column-names".into(),
         ],
@@ -152,9 +177,7 @@ async fn list_tables(
         _ => return Err(ApiError::BadRequest("Unsupported database type".into())),
     };
 
-    let output = state
-        .docker
-        .exec_in_container(&info.container_name, &cmd)
+    let output = exec_db(&state, &info, &cmd)
         .await
         .map_err(ApiError::internal)?;
 
@@ -286,10 +309,11 @@ async fn execute_sql_query(
             "-c".into(),
             limited,
         ],
+        // Password via MYSQL_PWD env (see exec_db) — keeps the insecure-password
+        // warning off stdout so it isn't parsed as the header row.
         _ => vec![
             "mysql".into(),
             format!("-u{}", info.user),
-            format!("-p{}", info.password),
             info.db_name.clone(),
             "-e".into(),
             limited,
@@ -297,9 +321,7 @@ async fn execute_sql_query(
         ],
     };
 
-    let output = state
-        .docker
-        .exec_in_container(&info.container_name, &cmd)
+    let output = exec_db(state, info, &cmd)
         .await
         .map_err(ApiError::internal)?;
 

@@ -60,7 +60,11 @@ use sqlx::SqlitePool;
 
 use crate::db::encryption::Encryptor;
 use crate::db::models::*;
-use crate::db::{Database, DbError};
+use crate::db::{
+    AppStore, BackupStore, Database, DatabaseStore, DbError, DeployStore, EnvironmentStore,
+    GitHubStore, InfraStore, MiscStore, NetworkingStore, NotificationStore, OAuthStore,
+    ObservabilityStore, ProjectStore, ProxyStore, TaskStore, TeamStore, UpdateStore, UserStore,
+};
 
 fn normalize_repo_url(url: &str) -> String {
     url.trim()
@@ -131,9 +135,7 @@ impl SqliteDatabase {
 }
 
 #[async_trait]
-impl Database for SqliteDatabase {
-    // --- Projects ---
-
+impl ProjectStore for SqliteDatabase {
     async fn list_projects(&self) -> Result<Vec<Project>, DbError> {
         projects::list_projects(&self.pool).await
     }
@@ -153,9 +155,10 @@ impl Database for SqliteDatabase {
     async fn delete_project(&self, id: &str) -> Result<(), DbError> {
         projects::delete_project(&self.pool, id).await
     }
+}
 
-    // --- Apps ---
-
+#[async_trait]
+impl AppStore for SqliteDatabase {
     async fn create_app(&self, app: &NewApp) -> Result<App, DbError> {
         apps::create_app(&self.pool, app).await
     }
@@ -188,8 +191,69 @@ impl Database for SqliteDatabase {
         apps::set_app_webhook_secret(&self.pool, app_id, secret).await
     }
 
-    // --- Reverse proxy management (IF-149) ---
+    async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError> {
+        apps::create_app_instance(&self.pool, instance).await
+    }
 
+    async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError> {
+        apps::get_app_instance(&self.pool, id).await
+    }
+
+    async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError> {
+        apps::list_app_instances(&self.pool, app_id).await
+    }
+
+    async fn list_app_instances_by_server(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<AppInstance>, DbError> {
+        apps::list_app_instances_by_server(&self.pool, server_id).await
+    }
+
+    async fn update_app_instance(
+        &self,
+        id: &str,
+        update: &UpdateAppInstance,
+    ) -> Result<AppInstance, DbError> {
+        apps::update_app_instance(&self.pool, id, update).await
+    }
+
+    async fn delete_app_instance(&self, id: &str) -> Result<(), DbError> {
+        apps::delete_app_instance(&self.pool, id).await
+    }
+
+    async fn clone_app(
+        &self,
+        source_app_id: &str,
+        new_name: &str,
+        target_project_id: Option<&str>,
+        target_server_id: Option<&str>,
+    ) -> Result<App, DbError> {
+        apps::clone_app(
+            &self.pool,
+            source_app_id,
+            new_name,
+            target_project_id,
+            target_server_id,
+        )
+        .await
+    }
+
+    async fn get_app_by_repo(&self, repo_url: &str) -> Result<Option<App>, DbError> {
+        deploys::get_app_by_repo(&self.pool, repo_url).await
+    }
+
+    async fn get_environment_by_branch(
+        &self,
+        app_id: &str,
+        branch: &str,
+    ) -> Result<Option<Environment>, DbError> {
+        environments::get_environment_by_branch(&self.pool, app_id, branch).await
+    }
+}
+
+#[async_trait]
+impl ProxyStore for SqliteDatabase {
     async fn record_proxy_config_history(&self, app_id: &str, config: &str) -> Result<(), DbError> {
         proxy::record_proxy_config_history(&self.pool, app_id, config).await
     }
@@ -230,40 +294,10 @@ impl Database for SqliteDatabase {
     ) -> Result<ProxySettings, DbError> {
         proxy::update_proxy_settings(&self.pool, update).await
     }
+}
 
-    async fn create_app_instance(&self, instance: &NewAppInstance) -> Result<AppInstance, DbError> {
-        apps::create_app_instance(&self.pool, instance).await
-    }
-
-    async fn get_app_instance(&self, id: &str) -> Result<Option<AppInstance>, DbError> {
-        apps::get_app_instance(&self.pool, id).await
-    }
-
-    async fn list_app_instances(&self, app_id: &str) -> Result<Vec<AppInstance>, DbError> {
-        apps::list_app_instances(&self.pool, app_id).await
-    }
-
-    async fn list_app_instances_by_server(
-        &self,
-        server_id: &str,
-    ) -> Result<Vec<AppInstance>, DbError> {
-        apps::list_app_instances_by_server(&self.pool, server_id).await
-    }
-
-    async fn update_app_instance(
-        &self,
-        id: &str,
-        update: &UpdateAppInstance,
-    ) -> Result<AppInstance, DbError> {
-        apps::update_app_instance(&self.pool, id, update).await
-    }
-
-    async fn delete_app_instance(&self, id: &str) -> Result<(), DbError> {
-        apps::delete_app_instance(&self.pool, id).await
-    }
-
-    // --- Environments ---
-
+#[async_trait]
+impl EnvironmentStore for SqliteDatabase {
     async fn create_environment(&self, env: &NewEnvironment) -> Result<Environment, DbError> {
         environments::create_environment(&self.pool, env).await
     }
@@ -275,8 +309,6 @@ impl Database for SqliteDatabase {
     async fn delete_environment(&self, id: &str) -> Result<(), DbError> {
         environments::delete_environment(&self.pool, id).await
     }
-
-    // --- Env Vars (encrypted) ---
 
     async fn set_env_var(&self, env_var: &NewEnvVar) -> Result<EnvVar, DbError> {
         environments::set_env_var(&self.pool, &self.encryptor, env_var).await
@@ -290,8 +322,47 @@ impl Database for SqliteDatabase {
         environments::delete_env_var(&self.pool, id).await
     }
 
-    // --- Deploys ---
+    async fn delete_env_vars_by_environment(&self, environment_id: &str) -> Result<(), DbError> {
+        environments::delete_env_vars_by_environment(&self.pool, environment_id).await
+    }
 
+    async fn create_project_environment(
+        &self,
+        env: &NewProjectEnvironment,
+    ) -> Result<ProjectEnvironment, DbError> {
+        project_environments::create_project_environment(&self.pool, env).await
+    }
+
+    async fn list_project_environments(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectEnvironment>, DbError> {
+        project_environments::list_project_environments(&self.pool, project_id).await
+    }
+
+    async fn update_project_environment(
+        &self,
+        id: &str,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<ProjectEnvironment, DbError> {
+        project_environments::update_project_environment(&self.pool, id, name, color).await
+    }
+
+    async fn delete_project_environment(&self, id: &str) -> Result<(), DbError> {
+        project_environments::delete_project_environment(&self.pool, id).await
+    }
+
+    async fn get_project_environment(
+        &self,
+        id: &str,
+    ) -> Result<Option<ProjectEnvironment>, DbError> {
+        project_environments::get_project_environment(&self.pool, id).await
+    }
+}
+
+#[async_trait]
+impl DeployStore for SqliteDatabase {
     async fn create_deploy(&self, deploy: &NewDeploy) -> Result<Deploy, DbError> {
         deploys::create_deploy(&self.pool, deploy).await
     }
@@ -320,6 +391,10 @@ impl Database for SqliteDatabase {
         deploys::update_deploy_status(&self.pool, id, status, log).await
     }
 
+    async fn set_deploy_log(&self, id: &str, log: &str) -> Result<(), DbError> {
+        deploys::set_deploy_log(&self.pool, id, log).await
+    }
+
     async fn list_due_scheduled_deploys(&self) -> Result<Vec<Deploy>, DbError> {
         deploys::list_due_scheduled_deploys(&self.pool).await
     }
@@ -336,8 +411,98 @@ impl Database for SqliteDatabase {
         deploys::reschedule_deploy(&self.pool, deploy_id, scheduled_at).await
     }
 
-    // --- Managed Databases ---
+    async fn record_deploy_event(
+        &self,
+        deploy_id: &str,
+        event_type: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), DbError> {
+        deploy_events::record_deploy_event(&self.pool, deploy_id, event_type, data).await
+    }
 
+    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError> {
+        deploy_events::list_deploy_events(&self.pool, deploy_id).await
+    }
+
+    async fn create_deploy_approval(
+        &self,
+        deploy_id: &str,
+        action: &str,
+        user_id: &str,
+        comment: Option<&str>,
+    ) -> Result<DeployApproval, DbError> {
+        deploy_approvals::create_deploy_approval(&self.pool, deploy_id, action, user_id, comment)
+            .await
+    }
+
+    async fn get_deploy_approval(
+        &self,
+        deploy_id: &str,
+    ) -> Result<Option<DeployApproval>, DbError> {
+        deploy_approvals::get_deploy_approval(&self.pool, deploy_id).await
+    }
+
+    async fn store_canary_result(
+        &self,
+        deploy_id: &str,
+        p50: f64,
+        p95: f64,
+        p99: f64,
+        errors: i32,
+        total: i32,
+        verdict: &str,
+    ) -> Result<CanaryResult, DbError> {
+        canary::store_canary_result(&self.pool, deploy_id, p50, p95, p99, errors, total, verdict)
+            .await
+    }
+
+    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError> {
+        canary::get_canary_baseline(&self.pool, app_id).await
+    }
+
+    async fn get_deploy_analytics(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<serde_json::Value, DbError> {
+        analytics::get_deploy_analytics(&self.pool, from, to).await
+    }
+
+    async fn update_deploy_container_id(
+        &self,
+        deploy_id: &str,
+        container_id: &str,
+    ) -> Result<(), DbError> {
+        deploys::update_deploy_container_id(&self.pool, deploy_id, container_id).await
+    }
+
+    async fn update_deploy_image_ref(
+        &self,
+        deploy_id: &str,
+        image_ref: &str,
+    ) -> Result<(), DbError> {
+        deploys::update_deploy_image_ref(&self.pool, deploy_id, image_ref).await
+    }
+
+    async fn update_deploy_env_snapshot(
+        &self,
+        deploy_id: &str,
+        env_snapshot: &str,
+    ) -> Result<(), DbError> {
+        deploys::update_deploy_env_snapshot(&self.pool, deploy_id, env_snapshot).await
+    }
+
+    async fn update_deploy_config_hash(
+        &self,
+        deploy_id: &str,
+        config_hash: &str,
+    ) -> Result<(), DbError> {
+        deploys::update_deploy_config_hash(&self.pool, deploy_id, config_hash).await
+    }
+}
+
+#[async_trait]
+impl DatabaseStore for SqliteDatabase {
     async fn create_managed_db(&self, db: &NewManagedDatabase) -> Result<ManagedDatabase, DbError> {
         databases::create_managed_db(&self.pool, &self.encryptor, db).await
     }
@@ -373,8 +538,55 @@ impl Database for SqliteDatabase {
         databases::delete_managed_db(&self.pool, id).await
     }
 
-    // --- Domains ---
+    async fn create_restore_record(
+        &self,
+        database_id: &str,
+        source_type: &str,
+        source_ref: Option<&str>,
+    ) -> Result<DatabaseRestoreRecord, DbError> {
+        restore::create_restore_record(&self.pool, database_id, source_type, source_ref).await
+    }
 
+    async fn update_restore_record(
+        &self,
+        id: &str,
+        status: &str,
+        output: Option<&str>,
+    ) -> Result<(), DbError> {
+        restore::update_restore_record(&self.pool, id, status, output).await
+    }
+
+    async fn list_restore_history(
+        &self,
+        database_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DatabaseRestoreRecord>, DbError> {
+        restore::list_restore_history(&self.pool, database_id, limit).await
+    }
+
+    async fn update_database_ssl(
+        &self,
+        id: &str,
+        ssl_enabled: bool,
+        ssl_mode: Option<&str>,
+    ) -> Result<(), DbError> {
+        databases::update_database_ssl(&self.pool, id, ssl_enabled, ssl_mode).await
+    }
+
+    async fn store_database_certs(
+        &self,
+        id: &str,
+        ca_cert: &str,
+        cert: &str,
+        key: &str,
+        expires_at: &str,
+    ) -> Result<(), DbError> {
+        databases::store_database_certs(&self.pool, id, ca_cert, cert, key, expires_at).await
+    }
+}
+
+#[async_trait]
+impl NetworkingStore for SqliteDatabase {
     async fn add_domain(&self, domain: &NewDomain) -> Result<Domain, DbError> {
         domains::add_domain(&self.pool, domain).await
     }
@@ -412,8 +624,6 @@ impl Database for SqliteDatabase {
     ) -> Result<(), DbError> {
         domains::update_domain_ssl_info(&self.pool, id, issuer, expires_at).await
     }
-
-    // --- Webhook endpoints ---
 
     async fn list_webhook_endpoints(&self) -> Result<Vec<WebhookEndpoint>, DbError> {
         webhooks::list_webhook_endpoints(&self.pool).await
@@ -459,14 +669,202 @@ impl Database for SqliteDatabase {
         webhooks::list_webhook_deliveries(&self.pool, endpoint_id, limit).await
     }
 
-    // --- Search ---
+    async fn allocate_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        port: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError> {
+        public_ports::allocate_public_port(
+            &self.pool,
+            resource_type,
+            resource_id,
+            port,
+            ip_whitelist,
+        )
+        .await
+    }
 
+    async fn allocate_free_public_port(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        range_start: i32,
+        range_end: i32,
+        ip_whitelist: Option<&str>,
+    ) -> Result<PublicPort, DbError> {
+        public_ports::allocate_free_public_port(
+            &self.pool,
+            resource_type,
+            resource_id,
+            range_start,
+            range_end,
+            ip_whitelist,
+        )
+        .await
+    }
+
+    async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError> {
+        public_ports::release_public_port(&self.pool, resource_id).await
+    }
+
+    async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError> {
+        public_ports::get_public_port(&self.pool, resource_id).await
+    }
+}
+
+#[async_trait]
+impl ObservabilityStore for SqliteDatabase {
     async fn search(&self, query: &str) -> Result<serde_json::Value, DbError> {
         search::search(&self.pool, query).await
     }
 
-    // --- Scheduled tasks ---
+    async fn record_config_change(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        field: &str,
+        old_value: Option<&str>,
+        new_value: Option<&str>,
+        changed_by: Option<&str>,
+    ) -> Result<(), DbError> {
+        config_history::record_config_change(
+            &self.pool,
+            resource_type,
+            resource_id,
+            field,
+            old_value,
+            new_value,
+            changed_by,
+        )
+        .await
+    }
 
+    async fn list_config_history(
+        &self,
+        resource_type: &str,
+        resource_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ConfigHistoryEntry>, DbError> {
+        config_history::list_config_history(&self.pool, resource_type, resource_id, limit).await
+    }
+
+    async fn record_drift_event(
+        &self,
+        app_id: &str,
+        drifted_fields: &str,
+        declared: Option<&str>,
+        actual: Option<&str>,
+    ) -> Result<DriftEvent, DbError> {
+        drift::record_drift_event(&self.pool, app_id, drifted_fields, declared, actual).await
+    }
+
+    async fn list_drift_events(
+        &self,
+        app_id: &str,
+        limit: i64,
+    ) -> Result<Vec<DriftEvent>, DbError> {
+        drift::list_drift_events(&self.pool, app_id, limit).await
+    }
+
+    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError> {
+        drift::resolve_drift_event(&self.pool, id).await
+    }
+
+    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError> {
+        incidents::create_incident(&self.pool, incident).await
+    }
+
+    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError> {
+        incidents::list_incidents(&self.pool, limit).await
+    }
+
+    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError> {
+        incidents::update_incident_status(&self.pool, id, status).await
+    }
+
+    async fn add_incident_note(
+        &self,
+        incident_id: &str,
+        content: &str,
+        author_id: Option<&str>,
+    ) -> Result<IncidentNote, DbError> {
+        incidents::add_incident_note(&self.pool, incident_id, content, author_id).await
+    }
+
+    async fn create_health_check(&self, hc: &NewHealthCheck) -> Result<HealthCheck, DbError> {
+        health::create_health_check(&self.pool, hc).await
+    }
+
+    async fn get_health_checks(&self, app_id: &str) -> Result<Vec<HealthCheck>, DbError> {
+        health::get_health_checks(&self.pool, app_id).await
+    }
+
+    async fn update_health_check(
+        &self,
+        id: &str,
+        interval_secs: Option<i64>,
+        failure_threshold: Option<i64>,
+        auto_restart: Option<bool>,
+        config: Option<&str>,
+    ) -> Result<(), DbError> {
+        health::update_health_check(
+            &self.pool,
+            id,
+            interval_secs,
+            failure_threshold,
+            auto_restart,
+            config,
+        )
+        .await
+    }
+
+    async fn delete_health_check(&self, id: &str) -> Result<(), DbError> {
+        health::delete_health_check(&self.pool, id).await
+    }
+
+    async fn record_health_event(&self, event: &NewHealthCheckEvent) -> Result<(), DbError> {
+        health::record_health_event(&self.pool, event).await
+    }
+
+    async fn get_health_events(
+        &self,
+        health_check_id: &str,
+        limit: i64,
+    ) -> Result<Vec<HealthCheckEvent>, DbError> {
+        health::get_health_events(&self.pool, health_check_id, limit).await
+    }
+
+    async fn get_health_events_for_checks(
+        &self,
+        health_check_ids: &[String],
+        limit_per_check: i64,
+    ) -> Result<Vec<HealthCheckEvent>, DbError> {
+        health::get_health_events_for_checks(&self.pool, health_check_ids, limit_per_check).await
+    }
+
+    async fn create_audit_log(&self, entry: &NewAuditLogEntry) -> Result<(), DbError> {
+        audit::create_audit_log(&self.pool, entry).await
+    }
+
+    async fn list_audit_logs(
+        &self,
+        server_id: Option<&str>,
+        action: Option<&str>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<AuditLogEntry>, DbError> {
+        audit::list_audit_logs(&self.pool, server_id, action, limit, offset).await
+    }
+
+    async fn prune_audit_logs(&self, older_than: &str) -> Result<u64, DbError> {
+        audit::prune_audit_logs(&self.pool, older_than).await
+    }
+}
+
+#[async_trait]
+impl TaskStore for SqliteDatabase {
     async fn list_scheduled_tasks(&self, app_id: &str) -> Result<Vec<ScheduledTask>, DbError> {
         scheduled_tasks::list_scheduled_tasks(&self.pool, app_id).await
     }
@@ -516,8 +914,6 @@ impl Database for SqliteDatabase {
         scheduled_tasks::list_task_executions(&self.pool, task_id, limit).await
     }
 
-    // --- Container cleanup ---
-
     async fn create_cleanup_execution(
         &self,
         server_id: &str,
@@ -554,77 +950,49 @@ impl Database for SqliteDatabase {
         cleanup::list_cleanup_executions(&self.pool, server_id, limit).await
     }
 
-    // --- App cloning ---
+    async fn get_cleanup_schedule(&self) -> Result<Option<CleanupSchedule>, DbError> {
+        cleanup_schedule::get_cleanup_schedule(&self.pool).await
+    }
 
-    async fn clone_app(
+    async fn upsert_cleanup_schedule(
         &self,
-        source_app_id: &str,
-        new_name: &str,
-        target_project_id: Option<&str>,
-        target_server_id: Option<&str>,
-    ) -> Result<App, DbError> {
-        apps::clone_app(
+        schedule: &CleanupSchedule,
+    ) -> Result<CleanupSchedule, DbError> {
+        cleanup_schedule::upsert_cleanup_schedule(&self.pool, schedule).await
+    }
+
+    async fn create_cleanup_run(&self) -> Result<CleanupRun, DbError> {
+        cleanup_runs::create_cleanup_run(&self.pool).await
+    }
+
+    async fn finish_cleanup_run(
+        &self,
+        id: &str,
+        status: &str,
+        freed_bytes: i64,
+        removed_items: i64,
+        error: Option<&str>,
+        details: Option<&str>,
+    ) -> Result<(), DbError> {
+        cleanup_runs::finish_cleanup_run(
             &self.pool,
-            source_app_id,
-            new_name,
-            target_project_id,
-            target_server_id,
+            id,
+            status,
+            freed_bytes,
+            removed_items,
+            error,
+            details,
         )
         .await
     }
 
-    // --- Database restore ---
-
-    async fn create_restore_record(
-        &self,
-        database_id: &str,
-        source_type: &str,
-        source_ref: Option<&str>,
-    ) -> Result<DatabaseRestoreRecord, DbError> {
-        restore::create_restore_record(&self.pool, database_id, source_type, source_ref).await
+    async fn list_cleanup_runs(&self, limit: i64) -> Result<Vec<CleanupRun>, DbError> {
+        cleanup_runs::list_cleanup_runs(&self.pool, limit).await
     }
+}
 
-    async fn update_restore_record(
-        &self,
-        id: &str,
-        status: &str,
-        output: Option<&str>,
-    ) -> Result<(), DbError> {
-        restore::update_restore_record(&self.pool, id, status, output).await
-    }
-
-    async fn list_restore_history(
-        &self,
-        database_id: &str,
-        limit: i64,
-    ) -> Result<Vec<DatabaseRestoreRecord>, DbError> {
-        restore::list_restore_history(&self.pool, database_id, limit).await
-    }
-
-    // --- Database SSL ---
-
-    async fn update_database_ssl(
-        &self,
-        id: &str,
-        ssl_enabled: bool,
-        ssl_mode: Option<&str>,
-    ) -> Result<(), DbError> {
-        databases::update_database_ssl(&self.pool, id, ssl_enabled, ssl_mode).await
-    }
-
-    async fn store_database_certs(
-        &self,
-        id: &str,
-        ca_cert: &str,
-        cert: &str,
-        key: &str,
-        expires_at: &str,
-    ) -> Result<(), DbError> {
-        databases::store_database_certs(&self.pool, id, ca_cert, cert, key, expires_at).await
-    }
-
-    // --- SSH keys ---
-
+#[async_trait]
+impl InfraStore for SqliteDatabase {
     async fn list_ssh_keys(&self, user_id: &str) -> Result<Vec<SshKey>, DbError> {
         ssh_keys::list_ssh_keys(&self.pool, user_id).await
     }
@@ -641,8 +1009,6 @@ impl Database for SqliteDatabase {
         ssh_keys::get_ssh_key(&self.pool, id).await
     }
 
-    // --- Container registries ---
-
     async fn list_registries(&self) -> Result<Vec<Registry>, DbError> {
         registries::list_registries(&self.pool, &self.encryptor).await
     }
@@ -655,54 +1021,112 @@ impl Database for SqliteDatabase {
         registries::delete_registry(&self.pool, id).await
     }
 
-    // --- Public ports ---
-
-    async fn allocate_public_port(
+    async fn get_server_metrics_for_forecast(
         &self,
-        resource_type: &str,
-        resource_id: &str,
-        port: i32,
-        ip_whitelist: Option<&str>,
-    ) -> Result<PublicPort, DbError> {
-        public_ports::allocate_public_port(
-            &self.pool,
-            resource_type,
-            resource_id,
-            port,
-            ip_whitelist,
-        )
-        .await
+        server_id: &str,
+        days: i64,
+    ) -> Result<Vec<(f64, f64, f64)>, DbError> {
+        forecast::get_server_metrics_for_forecast(&self.pool, server_id, days).await
     }
 
-    async fn allocate_free_public_port(
+    async fn insert_server_metric(
         &self,
-        resource_type: &str,
-        resource_id: &str,
-        range_start: i32,
-        range_end: i32,
-        ip_whitelist: Option<&str>,
-    ) -> Result<PublicPort, DbError> {
-        public_ports::allocate_free_public_port(
-            &self.pool,
-            resource_type,
-            resource_id,
-            range_start,
-            range_end,
-            ip_whitelist,
-        )
-        .await
+        snapshot: &crate::api::routes::server::ServerMetricsSnapshot,
+    ) -> Result<(), DbError> {
+        servers::insert_server_metric(&self.pool, snapshot).await
     }
 
-    async fn release_public_port(&self, resource_id: &str) -> Result<(), DbError> {
-        public_ports::release_public_port(&self.pool, resource_id).await
+    async fn query_server_metrics(
+        &self,
+        from: &str,
+        to: &str,
+        limit: usize,
+    ) -> Result<Vec<crate::api::routes::server::ServerMetricsSnapshot>, DbError> {
+        servers::query_server_metrics(&self.pool, from, to, limit).await
     }
 
-    async fn get_public_port(&self, resource_id: &str) -> Result<Option<PublicPort>, DbError> {
-        public_ports::get_public_port(&self.pool, resource_id).await
+    async fn prune_server_metrics(&self, older_than: &str) -> Result<u64, DbError> {
+        maintenance::prune_server_metrics(&self.pool, older_than).await
     }
 
-    // --- GitHub installations ---
+    async fn create_server(&self, server: &NewServer) -> Result<Server, DbError> {
+        servers::create_server(&self.pool, server).await
+    }
 
+    async fn get_server(&self, id: &str) -> Result<Option<Server>, DbError> {
+        servers::get_server(&self.pool, id).await
+    }
+
+    async fn get_server_by_token_hash(&self, hash: &str) -> Result<Option<Server>, DbError> {
+        servers::get_server_by_token_hash(&self.pool, hash).await
+    }
+
+    async fn list_servers(&self) -> Result<Vec<Server>, DbError> {
+        servers::list_servers(&self.pool).await
+    }
+
+    async fn update_server(&self, id: &str, update: &ServerUpdate) -> Result<Server, DbError> {
+        servers::update_server(&self.pool, id, update).await
+    }
+
+    async fn delete_server(&self, id: &str) -> Result<(), DbError> {
+        servers::delete_server(&self.pool, id).await
+    }
+
+    async fn update_server_heartbeat(&self, id: &str) -> Result<(), DbError> {
+        servers::update_server_heartbeat(&self.pool, id).await
+    }
+
+    async fn update_server_status(&self, id: &str, status: &str) -> Result<(), DbError> {
+        servers::update_server_status(&self.pool, id, status).await
+    }
+
+    async fn update_server_disk_alert_state(&self, id: &str, state: &str) -> Result<(), DbError> {
+        servers::update_server_disk_alert_state(&self.pool, id, state).await
+    }
+
+    async fn insert_server_metrics_record(
+        &self,
+        record: &NewServerMetricsRecord,
+    ) -> Result<ServerMetricsRecord, DbError> {
+        servers::insert_server_metrics_record(&self.pool, record).await
+    }
+
+    async fn query_server_metrics_history(
+        &self,
+        server_id: &str,
+        from: &str,
+        to: &str,
+        limit: usize,
+    ) -> Result<Vec<ServerMetricsRecord>, DbError> {
+        servers::query_server_metrics_history(&self.pool, server_id, from, to, limit).await
+    }
+
+    async fn prune_server_metrics_history(&self, older_than: &str) -> Result<u64, DbError> {
+        maintenance::prune_server_metrics_history(&self.pool, older_than).await
+    }
+
+    async fn record_container_metrics(
+        &self,
+        record: &crate::db::models::NewContainerMetricsRecord,
+    ) -> Result<(), DbError> {
+        container_metrics::record_container_metrics(&self.pool, record).await
+    }
+
+    async fn container_usage_stats(
+        &self,
+        days: i64,
+    ) -> Result<Vec<crate::db::models::ContainerUsageStats>, DbError> {
+        container_metrics::container_usage_stats(&self.pool, days).await
+    }
+
+    async fn prune_container_metrics(&self, keep_days: i64) -> Result<u64, DbError> {
+        container_metrics::prune_container_metrics(&self.pool, keep_days).await
+    }
+}
+
+#[async_trait]
+impl GitHubStore for SqliteDatabase {
     async fn create_github_installation(
         &self,
         installation_id: i64,
@@ -790,8 +1214,6 @@ impl Database for SqliteDatabase {
         .await
     }
 
-    // --- GitHub Apps ---
-
     async fn create_github_app(&self, app: &GitHubApp) -> Result<GitHubApp, DbError> {
         github::create_github_app(&self.pool, &self.encryptor, app).await
     }
@@ -822,163 +1244,10 @@ impl Database for SqliteDatabase {
     ) -> Result<Option<GitHubApp>, DbError> {
         github::get_github_app_for_installation(&self.pool, &self.encryptor, installation_id).await
     }
+}
 
-    // --- Config history ---
-
-    async fn record_config_change(
-        &self,
-        resource_type: &str,
-        resource_id: &str,
-        field: &str,
-        old_value: Option<&str>,
-        new_value: Option<&str>,
-        changed_by: Option<&str>,
-    ) -> Result<(), DbError> {
-        config_history::record_config_change(
-            &self.pool,
-            resource_type,
-            resource_id,
-            field,
-            old_value,
-            new_value,
-            changed_by,
-        )
-        .await
-    }
-
-    async fn list_config_history(
-        &self,
-        resource_type: &str,
-        resource_id: &str,
-        limit: i64,
-    ) -> Result<Vec<ConfigHistoryEntry>, DbError> {
-        config_history::list_config_history(&self.pool, resource_type, resource_id, limit).await
-    }
-
-    // --- Deploy events ---
-
-    async fn record_deploy_event(
-        &self,
-        deploy_id: &str,
-        event_type: &str,
-        data: &serde_json::Value,
-    ) -> Result<(), DbError> {
-        deploy_events::record_deploy_event(&self.pool, deploy_id, event_type, data).await
-    }
-
-    async fn list_deploy_events(&self, deploy_id: &str) -> Result<Vec<DeployEvent>, DbError> {
-        deploy_events::list_deploy_events(&self.pool, deploy_id).await
-    }
-
-    // --- Deploy approvals ---
-
-    async fn create_deploy_approval(
-        &self,
-        deploy_id: &str,
-        action: &str,
-        user_id: &str,
-        comment: Option<&str>,
-    ) -> Result<DeployApproval, DbError> {
-        deploy_approvals::create_deploy_approval(&self.pool, deploy_id, action, user_id, comment)
-            .await
-    }
-
-    async fn get_deploy_approval(
-        &self,
-        deploy_id: &str,
-    ) -> Result<Option<DeployApproval>, DbError> {
-        deploy_approvals::get_deploy_approval(&self.pool, deploy_id).await
-    }
-
-    // --- Canary results ---
-
-    async fn store_canary_result(
-        &self,
-        deploy_id: &str,
-        p50: f64,
-        p95: f64,
-        p99: f64,
-        errors: i32,
-        total: i32,
-        verdict: &str,
-    ) -> Result<CanaryResult, DbError> {
-        canary::store_canary_result(&self.pool, deploy_id, p50, p95, p99, errors, total, verdict)
-            .await
-    }
-
-    async fn get_canary_baseline(&self, app_id: &str) -> Result<Option<CanaryResult>, DbError> {
-        canary::get_canary_baseline(&self.pool, app_id).await
-    }
-
-    // --- Drift events ---
-
-    async fn record_drift_event(
-        &self,
-        app_id: &str,
-        drifted_fields: &str,
-        declared: Option<&str>,
-        actual: Option<&str>,
-    ) -> Result<DriftEvent, DbError> {
-        drift::record_drift_event(&self.pool, app_id, drifted_fields, declared, actual).await
-    }
-
-    async fn list_drift_events(
-        &self,
-        app_id: &str,
-        limit: i64,
-    ) -> Result<Vec<DriftEvent>, DbError> {
-        drift::list_drift_events(&self.pool, app_id, limit).await
-    }
-
-    async fn resolve_drift_event(&self, id: &str) -> Result<(), DbError> {
-        drift::resolve_drift_event(&self.pool, id).await
-    }
-
-    // --- Resource forecasting ---
-
-    async fn get_server_metrics_for_forecast(
-        &self,
-        server_id: &str,
-        days: i64,
-    ) -> Result<Vec<(f64, f64, f64)>, DbError> {
-        forecast::get_server_metrics_for_forecast(&self.pool, server_id, days).await
-    }
-
-    // --- Incidents ---
-
-    async fn create_incident(&self, incident: &NewIncident) -> Result<Incident, DbError> {
-        incidents::create_incident(&self.pool, incident).await
-    }
-
-    async fn list_incidents(&self, limit: i64) -> Result<Vec<Incident>, DbError> {
-        incidents::list_incidents(&self.pool, limit).await
-    }
-
-    async fn update_incident_status(&self, id: &str, status: &str) -> Result<(), DbError> {
-        incidents::update_incident_status(&self.pool, id, status).await
-    }
-
-    async fn add_incident_note(
-        &self,
-        incident_id: &str,
-        content: &str,
-        author_id: Option<&str>,
-    ) -> Result<IncidentNote, DbError> {
-        incidents::add_incident_note(&self.pool, incident_id, content, author_id).await
-    }
-
-    // --- Deploy analytics ---
-
-    async fn get_deploy_analytics(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> Result<serde_json::Value, DbError> {
-        analytics::get_deploy_analytics(&self.pool, from, to).await
-    }
-
-    // --- Service templates ---
-
+#[async_trait]
+impl MiscStore for SqliteDatabase {
     async fn list_service_templates(&self) -> Result<Vec<ServiceTemplate>, DbError> {
         let templates = sqlx::query_as::<_, ServiceTemplate>(
             "SELECT * FROM service_templates ORDER BY name ASC",
@@ -988,8 +1257,79 @@ impl Database for SqliteDatabase {
         Ok(templates)
     }
 
-    // --- Users ---
+    async fn prune_expired_sessions(&self, older_than: &str) -> Result<u64, DbError> {
+        maintenance::prune_expired_sessions(&self.pool, older_than).await
+    }
 
+    async fn prune_expired_tokens(&self) -> Result<u64, DbError> {
+        maintenance::prune_expired_tokens(&self.pool).await
+    }
+
+    async fn prune_expired_invitations(&self) -> Result<u64, DbError> {
+        maintenance::prune_expired_invitations(&self.pool).await
+    }
+
+    async fn prune_health_check_events(&self, older_than: &str) -> Result<u64, DbError> {
+        maintenance::prune_health_check_events(&self.pool, older_than).await
+    }
+
+    async fn prune_old_deploys(&self, older_than: &str, keep_per_app: i64) -> Result<u64, DbError> {
+        maintenance::prune_old_deploys(&self.pool, older_than, keep_per_app).await
+    }
+
+    async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
+        log_drains::create_log_drain(&self.pool, &self.encryptor, drain).await
+    }
+
+    async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError> {
+        log_drains::list_log_drains_for_app(&self.pool, &self.encryptor, app_id).await
+    }
+
+    async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError> {
+        log_drains::list_global_log_drains(&self.pool, &self.encryptor).await
+    }
+
+    async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
+        log_drains::update_log_drain(&self.pool, &self.encryptor, id, drain).await
+    }
+
+    async fn delete_log_drain(&self, id: &str) -> Result<(), DbError> {
+        log_drains::delete_log_drain(&self.pool, id).await
+    }
+
+    async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError> {
+        log_drains::get_log_drain(&self.pool, &self.encryptor, id).await
+    }
+
+    async fn list_shared_variables(
+        &self,
+        scope: &str,
+        scope_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::list_shared_variables(&self.pool, &self.encryptor, scope, scope_id).await
+    }
+
+    async fn set_shared_variable(
+        &self,
+        var: &NewSharedVariable,
+    ) -> Result<SharedVariable, DbError> {
+        shared_variables::set_shared_variable(&self.pool, &self.encryptor, var).await
+    }
+
+    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError> {
+        shared_variables::delete_shared_variable(&self.pool, id).await
+    }
+
+    async fn get_shared_variables_for_app(
+        &self,
+        app_id: &str,
+    ) -> Result<Vec<SharedVariable>, DbError> {
+        shared_variables::get_shared_variables_for_app(&self.pool, &self.encryptor, app_id).await
+    }
+}
+
+#[async_trait]
+impl UserStore for SqliteDatabase {
     async fn create_user(&self, user: &NewUser) -> Result<User, DbError> {
         users::create_user(&self.pool, user).await
     }
@@ -1041,8 +1381,6 @@ impl Database for SqliteDatabase {
         users::list_users(&self.pool).await
     }
 
-    // --- User Profile Updates ---
-
     async fn update_user_password(
         &self,
         user_id: &str,
@@ -1054,168 +1392,6 @@ impl Database for SqliteDatabase {
     async fn update_user_email(&self, user_id: &str, email: &str) -> Result<(), DbError> {
         users::update_user_email(&self.pool, user_id, email).await
     }
-
-    // --- Server Metrics (legacy single-server) ---
-
-    async fn insert_server_metric(
-        &self,
-        snapshot: &crate::api::routes::server::ServerMetricsSnapshot,
-    ) -> Result<(), DbError> {
-        servers::insert_server_metric(&self.pool, snapshot).await
-    }
-
-    async fn query_server_metrics(
-        &self,
-        from: &str,
-        to: &str,
-        limit: usize,
-    ) -> Result<Vec<crate::api::routes::server::ServerMetricsSnapshot>, DbError> {
-        servers::query_server_metrics(&self.pool, from, to, limit).await
-    }
-
-    async fn prune_server_metrics(&self, older_than: &str) -> Result<u64, DbError> {
-        maintenance::prune_server_metrics(&self.pool, older_than).await
-    }
-
-    // --- Health Checks ---
-
-    async fn create_health_check(&self, hc: &NewHealthCheck) -> Result<HealthCheck, DbError> {
-        health::create_health_check(&self.pool, hc).await
-    }
-
-    async fn get_health_checks(&self, app_id: &str) -> Result<Vec<HealthCheck>, DbError> {
-        health::get_health_checks(&self.pool, app_id).await
-    }
-
-    async fn update_health_check(
-        &self,
-        id: &str,
-        interval_secs: Option<i64>,
-        failure_threshold: Option<i64>,
-        auto_restart: Option<bool>,
-        config: Option<&str>,
-    ) -> Result<(), DbError> {
-        health::update_health_check(
-            &self.pool,
-            id,
-            interval_secs,
-            failure_threshold,
-            auto_restart,
-            config,
-        )
-        .await
-    }
-
-    async fn delete_health_check(&self, id: &str) -> Result<(), DbError> {
-        health::delete_health_check(&self.pool, id).await
-    }
-
-    async fn record_health_event(&self, event: &NewHealthCheckEvent) -> Result<(), DbError> {
-        health::record_health_event(&self.pool, event).await
-    }
-
-    async fn get_health_events(
-        &self,
-        health_check_id: &str,
-        limit: i64,
-    ) -> Result<Vec<HealthCheckEvent>, DbError> {
-        health::get_health_events(&self.pool, health_check_id, limit).await
-    }
-
-    async fn get_health_events_for_checks(
-        &self,
-        health_check_ids: &[String],
-        limit_per_check: i64,
-    ) -> Result<Vec<HealthCheckEvent>, DbError> {
-        health::get_health_events_for_checks(&self.pool, health_check_ids, limit_per_check).await
-    }
-
-    // --- Notifications ---
-
-    async fn create_notification_channel(
-        &self,
-        channel: &NewNotification,
-    ) -> Result<Notification, DbError> {
-        notifications::create_notification_channel(&self.pool, &self.encryptor, channel).await
-    }
-
-    async fn list_notification_channels(&self) -> Result<Vec<Notification>, DbError> {
-        notifications::list_notification_channels(&self.pool, &self.encryptor).await
-    }
-
-    async fn create_notification_rule(
-        &self,
-        rule: &NewNotificationRule,
-    ) -> Result<NotificationRule, DbError> {
-        notifications::create_notification_rule(&self.pool, rule).await
-    }
-
-    async fn get_notification_rules(&self, app_id: &str) -> Result<Vec<NotificationRule>, DbError> {
-        notifications::get_notification_rules(&self.pool, app_id).await
-    }
-
-    async fn get_notification_rules_by_event(
-        &self,
-        event_type: &str,
-    ) -> Result<Vec<NotificationRule>, DbError> {
-        notifications::get_notification_rules_by_event(&self.pool, event_type).await
-    }
-
-    // --- Lookup helpers ---
-
-    async fn get_app_by_repo(&self, repo_url: &str) -> Result<Option<App>, DbError> {
-        deploys::get_app_by_repo(&self.pool, repo_url).await
-    }
-
-    async fn get_environment_by_branch(
-        &self,
-        app_id: &str,
-        branch: &str,
-    ) -> Result<Option<Environment>, DbError> {
-        environments::get_environment_by_branch(&self.pool, app_id, branch).await
-    }
-
-    // --- Deploy extras ---
-
-    async fn update_deploy_container_id(
-        &self,
-        deploy_id: &str,
-        container_id: &str,
-    ) -> Result<(), DbError> {
-        deploys::update_deploy_container_id(&self.pool, deploy_id, container_id).await
-    }
-
-    async fn update_deploy_image_ref(
-        &self,
-        deploy_id: &str,
-        image_ref: &str,
-    ) -> Result<(), DbError> {
-        deploys::update_deploy_image_ref(&self.pool, deploy_id, image_ref).await
-    }
-
-    async fn update_deploy_env_snapshot(
-        &self,
-        deploy_id: &str,
-        env_snapshot: &str,
-    ) -> Result<(), DbError> {
-        deploys::update_deploy_env_snapshot(&self.pool, deploy_id, env_snapshot).await
-    }
-
-    async fn update_deploy_config_hash(
-        &self,
-        deploy_id: &str,
-        config_hash: &str,
-    ) -> Result<(), DbError> {
-        deploys::update_deploy_config_hash(&self.pool, deploy_id, config_hash).await
-    }
-
-    // --- Env var extras ---
-
-    async fn delete_env_vars_by_environment(&self, environment_id: &str) -> Result<(), DbError> {
-        environments::delete_env_vars_by_environment(&self.pool, environment_id).await
-    }
-
-    // --- Sessions ---
 
     async fn create_session(&self, user_id: &str, expires_at: &str) -> Result<Session, DbError> {
         sessions::create_session(&self.pool, user_id, expires_at).await
@@ -1244,8 +1420,6 @@ impl Database for SqliteDatabase {
     ) -> Result<(), DbError> {
         sessions::delete_user_sessions_except(&self.pool, user_id, keep_session_id).await
     }
-
-    // --- API Tokens ---
 
     async fn create_api_token(
         &self,
@@ -1278,8 +1452,6 @@ impl Database for SqliteDatabase {
         sessions::update_token_last_used(&self.pool, id).await
     }
 
-    // --- Invitations ---
-
     async fn create_invitation(
         &self,
         email: &str,
@@ -1297,8 +1469,6 @@ impl Database for SqliteDatabase {
     async fn delete_invitation(&self, id: &str) -> Result<(), DbError> {
         sessions::delete_invitation(&self.pool, id).await
     }
-
-    // --- Onboarding ---
 
     async fn get_onboarding(
         &self,
@@ -1320,8 +1490,73 @@ impl Database for SqliteDatabase {
             .await
     }
 
-    // --- Instance Backup ---
+    async fn delete_user(&self, user_id: &str) -> Result<(), DbError> {
+        users::delete_user(&self.pool, user_id).await
+    }
 
+    async fn count_admin_users(&self) -> Result<i64, DbError> {
+        users::count_admin_users(&self.pool).await
+    }
+
+    async fn get_user_preferences(&self, user_id: &str) -> Result<serde_json::Value, DbError> {
+        users::get_user_preferences(&self.pool, user_id).await
+    }
+
+    async fn update_user_preferences(
+        &self,
+        user_id: &str,
+        preferences: &serde_json::Value,
+    ) -> Result<(), DbError> {
+        users::update_user_preferences(&self.pool, user_id, preferences).await
+    }
+
+    async fn admin_reset_user_2fa(&self, user_id: &str) -> Result<(), DbError> {
+        users::admin_reset_user_2fa(&self.pool, user_id).await
+    }
+}
+
+#[async_trait]
+impl NotificationStore for SqliteDatabase {
+    async fn create_notification_channel(
+        &self,
+        channel: &NewNotification,
+    ) -> Result<Notification, DbError> {
+        notifications::create_notification_channel(&self.pool, &self.encryptor, channel).await
+    }
+
+    async fn list_notification_channels(&self) -> Result<Vec<Notification>, DbError> {
+        notifications::list_notification_channels(&self.pool, &self.encryptor).await
+    }
+
+    async fn delete_notification_channel(&self, id: &str) -> Result<(), DbError> {
+        notifications::delete_notification_channel(&self.pool, id).await
+    }
+
+    async fn create_notification_rule(
+        &self,
+        rule: &NewNotificationRule,
+    ) -> Result<NotificationRule, DbError> {
+        notifications::create_notification_rule(&self.pool, rule).await
+    }
+
+    async fn delete_notification_rule(&self, id: &str) -> Result<(), DbError> {
+        notifications::delete_notification_rule(&self.pool, id).await
+    }
+
+    async fn get_notification_rules(&self, app_id: &str) -> Result<Vec<NotificationRule>, DbError> {
+        notifications::get_notification_rules(&self.pool, app_id).await
+    }
+
+    async fn get_notification_rules_by_event(
+        &self,
+        event_type: &str,
+    ) -> Result<Vec<NotificationRule>, DbError> {
+        notifications::get_notification_rules_by_event(&self.pool, event_type).await
+    }
+}
+
+#[async_trait]
+impl BackupStore for SqliteDatabase {
     async fn get_instance_backup_config(&self) -> Result<Option<InstanceBackupConfig>, DbError> {
         backups::get_instance_backup_config(&self.pool).await
     }
@@ -1362,12 +1597,25 @@ impl Database for SqliteDatabase {
         backups::list_instance_backup_history(&self.pool, limit).await
     }
 
+    async fn fail_stale_instance_backups(&self) -> Result<u64, DbError> {
+        backups::fail_stale_instance_backups(&self.pool).await
+    }
+
+    async fn has_running_instance_backup(&self) -> Result<bool, DbError> {
+        backups::has_running_instance_backup(&self.pool).await
+    }
+
     async fn delete_instance_backup_record(&self, id: &str) -> Result<(), DbError> {
         backups::delete_instance_backup_record(&self.pool, id).await
     }
 
-    // --- OAuth Identities ---
+    async fn vacuum_into(&self, path: &str) -> Result<(), DbError> {
+        maintenance::vacuum_into(&self.pool, path).await
+    }
+}
 
+#[async_trait]
+impl OAuthStore for SqliteDatabase {
     async fn create_oauth_identity(
         &self,
         user_id: &str,
@@ -1404,8 +1652,6 @@ impl Database for SqliteDatabase {
         oauth::delete_oauth_identity(&self.pool, id).await
     }
 
-    // --- OAuth Settings ---
-
     async fn get_oauth_settings(&self) -> Result<Option<OAuthSettings>, DbError> {
         oauth::get_oauth_settings(&self.pool, &self.encryptor).await
     }
@@ -1413,8 +1659,6 @@ impl Database for SqliteDatabase {
     async fn upsert_oauth_settings(&self, settings: &OAuthSettings) -> Result<(), DbError> {
         oauth::upsert_oauth_settings(&self.pool, &self.encryptor, settings).await
     }
-
-    // --- Registration Settings ---
 
     async fn get_registration_settings(&self) -> Result<RegistrationSettings, DbError> {
         oauth::get_registration_settings(&self.pool).await
@@ -1434,59 +1678,10 @@ impl Database for SqliteDatabase {
         )
         .await
     }
+}
 
-    // --- User Deletion ---
-
-    async fn delete_user(&self, user_id: &str) -> Result<(), DbError> {
-        users::delete_user(&self.pool, user_id).await
-    }
-
-    async fn count_admin_users(&self) -> Result<i64, DbError> {
-        users::count_admin_users(&self.pool).await
-    }
-
-    // --- User Preferences ---
-
-    async fn get_user_preferences(&self, user_id: &str) -> Result<serde_json::Value, DbError> {
-        users::get_user_preferences(&self.pool, user_id).await
-    }
-
-    async fn update_user_preferences(
-        &self,
-        user_id: &str,
-        preferences: &serde_json::Value,
-    ) -> Result<(), DbError> {
-        users::update_user_preferences(&self.pool, user_id, preferences).await
-    }
-
-    // --- Admin 2FA reset ---
-
-    async fn admin_reset_user_2fa(&self, user_id: &str) -> Result<(), DbError> {
-        users::admin_reset_user_2fa(&self.pool, user_id).await
-    }
-
-    // --- Audit Log ---
-
-    async fn create_audit_log(&self, entry: &NewAuditLogEntry) -> Result<(), DbError> {
-        audit::create_audit_log(&self.pool, entry).await
-    }
-
-    async fn list_audit_logs(
-        &self,
-        server_id: Option<&str>,
-        action: Option<&str>,
-        limit: u32,
-        offset: u32,
-    ) -> Result<Vec<AuditLogEntry>, DbError> {
-        audit::list_audit_logs(&self.pool, server_id, action, limit, offset).await
-    }
-
-    async fn prune_audit_logs(&self, older_than: &str) -> Result<u64, DbError> {
-        audit::prune_audit_logs(&self.pool, older_than).await
-    }
-
-    // --- Update State ---
-
+#[async_trait]
+impl UpdateStore for SqliteDatabase {
     async fn get_update_state(&self) -> Result<UpdateState, DbError> {
         updates::get_update_state(&self.pool).await
     }
@@ -1527,8 +1722,6 @@ impl Database for SqliteDatabase {
         updates::set_last_check_at(&self.pool, timestamp).await
     }
 
-    // --- Update Preferences ---
-
     async fn set_update_channel(&self, channel: &str) -> Result<(), DbError> {
         updates::set_update_channel(&self.pool, channel).await
     }
@@ -1560,8 +1753,6 @@ impl Database for SqliteDatabase {
         deploys::has_active_deploys(&self.pool).await
     }
 
-    // --- Skipped Versions ---
-
     async fn skip_update_version(&self, version: &str) -> Result<(), DbError> {
         updates::skip_update_version(&self.pool, version).await
     }
@@ -1570,8 +1761,6 @@ impl Database for SqliteDatabase {
         updates::is_version_skipped(&self.pool, version).await
     }
 
-    // --- Update History ---
-
     async fn record_update_history(&self, entry: &UpdateHistoryEntry) -> Result<(), DbError> {
         updates::record_update_history(&self.pool, entry).await
     }
@@ -1579,252 +1768,10 @@ impl Database for SqliteDatabase {
     async fn list_update_history(&self, limit: usize) -> Result<Vec<UpdateHistoryEntry>, DbError> {
         updates::list_update_history(&self.pool, limit).await
     }
+}
 
-    // --- Servers ---
-
-    async fn create_server(&self, server: &NewServer) -> Result<Server, DbError> {
-        servers::create_server(&self.pool, server).await
-    }
-
-    async fn get_server(&self, id: &str) -> Result<Option<Server>, DbError> {
-        servers::get_server(&self.pool, id).await
-    }
-
-    async fn get_server_by_token_hash(&self, hash: &str) -> Result<Option<Server>, DbError> {
-        servers::get_server_by_token_hash(&self.pool, hash).await
-    }
-
-    async fn list_servers(&self) -> Result<Vec<Server>, DbError> {
-        servers::list_servers(&self.pool).await
-    }
-
-    async fn update_server(&self, id: &str, update: &ServerUpdate) -> Result<Server, DbError> {
-        servers::update_server(&self.pool, id, update).await
-    }
-
-    async fn delete_server(&self, id: &str) -> Result<(), DbError> {
-        servers::delete_server(&self.pool, id).await
-    }
-
-    async fn update_server_heartbeat(&self, id: &str) -> Result<(), DbError> {
-        servers::update_server_heartbeat(&self.pool, id).await
-    }
-
-    async fn update_server_status(&self, id: &str, status: &str) -> Result<(), DbError> {
-        servers::update_server_status(&self.pool, id, status).await
-    }
-
-    async fn update_server_disk_alert_state(&self, id: &str, state: &str) -> Result<(), DbError> {
-        servers::update_server_disk_alert_state(&self.pool, id, state).await
-    }
-
-    // --- Server Metrics History ---
-
-    async fn insert_server_metrics_record(
-        &self,
-        record: &NewServerMetricsRecord,
-    ) -> Result<ServerMetricsRecord, DbError> {
-        servers::insert_server_metrics_record(&self.pool, record).await
-    }
-
-    async fn query_server_metrics_history(
-        &self,
-        server_id: &str,
-        from: &str,
-        to: &str,
-        limit: usize,
-    ) -> Result<Vec<ServerMetricsRecord>, DbError> {
-        servers::query_server_metrics_history(&self.pool, server_id, from, to, limit).await
-    }
-
-    async fn prune_server_metrics_history(&self, older_than: &str) -> Result<u64, DbError> {
-        maintenance::prune_server_metrics_history(&self.pool, older_than).await
-    }
-
-    // --- Container Metrics History (IF-191) ---
-
-    async fn record_container_metrics(
-        &self,
-        record: &crate::db::models::NewContainerMetricsRecord,
-    ) -> Result<(), DbError> {
-        container_metrics::record_container_metrics(&self.pool, record).await
-    }
-
-    async fn container_usage_stats(
-        &self,
-        days: i64,
-    ) -> Result<Vec<crate::db::models::ContainerUsageStats>, DbError> {
-        container_metrics::container_usage_stats(&self.pool, days).await
-    }
-
-    async fn prune_container_metrics(&self, keep_days: i64) -> Result<u64, DbError> {
-        container_metrics::prune_container_metrics(&self.pool, keep_days).await
-    }
-
-    // --- Cleanup / Pruning ---
-
-    async fn prune_expired_sessions(&self, older_than: &str) -> Result<u64, DbError> {
-        maintenance::prune_expired_sessions(&self.pool, older_than).await
-    }
-
-    async fn prune_expired_tokens(&self) -> Result<u64, DbError> {
-        maintenance::prune_expired_tokens(&self.pool).await
-    }
-
-    async fn prune_expired_invitations(&self) -> Result<u64, DbError> {
-        maintenance::prune_expired_invitations(&self.pool).await
-    }
-
-    async fn prune_health_check_events(&self, older_than: &str) -> Result<u64, DbError> {
-        maintenance::prune_health_check_events(&self.pool, older_than).await
-    }
-
-    async fn prune_old_deploys(&self, older_than: &str, keep_per_app: i64) -> Result<u64, DbError> {
-        maintenance::prune_old_deploys(&self.pool, older_than, keep_per_app).await
-    }
-
-    // --- Backup ---
-
-    async fn vacuum_into(&self, path: &str) -> Result<(), DbError> {
-        maintenance::vacuum_into(&self.pool, path).await
-    }
-
-    // --- Log Drains ---
-
-    async fn create_log_drain(&self, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
-        log_drains::create_log_drain(&self.pool, &self.encryptor, drain).await
-    }
-
-    async fn list_log_drains_for_app(&self, app_id: &str) -> Result<Vec<LogDrain>, DbError> {
-        log_drains::list_log_drains_for_app(&self.pool, &self.encryptor, app_id).await
-    }
-
-    async fn list_global_log_drains(&self) -> Result<Vec<LogDrain>, DbError> {
-        log_drains::list_global_log_drains(&self.pool, &self.encryptor).await
-    }
-
-    async fn update_log_drain(&self, id: &str, drain: &NewLogDrain) -> Result<LogDrain, DbError> {
-        log_drains::update_log_drain(&self.pool, &self.encryptor, id, drain).await
-    }
-
-    async fn delete_log_drain(&self, id: &str) -> Result<(), DbError> {
-        log_drains::delete_log_drain(&self.pool, id).await
-    }
-
-    async fn get_log_drain(&self, id: &str) -> Result<Option<LogDrain>, DbError> {
-        log_drains::get_log_drain(&self.pool, &self.encryptor, id).await
-    }
-
-    // --- Project Environments ---
-
-    async fn create_project_environment(
-        &self,
-        env: &NewProjectEnvironment,
-    ) -> Result<ProjectEnvironment, DbError> {
-        project_environments::create_project_environment(&self.pool, env).await
-    }
-
-    async fn list_project_environments(
-        &self,
-        project_id: &str,
-    ) -> Result<Vec<ProjectEnvironment>, DbError> {
-        project_environments::list_project_environments(&self.pool, project_id).await
-    }
-
-    async fn update_project_environment(
-        &self,
-        id: &str,
-        name: &str,
-        color: Option<&str>,
-    ) -> Result<ProjectEnvironment, DbError> {
-        project_environments::update_project_environment(&self.pool, id, name, color).await
-    }
-
-    async fn delete_project_environment(&self, id: &str) -> Result<(), DbError> {
-        project_environments::delete_project_environment(&self.pool, id).await
-    }
-
-    async fn get_project_environment(
-        &self,
-        id: &str,
-    ) -> Result<Option<ProjectEnvironment>, DbError> {
-        project_environments::get_project_environment(&self.pool, id).await
-    }
-
-    // --- Cleanup Schedule ---
-
-    async fn get_cleanup_schedule(&self) -> Result<Option<CleanupSchedule>, DbError> {
-        cleanup_schedule::get_cleanup_schedule(&self.pool).await
-    }
-
-    async fn upsert_cleanup_schedule(
-        &self,
-        schedule: &CleanupSchedule,
-    ) -> Result<CleanupSchedule, DbError> {
-        cleanup_schedule::upsert_cleanup_schedule(&self.pool, schedule).await
-    }
-
-    // --- Cleanup Runs ---
-
-    async fn create_cleanup_run(&self) -> Result<CleanupRun, DbError> {
-        cleanup_runs::create_cleanup_run(&self.pool).await
-    }
-
-    async fn finish_cleanup_run(
-        &self,
-        id: &str,
-        status: &str,
-        freed_bytes: i64,
-        removed_items: i64,
-        error: Option<&str>,
-        details: Option<&str>,
-    ) -> Result<(), DbError> {
-        cleanup_runs::finish_cleanup_run(
-            &self.pool,
-            id,
-            status,
-            freed_bytes,
-            removed_items,
-            error,
-            details,
-        )
-        .await
-    }
-
-    async fn list_cleanup_runs(&self, limit: i64) -> Result<Vec<CleanupRun>, DbError> {
-        cleanup_runs::list_cleanup_runs(&self.pool, limit).await
-    }
-
-    // --- Shared Variables ---
-
-    async fn list_shared_variables(
-        &self,
-        scope: &str,
-        scope_id: &str,
-    ) -> Result<Vec<SharedVariable>, DbError> {
-        shared_variables::list_shared_variables(&self.pool, &self.encryptor, scope, scope_id).await
-    }
-
-    async fn set_shared_variable(
-        &self,
-        var: &NewSharedVariable,
-    ) -> Result<SharedVariable, DbError> {
-        shared_variables::set_shared_variable(&self.pool, &self.encryptor, var).await
-    }
-
-    async fn delete_shared_variable(&self, id: &str) -> Result<(), DbError> {
-        shared_variables::delete_shared_variable(&self.pool, id).await
-    }
-
-    async fn get_shared_variables_for_app(
-        &self,
-        app_id: &str,
-    ) -> Result<Vec<SharedVariable>, DbError> {
-        shared_variables::get_shared_variables_for_app(&self.pool, &self.encryptor, app_id).await
-    }
-
-    // --- Team-scoped queries ---
-
+#[async_trait]
+impl TeamStore for SqliteDatabase {
     async fn list_apps_by_team(&self, team_id: &str) -> Result<Vec<App>, DbError> {
         team_scoping::list_apps_by_team(&self.pool, team_id).await
     }
@@ -1882,8 +1829,6 @@ impl Database for SqliteDatabase {
     async fn set_database_team(&self, db_id: &str, team_id: &str) -> Result<(), DbError> {
         team_scoping::set_database_team(&self.pool, db_id, team_id).await
     }
-
-    // --- Teams ---
 
     async fn create_team(&self, team: &NewTeam) -> Result<Team, DbError> {
         teams::create_team(&self.pool, team).await
@@ -1982,8 +1927,6 @@ impl Database for SqliteDatabase {
         teams::set_session_team(&self.pool, session_id, team_id).await
     }
 
-    // --- Cross-team server sharing ---
-
     async fn share_server_with_team(
         &self,
         server_id: &str,
@@ -2009,9 +1952,10 @@ impl Database for SqliteDatabase {
     ) -> Result<Vec<(Server, String)>, DbError> {
         teams::list_servers_shared_with_team(&self.pool, team_id).await
     }
+}
 
-    // --- Migrations ---
-
+#[async_trait]
+impl Database for SqliteDatabase {
     async fn run_migrations(&self) -> Result<(), DbError> {
         maintenance::run_migrations(&self.pool).await
     }

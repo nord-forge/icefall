@@ -1,5 +1,23 @@
 @import './tokens.css';
 
+/* Self-hosted variable fonts (served from /fonts, so they satisfy the CSP's
+   font-src 'self'). Replaces the Google Fonts <link> tags, which the CSP blocked
+   — that's why type was silently falling back to system fonts. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-variable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-variable.woff2') format('woff2');
+}
+
 *,
 *::before,
 *::after {
@@ -20,6 +38,9 @@ body {
   line-height: var(--leading-normal);
   color: var(--color-text);
   background: var(--color-bg);
+  /* Native checkboxes/radios/range sliders default to the green brand color
+     instead of the browser's blue. Custom-styled controls set their own. */
+  accent-color: var(--color-primary);
 }
 
 a {

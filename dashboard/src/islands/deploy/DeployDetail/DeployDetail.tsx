@@ -26,10 +26,21 @@ export default function DeployDetail({ appId, deployId, appName }: Props) {
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.listDeploys(appId).then(({ data }) => {
-      const d = data.find((d) => d.id === deployId);
-      if (d) setDeploy(d);
-    });
+    let cancelled = false;
+    // Fetch the specific deploy directly. On first deploy the record may be
+    // created a beat after we navigate here, so retry briefly before giving up
+    // instead of rendering an empty page until a manual refresh.
+    const load = (attempt: number) => {
+      api.getDeploy(appId, deployId)
+        .then(({ data }) => { if (!cancelled) setDeploy(data); })
+        .catch(() => {
+          if (!cancelled && attempt < 5) {
+            setTimeout(() => load(attempt + 1), 600);
+          }
+        });
+    };
+    load(0);
+    return () => { cancelled = true; };
   }, [appId, deployId]);
 
   useEffect(() => {

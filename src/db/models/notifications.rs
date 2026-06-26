@@ -6,11 +6,14 @@ pub struct Notification {
     pub channel_type: String,
     pub config: String,
     pub created_at: String,
+    /// Email of the admin who created the channel; None for pre-existing rows.
+    pub created_by: Option<String>,
 }
 
 pub struct NewNotification {
     pub channel_type: String,
     pub config: String,
+    pub created_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

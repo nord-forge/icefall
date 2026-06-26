@@ -90,6 +90,9 @@
 
 .terminalContainer {
   flex: 1;
+  /* min-height:0 lets this flex item actually shrink to its track so it reports
+     a real height to xterm's fit addon; without it the box can compute to 0 rows. */
+  min-height: 0;
   background: var(--term-bg);
   padding: var(--space-2);
   overflow: hidden;

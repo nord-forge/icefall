@@ -50,6 +50,10 @@ const DB_COLORS: Record<string, string> = {
   mongo: 'oklch(0.55 0.15 140)',
 };
 
+// Engines we can both dump and restore — backups are only shown for these.
+// Mirrors backup_supported() on the backend.
+const BACKUP_SUPPORTED = new Set(['postgres', 'mysql', 'mariadb', 'mongo']);
+
 export default function DatabasesPage() {
   const cachedDbs = useStore($databases);
   const wasLoaded = useStore($databasesLoaded);
@@ -170,6 +174,7 @@ export default function DatabasesPage() {
             </div>
           </div>
 
+          {BACKUP_SUPPORTED.has(selectedDb.db_type) && (
           <div class={styles.card}>
             <div class={styles.backupHeader}>
               <h3 class={styles.cardTitle}>Backups</h3>
@@ -241,6 +246,7 @@ export default function DatabasesPage() {
               </table>
             )}
           </div>
+          )}
 
           <div class={styles.card}>
             <DatabasePublicAccess dbId={selectedDb.id} />
@@ -324,8 +330,8 @@ export default function DatabasesPage() {
               onChange={(v) => setNewDb({ ...newDb, name: v })}
               placeholder="my-database"
             />
-            <div>
-              <label htmlFor="db-create-type" class={formStyles.label}>Type</label>
+            <div class={formStyles.field}>
+              <label htmlFor="db-create-type" class={formStyles.fieldLabel}>Type</label>
               <Select
                 id="db-create-type"
                 options={[

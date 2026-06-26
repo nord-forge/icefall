@@ -19,7 +19,15 @@ use crate::events::{EventBus, EventType};
 
 use helpers::{
     atomic_symlink, cleanup_old_deploys, copy_dir_recursive, install_command, run_command,
+    toolchain_available,
 };
+
+/// Whether the native pipeline can actually run for this detection: the
+/// framework must be native-eligible AND the host must have the package
+/// manager's toolchain. Otherwise the caller falls back to the container build.
+pub fn can_use_native(detection: &DetectionResult) -> bool {
+    should_use_native(detection) && toolchain_available(&detection.package_manager)
+}
 
 /// Determines whether a detected framework should use the native (static) pipeline.
 pub fn should_use_native(detection: &DetectionResult) -> bool {

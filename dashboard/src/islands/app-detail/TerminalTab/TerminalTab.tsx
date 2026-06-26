@@ -30,20 +30,23 @@ export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props
   const wsRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
 
+  // Connecting just flips status. The terminal itself is created in an effect
+  // AFTER the connected-view DOM (and thus terminalRef) is committed — calling
+  // term.open() synchronously here would hit a still-null terminalRef (the empty
+  // state had unmounted that div), leaving an empty container that can't focus.
   const connect = useCallback(() => {
-    // Clean up any existing connection
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-
     if (xtermRef.current) {
       xtermRef.current.dispose();
       xtermRef.current = null;
     }
-
     setStatus('connecting');
+  }, []);
 
+  const openTerminal = useCallback(() => {
     const term = new XTerm({
       cursorBlink: true,
       fontFamily: 'var(--font-mono), "Fira Code", "JetBrains Mono", "Cascadia Code", monospace',
@@ -82,14 +85,33 @@ export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props
 
     if (terminalRef.current) {
       term.open(terminalRef.current);
-      // Delay fit to ensure the DOM element has dimensions
-      requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {
-          // Container may not have dimensions yet
+      // The container can still be 0×0 on the frame after open() (flex/grid
+      // layout not settled), which makes fit() compute a 0-row grid — xterm then
+      // renders no rows and no focusable textarea, so the terminal looks blank
+      // and can't be clicked into. Retry fit until the container has real
+      // dimensions, then focus so the user can type immediately.
+      const tryFit = (attempt: number) => {
+        const el = terminalRef.current;
+        if (!el) return;
+        if (el.clientHeight > 0 && el.clientWidth > 0) {
+          try {
+            fitAddon.fit();
+          } catch {
+            // ignore transient fit errors
+          }
+          term.focus();
+          // Push the freshly-fit size to the backend so the PTY matches.
+          const dims = fitAddon.proposeDimensions();
+          if (dims && wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+          }
+          return;
         }
-      });
+        if (attempt < 20) {
+          requestAnimationFrame(() => tryFit(attempt + 1));
+        }
+      };
+      requestAnimationFrame(() => tryFit(0));
     }
 
     const url = getWebSocketUrl(resolvedPath);
@@ -152,6 +174,15 @@ export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props
     });
   }, [resolvedPath]);
 
+  // Once status flips to 'connecting', the connected view (with terminalRef) has
+  // rendered — now it's safe to create and open the terminal. Guard with the ref
+  // so we only open once per connection.
+  useEffect(() => {
+    if (status === 'connecting' && terminalRef.current && !xtermRef.current) {
+      openTerminal();
+    }
+  }, [status, openTerminal]);
+
   // Handle terminal resize
   useEffect(() => {
     function handleResize() {
@@ -204,6 +235,11 @@ export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props
   function handleDisconnect() {
     wsRef.current?.close();
     wsRef.current = null;
+    // Dispose and clear the xterm instance too, so the empty-state guard
+    // (status === 'disconnected' && !xtermRef.current) tears the terminal UI
+    // back down to the Connect screen instead of leaving a dead black panel.
+    xtermRef.current?.dispose();
+    xtermRef.current = null;
     setStatus('disconnected');
   }
 
@@ -263,7 +299,9 @@ export default function TerminalTab({ appId, wsPath, warning, emptyHint }: Props
               Reconnect
             </button>
           )}
-          {status === 'connected' && (
+          {/* After a session ends the xterm panel lingers; offer Close to tear it
+              back down to the Connect screen, not just Reconnect. */}
+          {(status === 'connected' || (status === 'disconnected' && xtermRef.current)) && (
             <button
               type="button"
               class={styles.ghostButton}

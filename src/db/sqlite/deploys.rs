@@ -145,18 +145,34 @@ pub(super) async fn update_deploy_status(
     status: &str,
     log: Option<&str>,
 ) -> Result<(), DbError> {
-    let now = now_iso8601();
+    // Only stamp finished_at on terminal states — a deploy that is still
+    // "building"/"deploying" must not look finished, or the UI computes a
+    // duration and stops treating it as in-progress.
+    let finished_at = match status {
+        "running" | "failed" | "stopped" | "cancelled" | "missed" => Some(now_iso8601()),
+        _ => None,
+    };
 
     sqlx::query(
-        "UPDATE deploys SET status = ?, build_log = COALESCE(?, build_log), finished_at = ? WHERE id = ?",
+        "UPDATE deploys SET status = ?, build_log = COALESCE(?, build_log), \
+         finished_at = COALESCE(?, finished_at) WHERE id = ?",
     )
     .bind(status)
     .bind(log)
-    .bind(&now)
+    .bind(finished_at)
     .bind(id)
     .execute(pool)
     .await?;
 
+    Ok(())
+}
+
+pub(super) async fn set_deploy_log(pool: &SqlitePool, id: &str, log: &str) -> Result<(), DbError> {
+    sqlx::query("UPDATE deploys SET build_log = ? WHERE id = ?")
+        .bind(log)
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

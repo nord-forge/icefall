@@ -14,10 +14,10 @@ import {
   ChevronUp,
 } from 'lucide-preact';
 import Button from '@islands/shared/Button/Button';
-import { $updateInfo, $updateStatus, $updateDialogOpen } from '@stores/update';
+import { $updateInfo, $updateStatus, $updateDialogOpen, mapUpdateStatus } from '@stores/update';
 import { api } from '@lib/api';
 import { addToast } from '@stores/toast';
-import type { UpdateStep, UpdateStatus } from '@stores/update';
+import type { UpdateStep } from '@stores/update';
 import styles from './update-dialog.module.css';
 
 const STEP_LABELS: Record<string, string> = {
@@ -145,7 +145,7 @@ export default function UpdateDialog() {
     async function poll() {
       try {
         const res = await api.getUpdateStatus();
-        $updateStatus.set(res.data);
+        $updateStatus.set(mapUpdateStatus(res.data));
       } catch {
         // SSE drop during restart is expected
       }
@@ -190,12 +190,48 @@ export default function UpdateDialog() {
   async function handleBeginUpdate() {
     setStarting(true);
     try {
+      // The binary must be downloaded before /apply will accept it. Kick off the
+      // download, then poll status until it's ready (or errors) before applying.
+      await api.downloadUpdate();
+
+      const ready = await waitForDownload();
+      if (!ready) {
+        setStarting(false);
+        return; // waitForDownload already surfaced the error and set failed state
+      }
+
       const res = await api.applyUpdate();
-      $updateStatus.set(res.data);
+      $updateStatus.set({
+        state: 'applying',
+        target_version: res.data.version,
+        steps: $updateStatus.get()?.steps ?? [],
+        error: null,
+      });
     } catch (err: any) {
       addToast('error', err.message || 'Failed to start update');
     }
     setStarting(false);
+  }
+
+  // Poll /status until the download reaches 'ready'. Drives the progress UI via
+  // the mapped status. Returns true when ready, false if it errored/timed out.
+  async function waitForDownload(): Promise<boolean> {
+    const deadline = Date.now() + 10 * 60 * 1000; // 10 min cap
+    while (Date.now() < deadline) {
+      const res = await api.getUpdateStatus();
+      const mapped = mapUpdateStatus(res.data);
+      $updateStatus.set(mapped);
+
+      if (res.data.download_state === 'ready') return true;
+      if (res.data.download_state === 'error') {
+        addToast('error', res.data.error_message || 'Download failed');
+        return false;
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    addToast('error', 'Update download timed out');
+    $updateStatus.set({ state: 'failed', target_version: info?.latest_version ?? null, steps: $updateStatus.get()?.steps ?? [], error: 'Download timed out' });
+    return false;
   }
 
   function getTotalDuration(): string {

@@ -53,6 +53,14 @@ pub(super) async fn try_auto_apply(
         return Ok(());
     }
 
+    // Never apply an update while a backup is running — the update restarts the
+    // daemon, which would interrupt the backup mid-write and risk a corrupt or
+    // truncated archive. Wait and retry on the next tick.
+    if db.has_running_instance_backup().await? {
+        info!("auto-update: instance backup in progress, deferring update");
+        return Ok(());
+    }
+
     let binary_path = match state.download_path.as_deref() {
         Some(p) => p.to_string(),
         None => return Err("no download path".into()),

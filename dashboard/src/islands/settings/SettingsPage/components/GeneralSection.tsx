@@ -77,9 +77,9 @@ export default function GeneralSection({ onSaveMessage }: Props) {
           placeholder="recovery@example.com"
           helpText="Receives password reset links if the admin account is locked out."
         />
-        <div>
+        <div class={formStyles.field}>
           {/* a11y [1.3.1]: label explicitly associated with the timezone select */}
-          <label htmlFor="sp-timezone" class={formStyles.label}>Timezone</label>
+          <label htmlFor="sp-timezone" class={formStyles.fieldLabel}>Timezone</label>
           <Select
             id="sp-timezone"
             options={TIMEZONES.map(tz => ({ value: tz, label: tz.replace(/_/g, ' ') }))}

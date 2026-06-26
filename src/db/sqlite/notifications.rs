@@ -14,13 +14,14 @@ pub(super) async fn create_notification_channel(
     let encrypted_config = encryptor.encrypt(channel.config.as_bytes())?;
 
     sqlx::query(
-        "INSERT INTO notifications (id, channel_type, config_encrypted, created_at)
-         VALUES (?, ?, ?, ?)",
+        "INSERT INTO notifications (id, channel_type, config_encrypted, created_at, created_by)
+         VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&channel.channel_type)
     .bind(&encrypted_config)
     .bind(&now)
+    .bind(&channel.created_by)
     .execute(pool)
     .await?;
 
@@ -29,6 +30,7 @@ pub(super) async fn create_notification_channel(
         channel_type: channel.channel_type.clone(),
         config: channel.config.clone(),
         created_at: now,
+        created_by: channel.created_by.clone(),
     })
 }
 
@@ -37,7 +39,7 @@ pub(super) async fn list_notification_channels(
     encryptor: &Encryptor,
 ) -> Result<Vec<Notification>, DbError> {
     let rows = sqlx::query(
-        "SELECT id, channel_type, config_encrypted, created_at FROM notifications ORDER BY created_at",
+        "SELECT id, channel_type, config_encrypted, created_at, created_by FROM notifications ORDER BY created_at",
     )
     .fetch_all(pool)
     .await?;
@@ -53,9 +55,36 @@ pub(super) async fn list_notification_channels(
             channel_type: row.get("channel_type"),
             config,
             created_at: row.get("created_at"),
+            created_by: row.get("created_by"),
         });
     }
     Ok(channels)
+}
+
+pub(super) async fn delete_notification_channel(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<(), DbError> {
+    // Remove dependent rules first, then the channel. The FK is ON DELETE
+    // CASCADE, but we delete rules explicitly so the channel is gone even if
+    // foreign_keys enforcement is off on this connection.
+    sqlx::query("DELETE FROM notification_rules WHERE notification_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM notifications WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub(super) async fn delete_notification_rule(pool: &SqlitePool, id: &str) -> Result<(), DbError> {
+    sqlx::query("DELETE FROM notification_rules WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub(super) async fn create_notification_rule(

@@ -17,6 +17,40 @@ pub(super) struct ListAppsQuery {
 /// per-service), `raw-compose` (IF-173, file to CLI). Unset defaults to `auto`.
 const VALID_DEPLOY_MODES: &[&str] = &["auto", "compose", "raw-compose"];
 
+/// Validate that an app name is safe to embed in a Docker image reference
+/// (`icefall/{name}:{tag}`). Bad names (spaces, colons, uppercase) otherwise
+/// surface much later as a cryptic "invalid reference format" build failure.
+fn validate_app_name(name: &str) -> Result<(), ApiError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(ApiError::BadRequest("App name must not be empty".into()));
+    }
+    if trimmed.len() > 63 {
+        return Err(ApiError::BadRequest(
+            "App name must be 63 characters or fewer".into(),
+        ));
+    }
+    let valid = trimmed
+        .bytes()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_' | b'.'));
+    let edges_ok = trimmed
+        .bytes()
+        .next()
+        .is_some_and(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        && trimmed
+            .bytes()
+            .next_back()
+            .is_some_and(|b| b.is_ascii_lowercase() || b.is_ascii_digit());
+    if !valid || !edges_ok {
+        return Err(ApiError::BadRequest(
+            "App name may use only lowercase letters, digits, '-', '_', '.', \
+             and must start and end with a letter or digit"
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Build a build_config JSON string from the create request's overrides,
 /// omitting unset/blank fields. Returns None when no override was provided.
 fn build_config_json(body: &CreateAppRequest) -> Option<String> {
@@ -144,11 +178,7 @@ pub(super) async fn create_app(
     // Creating an app requires at least member role in the team.
     ctx.verify_team_access(&ctx.team_id, TeamRole::Member)?;
 
-    if body.name.trim().is_empty() {
-        return Err(ApiError::BadRequest(
-            "App name must not be empty".to_string(),
-        ));
-    }
+    validate_app_name(&body.name)?;
 
     validate_deploy_mode(body.deploy_mode.as_deref())?;
 
@@ -271,6 +301,9 @@ pub(super) async fn update_app(
     ctx.verify_team_access(&app.team_id, TeamRole::Member)?;
 
     validate_deploy_mode(body.deploy_mode.as_deref())?;
+    if let Some(ref name) = body.name {
+        validate_app_name(name)?;
+    }
 
     let app = state
         .db
@@ -388,5 +421,16 @@ mod tests {
         assert!(validate_deploy_mode(Some("compose")).is_ok());
         assert!(validate_deploy_mode(Some("raw-compose")).is_ok());
         assert!(validate_deploy_mode(Some("bogus")).is_err());
+    }
+
+    #[test]
+    fn app_name_validation() {
+        assert!(validate_app_name("webgl-portfolio").is_ok());
+        assert!(validate_app_name("my_app.2").is_ok());
+        assert!(validate_app_name("").is_err());
+        assert!(validate_app_name("My App").is_err()); // space + uppercase
+        assert!(validate_app_name("bad:name").is_err()); // colon
+        assert!(validate_app_name("-leading").is_err()); // bad edge
+        assert!(validate_app_name("npm: not found").is_err());
     }
 }

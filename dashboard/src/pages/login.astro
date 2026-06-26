@@ -9,9 +9,8 @@ import '../styles/global.css';
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign in | Icefall</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap" />
+    <!-- Self-hosted fonts (declared via @font-face in global.css); CSP blocks Google Fonts. -->
+    <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin />
     <style is:inline>
       html { box-sizing: border-box; }
       *, *::before, *::after { box-sizing: inherit; margin: 0; padding: 0; }

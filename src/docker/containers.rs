@@ -335,16 +335,35 @@ impl DockerClient {
         container: &str,
         cmd: &[String],
     ) -> Result<String, DockerError> {
+        self.exec_in_container_with_env(container, cmd, &[]).await
+    }
+
+    /// Like `exec_in_container`, but sets environment variables for the exec.
+    /// Used to pass DB passwords via `MYSQL_PWD` so they neither appear in the
+    /// container process list nor trigger the mysql CLI's insecure-password
+    /// warning (which otherwise pollutes parsed stdout).
+    pub async fn exec_in_container_with_env(
+        &self,
+        container: &str,
+        cmd: &[String],
+        env: &[String],
+    ) -> Result<String, DockerError> {
         use bollard::container::LogOutput;
         use bollard::exec::{CreateExecOptions, StartExecResults};
         use futures_util::StreamExt;
 
+        let env = if env.is_empty() {
+            None
+        } else {
+            Some(env.to_vec())
+        };
         let exec = self
             .inner()
             .create_exec(
                 container,
                 CreateExecOptions {
                     cmd: Some(cmd.to_vec()),
+                    env,
                     attach_stdout: Some(true),
                     attach_stderr: Some(true),
                     ..Default::default()
@@ -372,5 +391,53 @@ impl DockerClient {
         }
 
         Ok(output)
+    }
+
+    /// Write `bytes` to `dest_path` inside the container. The Docker archive API
+    /// only accepts tar streams, so the bytes are wrapped in a one-entry tar
+    /// (named by `dest_path`'s file name) and extracted into its parent dir.
+    /// Used to stage a backup dump for restore.
+    pub async fn write_file_to_container(
+        &self,
+        container: &str,
+        dest_path: &str,
+        bytes: &[u8],
+    ) -> Result<(), DockerError> {
+        use bollard::query_parameters::UploadToContainerOptionsBuilder;
+
+        let path = std::path::Path::new(dest_path);
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| DockerError::Unavailable(format!("invalid dest path: {dest_path}")))?;
+        let parent = path
+            .parent()
+            .and_then(|p| p.to_str())
+            .filter(|p| !p.is_empty())
+            .unwrap_or("/");
+
+        let mut tar_buf = Vec::new();
+        {
+            let mut builder = tar::Builder::new(&mut tar_buf);
+            let mut header = tar::Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, file_name, bytes)
+                .map_err(|e| DockerError::Unavailable(format!("tar build failed: {e}")))?;
+            builder
+                .finish()
+                .map_err(|e| DockerError::Unavailable(format!("tar finalize failed: {e}")))?;
+        }
+
+        let options = UploadToContainerOptionsBuilder::default()
+            .path(parent)
+            .build();
+        let body = bollard::body_full(tar_buf.into());
+        self.inner()
+            .upload_to_container(container, Some(options), body)
+            .await?;
+        Ok(())
     }
 }

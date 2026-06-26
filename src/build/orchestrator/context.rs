@@ -1,8 +1,12 @@
+#[cfg(test)]
 use std::path::Path;
 
+#[cfg(test)]
 use bytes::Bytes;
 
-use crate::build::{BuildError, BuildStep, BuildStepStatus};
+#[cfg(test)]
+use crate::build::BuildError;
+use crate::build::{BuildStep, BuildStepStatus};
 use crate::db::models::now_iso8601;
 
 pub(super) fn new_step(name: &str) -> BuildStep {
@@ -20,6 +24,9 @@ pub(super) fn finish_step(step: &mut BuildStep, status: BuildStepStatus) {
     step.finished_at = Some(now_iso8601());
 }
 
+// Retained for the build-context archive test; the live build path now streams
+// via the runtime CLI from the source directory, so this is test-only.
+#[cfg(test)]
 pub(super) const IGNORE_DIRS: &[&str] = &[
     "node_modules",
     ".git",
@@ -33,6 +40,7 @@ pub(super) const IGNORE_DIRS: &[&str] = &[
     "dist",
 ];
 
+#[cfg(test)]
 pub(super) fn create_build_context(project_dir: &Path) -> Result<Bytes, BuildError> {
     let buf = Vec::new();
     let encoder = flate2::write::GzEncoder::new(buf, flate2::Compression::fast());
@@ -85,4 +93,40 @@ pub(super) fn redact_secrets(line: &str, secrets: &[String]) -> String {
         }
     }
     result
+}
+
+/// Coerce an app name into a valid Docker image-name component (lowercase
+/// alphanumerics and `-_.`, trimmed at the edges). Falls back to "app" if
+/// nothing usable remains.
+pub(super) fn sanitize_image_name(name: &str) -> String {
+    let mapped: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = mapped.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+    if trimmed.is_empty() {
+        "app".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_image_name;
+
+    #[test]
+    fn sanitizes_bad_names() {
+        assert_eq!(sanitize_image_name("My App"), "my-app");
+        assert_eq!(sanitize_image_name("webgl-portfolio"), "webgl-portfolio");
+        assert_eq!(sanitize_image_name("  weird:name!! "), "weird-name");
+        assert_eq!(sanitize_image_name("***"), "app");
+    }
 }

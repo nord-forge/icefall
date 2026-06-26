@@ -91,8 +91,8 @@ pub(super) async fn get_oauth_settings(
     encryptor: &Encryptor,
 ) -> Result<Option<OAuthSettings>, DbError> {
     let row = sqlx::query(
-        "SELECT github_client_id, github_client_secret_encrypted, github_enabled,
-                google_client_id, google_client_secret_encrypted, google_enabled
+        "SELECT github_client_id, github_client_secret_encrypted, github_enabled, github_configured_at,
+                google_client_id, google_client_secret_encrypted, google_enabled, google_configured_at
          FROM oauth_settings WHERE id = 'singleton'",
     )
     .fetch_optional(pool)
@@ -123,9 +123,11 @@ pub(super) async fn get_oauth_settings(
                 github_client_id: row.get("github_client_id"),
                 github_client_secret,
                 github_enabled: row.get::<bool, _>("github_enabled"),
+                github_configured_at: row.get("github_configured_at"),
                 google_client_id: row.get("google_client_id"),
                 google_client_secret,
                 google_enabled: row.get::<bool, _>("google_enabled"),
+                google_configured_at: row.get("google_configured_at"),
             }))
         }
         None => Ok(None),
@@ -150,24 +152,28 @@ pub(super) async fn upsert_oauth_settings(
     };
 
     sqlx::query(
-        "INSERT INTO oauth_settings (id, github_client_id, github_client_secret_encrypted, github_enabled,
-                                      google_client_id, google_client_secret_encrypted, google_enabled, updated_at)
-         VALUES ('singleton', ?, ?, ?, ?, ?, ?, ?)
+        "INSERT INTO oauth_settings (id, github_client_id, github_client_secret_encrypted, github_enabled, github_configured_at,
+                                      google_client_id, google_client_secret_encrypted, google_enabled, google_configured_at, updated_at)
+         VALUES ('singleton', ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
             github_client_id = excluded.github_client_id,
             github_client_secret_encrypted = excluded.github_client_secret_encrypted,
             github_enabled = excluded.github_enabled,
+            github_configured_at = excluded.github_configured_at,
             google_client_id = excluded.google_client_id,
             google_client_secret_encrypted = excluded.google_client_secret_encrypted,
             google_enabled = excluded.google_enabled,
+            google_configured_at = excluded.google_configured_at,
             updated_at = excluded.updated_at",
     )
     .bind(&settings.github_client_id)
     .bind(&github_secret_enc)
     .bind(settings.github_enabled)
+    .bind(&settings.github_configured_at)
     .bind(&settings.google_client_id)
     .bind(&google_secret_enc)
     .bind(settings.google_enabled)
+    .bind(&settings.google_configured_at)
     .bind(&now)
     .execute(pool)
     .await?;

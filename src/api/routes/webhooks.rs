@@ -247,8 +247,12 @@ async fn trigger_deploy(
     tokio::spawn(async move {
         let _guard = lock.lock().await;
 
-        let orchestrator =
-            BuildOrchestrator::new(state.docker.clone(), state.db.clone(), state.config.clone());
+        let orchestrator = BuildOrchestrator::new(
+            state.docker.clone(),
+            state.db.clone(),
+            state.config.clone(),
+            state.event_bus.clone(),
+        );
 
         match orchestrator
             .build(&deploy_id, &app, build_config, false)

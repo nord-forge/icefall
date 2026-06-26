@@ -27,6 +27,7 @@ pub(super) async fn list_channels(
                 "channel_type": c.channel_type,
                 "config": "••••••••",
                 "created_at": c.created_at,
+                "created_by": c.created_by,
             })
         })
         .collect();
@@ -66,6 +67,7 @@ pub(super) async fn create_channel(
         .create_notification_channel(&NewNotification {
             channel_type: body.channel_type,
             config: config_str,
+            created_by: Some(caller.email.clone()),
         })
         .await?;
 
@@ -86,7 +88,7 @@ pub(super) async fn delete_channel(
         return Err(ApiError::BadRequest("Admin access required".into()));
     }
 
-    let _ = id;
+    state.db.delete_notification_channel(&id).await?;
     Ok(Json(serde_json::json!({ "message": "deleted" })))
 }
 
@@ -118,8 +120,10 @@ pub(super) async fn test_channel(
         Ok(()) => Ok(Json(
             serde_json::json!({ "message": "test notification sent" }),
         )),
-        Err(e) => Ok(Json(
-            serde_json::json!({ "message": format!("test failed: {e}") }),
-        )),
+        // A failed test must NOT return 200 — the dashboard was treating the
+        // failure body as success. Use 503 (not 400, which the API client routes
+        // through its auth-redirect path) and carry the reason
+        // (e.g. "discord config missing 'webhook_url'") so the UI can show it.
+        Err(e) => Err(ApiError::ServiceUnavailable(format!("test failed: {e}"))),
     }
 }

@@ -90,7 +90,7 @@ export default function InstanceBackupSection({ onSaveMessage }: Props) {
     setIbTriggering(true);
     try {
       await api.triggerInstanceBackup();
-      onSaveMessage('Instance backup triggered');
+      onSaveMessage('Your backup will start soon');
       setTimeout(async () => {
         try {
           const d = await api.listInstanceBackupHistory();

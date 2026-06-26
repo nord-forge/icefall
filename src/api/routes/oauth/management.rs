@@ -146,10 +146,12 @@ pub(super) async fn get_oauth_settings(
                 "github_client_id": s.github_client_id,
                 "github_has_secret": s.github_client_secret.is_some(),
                 "github_enabled": s.github_enabled,
+                "github_configured_at": s.github_configured_at,
                 "github_callback_url": format!("{base}/api/v1/auth/oauth/github/callback"),
                 "google_client_id": s.google_client_id,
                 "google_has_secret": s.google_client_secret.is_some(),
                 "google_enabled": s.google_enabled,
+                "google_configured_at": s.google_configured_at,
                 "google_callback_url": format!("{base}/api/v1/auth/oauth/google/callback"),
             }
         }))),
@@ -165,6 +167,23 @@ pub(super) async fn get_oauth_settings(
                 "google_callback_url": format!("{base}/api/v1/auth/oauth/google/callback"),
             }
         }))),
+    }
+}
+
+/// A provider counts as configured once it has a client id + secret and is enabled.
+fn is_configured(client_id: &Option<String>, secret: &Option<String>, enabled: bool) -> bool {
+    enabled
+        && client_id.as_deref().is_some_and(|s| !s.is_empty())
+        && secret.as_deref().is_some_and(|s| !s.is_empty())
+}
+
+/// Keep the original configured_at if still configured; stamp now on first
+/// configuration; clear it when no longer configured.
+fn configured_at(existing: Option<String>, configured: bool) -> Option<String> {
+    match (configured, existing) {
+        (true, Some(ts)) => Some(ts),
+        (true, None) => Some(crate::db::models::now_iso8601()),
+        (false, _) => None,
     }
 }
 
@@ -202,18 +221,42 @@ pub(super) async fn update_oauth_settings(
             github_client_id: None,
             github_client_secret: None,
             github_enabled: false,
+            github_configured_at: None,
             google_client_id: None,
             google_client_secret: None,
             google_enabled: false,
+            google_configured_at: None,
         });
 
+    let github_client_id = body.github_client_id.or(existing.github_client_id);
+    let github_client_secret = body.github_client_secret.or(existing.github_client_secret);
+    let github_enabled = body.github_enabled.unwrap_or(existing.github_enabled);
+    let google_client_id = body.google_client_id.or(existing.google_client_id);
+    let google_client_secret = body.google_client_secret.or(existing.google_client_secret);
+    let google_enabled = body.google_enabled.unwrap_or(existing.google_enabled);
+
+    // "Configured" = has client_id + secret AND is enabled. Stamp configured_at
+    // on the transition to configured (preserving the original date if it was
+    // already set), and clear it when the provider is no longer configured — so
+    // the UI's "Connected since {date}" reflects the first successful setup.
+    let github_configured_at = configured_at(
+        existing.github_configured_at,
+        is_configured(&github_client_id, &github_client_secret, github_enabled),
+    );
+    let google_configured_at = configured_at(
+        existing.google_configured_at,
+        is_configured(&google_client_id, &google_client_secret, google_enabled),
+    );
+
     let updated = OAuthSettings {
-        github_client_id: body.github_client_id.or(existing.github_client_id),
-        github_client_secret: body.github_client_secret.or(existing.github_client_secret),
-        github_enabled: body.github_enabled.unwrap_or(existing.github_enabled),
-        google_client_id: body.google_client_id.or(existing.google_client_id),
-        google_client_secret: body.google_client_secret.or(existing.google_client_secret),
-        google_enabled: body.google_enabled.unwrap_or(existing.google_enabled),
+        github_client_id,
+        github_client_secret,
+        github_enabled,
+        github_configured_at,
+        google_client_id,
+        google_client_secret,
+        google_enabled,
+        google_configured_at,
     };
 
     state.db.upsert_oauth_settings(&updated).await?;
@@ -228,10 +271,12 @@ pub(super) async fn update_oauth_settings(
             "github_client_id": updated.github_client_id,
             "github_has_secret": updated.github_client_secret.is_some(),
             "github_enabled": updated.github_enabled,
+            "github_configured_at": updated.github_configured_at,
             "github_callback_url": format!("{base}/api/v1/auth/oauth/github/callback"),
             "google_client_id": updated.google_client_id,
             "google_has_secret": updated.google_client_secret.is_some(),
             "google_enabled": updated.google_enabled,
+            "google_configured_at": updated.google_configured_at,
             "google_callback_url": format!("{base}/api/v1/auth/oauth/google/callback"),
         },
         "message": "OAuth settings updated"

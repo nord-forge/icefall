@@ -16,6 +16,7 @@ pub fn routes() -> Router<AppState> {
             "/apps/{id}/deploys",
             get(query::list_deploys).post(operations::create_deploy),
         )
+        .route("/apps/{id}/deploys/{deploy_id}", get(query::get_deploy))
         .route(
             "/apps/{id}/deploys/{deploy_id}/rollback",
             post(operations::rollback_deploy),

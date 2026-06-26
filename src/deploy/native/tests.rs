@@ -13,6 +13,7 @@ fn static_frameworks_are_native() {
         start_command: None,
         detected_port: 80,
         astro_mode: astro,
+        yarn_berry: false,
     };
 
     assert!(should_use_native(&make(Framework::StaticSite, None)));
@@ -31,6 +32,30 @@ fn static_frameworks_are_native() {
         Framework::Astro,
         Some(AstroMode::Ssr)
     )));
+}
+
+#[test]
+fn can_use_native_requires_toolchain() {
+    use crate::build::{DetectionResult, Framework, PackageManager};
+
+    // A package manager that is never installed on a build host.
+    let det = DetectionResult {
+        framework: Framework::StaticSite,
+        package_manager: PackageManager::Bun,
+        node_version: "22".to_string(),
+        build_command: None,
+        output_dir: None,
+        start_command: None,
+        detected_port: 80,
+        astro_mode: None,
+        yarn_berry: false,
+    };
+    // Framework is native-eligible, but with no `bun` on PATH the native path
+    // must be refused so the caller falls back to the container build.
+    assert!(should_use_native(&det));
+    if !helpers::toolchain_available(&PackageManager::Bun) {
+        assert!(!can_use_native(&det));
+    }
 }
 
 #[test]
