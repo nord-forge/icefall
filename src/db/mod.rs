@@ -664,6 +664,12 @@ pub trait Database: Send + Sync + 'static {
         &self,
         limit: i64,
     ) -> Result<Vec<InstanceBackupRecord>, DbError>;
+    /// Mark orphaned "running" backups as failed (startup reconciliation).
+    /// Returns how many records were reconciled.
+    async fn fail_stale_instance_backups(&self) -> Result<u64, DbError>;
+    /// True if any instance backup is currently running. Used to block updates
+    /// (which restart the daemon) so a backup is never interrupted mid-write.
+    async fn has_running_instance_backup(&self) -> Result<bool, DbError>;
     async fn delete_instance_backup_record(&self, id: &str) -> Result<(), DbError>;
 
     // OAuth Identities

@@ -1366,6 +1366,14 @@ impl Database for SqliteDatabase {
         backups::list_instance_backup_history(&self.pool, limit).await
     }
 
+    async fn fail_stale_instance_backups(&self) -> Result<u64, DbError> {
+        backups::fail_stale_instance_backups(&self.pool).await
+    }
+
+    async fn has_running_instance_backup(&self) -> Result<bool, DbError> {
+        backups::has_running_instance_backup(&self.pool).await
+    }
+
     async fn delete_instance_backup_record(&self, id: &str) -> Result<(), DbError> {
         backups::delete_instance_backup_record(&self.pool, id).await
     }

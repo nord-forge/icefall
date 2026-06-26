@@ -157,6 +157,15 @@ pub(super) async fn apply_update(
         ));
     }
 
+    // Applying an update restarts the daemon; refuse while a backup is running
+    // so it can't be interrupted mid-write (corruption guard).
+    if state.db.has_running_instance_backup().await? {
+        return Err(ApiError::BadRequest(
+            "A backup is currently running. Wait for it to finish before applying an update."
+                .into(),
+        ));
+    }
+
     let version = update_state
         .available_version
         .as_deref()

@@ -114,6 +114,15 @@ impl DaemonRunner {
         info!("Database connected and migrations applied");
         let db: Arc<dyn Database> = Arc::new(db);
 
+        // Reconcile orphaned backups: a "running" record means the previous
+        // process died mid-backup (deploy/restart/crash), so it can never
+        // finish. Mark them failed so the UI stops showing "In progress".
+        match db.fail_stale_instance_backups().await {
+            Ok(0) => {}
+            Ok(n) => warn!("Marked {n} interrupted instance backup(s) as failed on startup"),
+            Err(e) => warn!("Could not reconcile stale instance backups: {e}"),
+        }
+
         // Connect to container runtime
         info!(
             "Connecting to {} runtime at {}",

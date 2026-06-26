@@ -1,4 +1,4 @@
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 
 use crate::db::models::*;
 use crate::db::DbError;
@@ -66,6 +66,35 @@ pub(super) async fn create_instance_backup_record(
         started_at: now,
         finished_at: None,
     })
+}
+
+/// Mark every still-"running" instance backup as failed. Called at startup:
+/// a running record means the process that owned it died mid-backup (deploy,
+/// restart, crash), so it can never complete and would otherwise show
+/// "In progress" forever.
+pub(super) async fn fail_stale_instance_backups(pool: &SqlitePool) -> Result<u64, DbError> {
+    let now = now_iso8601();
+    let result = sqlx::query(
+        "UPDATE instance_backup_history
+         SET status = 'failed',
+             error_message = 'Interrupted — the server restarted while this backup was running',
+             finished_at = ?
+         WHERE status = 'running'",
+    )
+    .bind(&now)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+pub(super) async fn has_running_instance_backup(pool: &SqlitePool) -> Result<bool, DbError> {
+    let row = sqlx::query(
+        "SELECT EXISTS(SELECT 1 FROM instance_backup_history WHERE status = 'running') AS running",
+    )
+    .fetch_one(pool)
+    .await?;
+    let running: i64 = row.get("running");
+    Ok(running != 0)
 }
 
 pub(super) async fn update_instance_backup_record(
