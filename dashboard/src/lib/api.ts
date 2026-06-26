@@ -62,9 +62,12 @@ export async function request<T>(
   if (method === 'GET' && !opts?.noCache) {
     setCache(path, data);
   } else if (method !== 'GET') {
-    // Invalidate the resource path (e.g. /apps/123 invalidates /apps*)
-    const basePath = '/' + path.split('/').filter(Boolean).slice(0, 2).join('/');
-    invalidatePrefix(basePath);
+    // Invalidate the whole collection, not just the specific resource. A
+    // DELETE /projects/123 must clear the cached /projects LIST (keyed without
+    // the id) so the deleted item disappears without a manual refresh — keying
+    // off the first path segment (/projects) prefix-matches both.
+    const collection = '/' + (path.split('/').filter(Boolean)[0] ?? '');
+    invalidatePrefix(collection);
   }
 
   return data;
