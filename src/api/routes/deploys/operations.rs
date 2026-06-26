@@ -440,6 +440,7 @@ pub(crate) async fn trigger_deploy(
                         state.docker.clone(),
                         state.db.clone(),
                         state.config.clone(),
+                        state.event_bus.clone(),
                     );
 
                     match orchestrator

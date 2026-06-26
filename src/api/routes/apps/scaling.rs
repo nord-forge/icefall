@@ -98,8 +98,12 @@ pub(super) async fn scale_app(
             return;
         };
 
-        let orchestrator =
-            BuildOrchestrator::new(state.docker.clone(), state.db.clone(), state.config.clone());
+        let orchestrator = BuildOrchestrator::new(
+            state.docker.clone(),
+            state.db.clone(),
+            state.config.clone(),
+            state.event_bus.clone(),
+        );
         let image_ref = match orchestrator.build(&deploy_id, &app, None, false).await {
             Ok(result) => result.image_ref,
             Err(e) => {

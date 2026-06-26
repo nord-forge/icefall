@@ -1,3 +1,4 @@
+pub mod build_cli;
 pub mod containers;
 pub mod images;
 pub mod logs;

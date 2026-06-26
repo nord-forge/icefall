@@ -4,9 +4,6 @@ mod tests;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bytes::Bytes;
-use futures_util::StreamExt;
-
 use crate::build::detect::detect;
 use crate::build::dockerfile::{generate_dockerfile, generate_dockerignore};
 use crate::build::git::{clone_repo, GitCloneOptions};
@@ -15,13 +12,15 @@ use crate::config::IcefallConfig;
 use crate::db::models::App;
 use crate::db::Database;
 use crate::docker::DockerClient;
+use crate::events::{EventBus, EventType};
 
-use context::{create_build_context, finish_step, new_step, redact_secrets, sanitize_image_name};
+use context::{finish_step, new_step, redact_secrets, sanitize_image_name};
 
 pub struct BuildOrchestrator {
     docker: Arc<DockerClient>,
     db: Arc<dyn Database>,
     config: Arc<IcefallConfig>,
+    events: Arc<EventBus>,
 }
 
 impl BuildOrchestrator {
@@ -29,8 +28,53 @@ impl BuildOrchestrator {
         docker: Arc<DockerClient>,
         db: Arc<dyn Database>,
         config: Arc<IcefallConfig>,
+        events: Arc<EventBus>,
     ) -> Self {
-        Self { docker, db, config }
+        Self {
+            docker,
+            db,
+            config,
+            events,
+        }
+    }
+
+    /// Announce a build step starting, so the live view renders it immediately.
+    fn emit_step_start(&self, app_id: &str, deploy_id: &str, name: &str) {
+        self.events.emit(
+            EventType::BuildStepStart,
+            Some(app_id),
+            Some(deploy_id),
+            serde_json::json!({ "name": name }),
+        );
+    }
+
+    /// Stream a single output line for the current step to live subscribers.
+    fn emit_step_output(&self, app_id: &str, deploy_id: &str, line: &str) {
+        self.events.emit(
+            EventType::BuildStepOutput,
+            Some(app_id),
+            Some(deploy_id),
+            serde_json::json!({ "line": line }),
+        );
+    }
+
+    fn emit_step_complete(&self, app_id: &str, deploy_id: &str, status: &str) {
+        self.events.emit(
+            EventType::BuildStepComplete,
+            Some(app_id),
+            Some(deploy_id),
+            serde_json::json!({ "status": status }),
+        );
+    }
+
+    /// Persist the accumulated structured steps so a page load mid-build shows
+    /// the same step view the live SSE stream is building. Best-effort.
+    async fn persist_steps(&self, deploy_id: &str, steps: &[BuildStep], current: &BuildStep) {
+        let mut snapshot: Vec<&BuildStep> = steps.iter().collect();
+        snapshot.push(current);
+        if let Ok(json) = serde_json::to_string(&snapshot) {
+            let _ = self.db.set_deploy_log(deploy_id, &json).await;
+        }
     }
 
     pub async fn build(
@@ -47,11 +91,19 @@ impl BuildOrchestrator {
         self.db
             .update_deploy_status(deploy_id, "building", None)
             .await?;
+        // Flip the UI to "building" the instant the build starts.
+        self.events.emit(
+            EventType::DeployStatus,
+            Some(&app.id),
+            Some(deploy_id),
+            serde_json::json!({ "status": "building" }),
+        );
 
         let secrets = self.collect_secrets(deploy_id).await;
 
         // Step 1: Clone
         let mut step = new_step("Cloning repository");
+        self.emit_step_start(&app.id, deploy_id, &step.name);
         let work_dir = self.config.data_dir.join("builds").join(deploy_id);
 
         let git_repo = app
@@ -80,15 +132,19 @@ impl BuildOrchestrator {
                     git_repo,
                     &result.resolved_sha[..8.min(result.resolved_sha.len())]
                 );
+                self.emit_step_output(&app.id, deploy_id, &msg);
                 step.output.push(msg.clone());
                 all_output.push(msg);
                 finish_step(&mut step, BuildStepStatus::Done);
+                self.emit_step_complete(&app.id, deploy_id, "done");
             }
             Err(e) => {
                 let msg = format!("Clone failed: {e}");
+                self.emit_step_output(&app.id, deploy_id, &msg);
                 step.output.push(msg.clone());
                 all_output.push(msg);
                 finish_step(&mut step, BuildStepStatus::Failed);
+                self.emit_step_complete(&app.id, deploy_id, "failed");
                 steps.push(step);
                 self.fail_deploy(deploy_id, &all_output).await;
                 return Err(e);
@@ -118,22 +174,27 @@ impl BuildOrchestrator {
 
         // Step 2: Detect
         let mut step = new_step("Detecting framework");
+        self.emit_step_start(&app.id, deploy_id, &step.name);
         let detection = match detect(&effective_dir, build_config.as_ref()) {
             Ok(det) => {
                 let msg = format!(
                     "Detected {} with {} (node {})",
                     det.framework, det.package_manager, det.node_version
                 );
+                self.emit_step_output(&app.id, deploy_id, &msg);
                 step.output.push(msg.clone());
                 all_output.push(msg);
                 finish_step(&mut step, BuildStepStatus::Done);
+                self.emit_step_complete(&app.id, deploy_id, "done");
                 det
             }
             Err(e) => {
                 let msg = format!("Detection failed: {e}");
+                self.emit_step_output(&app.id, deploy_id, &msg);
                 step.output.push(msg.clone());
                 all_output.push(msg);
                 finish_step(&mut step, BuildStepStatus::Failed);
+                self.emit_step_complete(&app.id, deploy_id, "failed");
                 steps.push(step);
                 self.fail_deploy(deploy_id, &all_output).await;
                 return Err(e.into());
@@ -148,6 +209,7 @@ impl BuildOrchestrator {
 
         // Step 3: Generate Dockerfile
         let mut step = new_step("Generating Dockerfile");
+        self.emit_step_start(&app.id, deploy_id, &step.name);
         let uses_existing_dockerfile = detection.framework == Framework::Dockerfile;
 
         if !uses_existing_dockerfile {
@@ -160,9 +222,11 @@ impl BuildOrchestrator {
                             .await
                     {
                         let msg = format!("Failed to write Dockerfile: {e}");
+                        self.emit_step_output(&app.id, deploy_id, &msg);
                         step.output.push(msg.clone());
                         all_output.push(msg);
                         finish_step(&mut step, BuildStepStatus::Failed);
+                        self.emit_step_complete(&app.id, deploy_id, "failed");
                         steps.push(step);
                         self.fail_deploy(deploy_id, &all_output).await;
                         return Err(BuildError::Io(e));
@@ -171,24 +235,31 @@ impl BuildOrchestrator {
                         tokio::fs::write(effective_dir.join(".dockerignore"), &dockerignore).await;
 
                     let msg = format!("Generated Dockerfile for {}", detection.framework);
+                    self.emit_step_output(&app.id, deploy_id, &msg);
                     step.output.push(msg.clone());
                     all_output.push(msg);
                     finish_step(&mut step, BuildStepStatus::Done);
+                    self.emit_step_complete(&app.id, deploy_id, "done");
                 }
                 Err(e) => {
                     let msg = format!("Dockerfile generation failed: {e}");
+                    self.emit_step_output(&app.id, deploy_id, &msg);
                     step.output.push(msg.clone());
                     all_output.push(msg);
                     finish_step(&mut step, BuildStepStatus::Failed);
+                    self.emit_step_complete(&app.id, deploy_id, "failed");
                     steps.push(step);
                     self.fail_deploy(deploy_id, &all_output).await;
                     return Err(e.into());
                 }
             }
         } else {
-            step.output.push("Using existing Dockerfile".to_string());
-            all_output.push("Using existing Dockerfile".to_string());
+            let msg = "Using existing Dockerfile".to_string();
+            self.emit_step_output(&app.id, deploy_id, &msg);
+            step.output.push(msg.clone());
+            all_output.push(msg);
             finish_step(&mut step, BuildStepStatus::Done);
+            self.emit_step_complete(&app.id, deploy_id, "done");
         }
         steps.push(step);
 
@@ -199,24 +270,12 @@ impl BuildOrchestrator {
 
         // Step 4: Build image
         let mut step = new_step("Building container image");
+        self.emit_step_start(&app.id, deploy_id, &step.name);
         // Sanitize the name for the image reference — names are validated at
         // create time, but defend against legacy/edge values producing an
         // "invalid reference format" error here.
         let image_name = sanitize_image_name(&app.name);
         let image_tag = format!("icefall/{image_name}:{deploy_id}");
-
-        let context = match create_build_context(&effective_dir) {
-            Ok(ctx) => ctx,
-            Err(e) => {
-                let msg = format!("Failed to create build context: {e}");
-                step.output.push(msg.clone());
-                all_output.push(msg);
-                finish_step(&mut step, BuildStepStatus::Failed);
-                steps.push(step);
-                self.fail_deploy(deploy_id, &all_output).await;
-                return Err(e);
-            }
-        };
 
         let timeout_secs = build_config
             .as_ref()
@@ -224,46 +283,55 @@ impl BuildOrchestrator {
             .unwrap_or(self.config.build_timeout_secs);
 
         if no_cache {
-            all_output.push("Force rebuild: build cache disabled".to_string());
+            let msg = "Force rebuild: build cache disabled".to_string();
+            self.emit_step_output(&app.id, deploy_id, &msg);
+            step.output.push(msg.clone());
+            all_output.push(msg);
         }
 
-        let build_result = tokio::time::timeout(
-            Duration::from_secs(timeout_secs),
-            self.stream_build(&image_tag, context, &secrets, no_cache, deploy_id),
-        )
-        .await;
+        let build_result = self
+            .stream_build_cli(
+                &image_tag,
+                &effective_dir,
+                &secrets,
+                no_cache,
+                deploy_id,
+                &app.id,
+                timeout_secs,
+                &steps,
+                &mut step,
+            )
+            .await;
+
+        // Fold the streamed lines into the running totals regardless of outcome,
+        // so the failing RUN step's npm/vite logs reach the deploy log.
+        all_output.extend(step.output.iter().cloned());
 
         match build_result {
-            // Always fold in the streamed build output, success or failure, so
-            // the failing step's logs reach the deploy log.
-            Ok((lines, outcome)) => {
-                step.output.extend(lines.iter().cloned());
-                all_output.extend(lines);
-                if let Err(e) = outcome {
-                    let msg = format!("Build failed: {e}");
-                    step.output.push(msg.clone());
-                    all_output.push(msg);
-                    finish_step(&mut step, BuildStepStatus::Failed);
-                    steps.push(step);
-                    self.fail_deploy(deploy_id, &all_output).await;
-                    return Err(e);
-                }
+            Ok(()) => {
                 finish_step(&mut step, BuildStepStatus::Done);
+                self.emit_step_complete(&app.id, deploy_id, "done");
             }
-            Err(_) => {
-                let msg = format!("Build timed out after {timeout_secs}s");
+            Err(e) => {
+                let msg = match &e {
+                    BuildError::Timeout(s) => format!("Build timed out after {s}s"),
+                    other => format!("Build failed: {other}"),
+                };
+                self.emit_step_output(&app.id, deploy_id, &msg);
                 step.output.push(msg.clone());
                 all_output.push(msg);
                 finish_step(&mut step, BuildStepStatus::Failed);
+                self.emit_step_complete(&app.id, deploy_id, "failed");
                 steps.push(step);
                 self.fail_deploy(deploy_id, &all_output).await;
-                return Err(BuildError::Timeout(timeout_secs));
+                return Err(e);
             }
         }
         steps.push(step);
 
         // Step 5: Tag
         let mut step = new_step("Tagging image");
+        self.emit_step_start(&app.id, deploy_id, &step.name);
         let latest_tag = format!("icefall/{image_name}:latest");
 
         if let Err(e) = self
@@ -272,21 +340,27 @@ impl BuildOrchestrator {
             .await
         {
             let msg = format!("Tagging failed: {e}");
+            self.emit_step_output(&app.id, deploy_id, &msg);
             step.output.push(msg.clone());
             all_output.push(msg);
             finish_step(&mut step, BuildStepStatus::Failed);
+            self.emit_step_complete(&app.id, deploy_id, "failed");
             steps.push(step);
             self.fail_deploy(deploy_id, &all_output).await;
             return Err(BuildError::Docker(e));
         }
 
-        step.output.push(format!("Tagged as {latest_tag}"));
-        all_output.push(format!("Tagged as {latest_tag}"));
+        let msg = format!("Tagged as {latest_tag}");
+        self.emit_step_output(&app.id, deploy_id, &msg);
+        step.output.push(msg.clone());
+        all_output.push(msg);
         finish_step(&mut step, BuildStepStatus::Done);
+        self.emit_step_complete(&app.id, deploy_id, "done");
         steps.push(step);
 
         // Step 6: Cleanup
         let mut step = new_step("Cleaning up");
+        self.emit_step_start(&app.id, deploy_id, &step.name);
         let _ = tokio::fs::remove_dir_all(&work_dir).await;
 
         let keep = build_config
@@ -298,6 +372,7 @@ impl BuildOrchestrator {
             Ok(removed) => {
                 if !removed.is_empty() {
                     let msg = format!("Removed {} old image(s)", removed.len());
+                    self.emit_step_output(&app.id, deploy_id, &msg);
                     step.output.push(msg.clone());
                     all_output.push(msg);
                 }
@@ -307,10 +382,12 @@ impl BuildOrchestrator {
             }
         }
         finish_step(&mut step, BuildStepStatus::Done);
+        self.emit_step_complete(&app.id, deploy_id, "done");
         steps.push(step);
 
-        // Update deploy record
-        let log = all_output.join("\n");
+        // Persist the structured steps as the build log so a page load renders
+        // the same rich step view the live SSE stream built, then advance state.
+        let log = serde_json::to_string(&steps).unwrap_or_else(|_| all_output.join("\n"));
         let _ = self
             .db
             .update_deploy_status(deploy_id, "deploying", Some(&log))
@@ -327,50 +404,91 @@ impl BuildOrchestrator {
         })
     }
 
-    /// Stream the image build, collecting every output line. Returns the lines
-    /// collected so far ALONGSIDE the outcome — so on failure the caller can
-    /// still persist the build output (e.g. the failing `RUN` step) to the
-    /// deploy log instead of losing it and showing "No build output available".
-    async fn stream_build(
+    /// Stream the image build via the runtime CLI, pushing every line into the
+    /// step (and emitting it live + persisting periodically) as it arrives. The
+    /// CLI path is used because Podman's REST build endpoint does not stream
+    /// per-step `RUN` output — only the CLI surfaces the real npm/compiler logs.
+    #[allow(clippy::too_many_arguments)]
+    async fn stream_build_cli(
         &self,
         tag: &str,
-        context: Bytes,
+        context_dir: &std::path::Path,
         secrets: &[String],
         no_cache: bool,
         deploy_id: &str,
-    ) -> (Vec<String>, Result<(), BuildError>) {
-        let mut lines = Vec::with_capacity(256);
-        let mut stream = self.docker.build_image(tag, context, no_cache);
-        let mut line_count = 0u32;
+        app_id: &str,
+        timeout_secs: u64,
+        prior_steps: &[BuildStep],
+        step: &mut BuildStep,
+    ) -> Result<(), BuildError> {
+        use std::sync::Mutex;
 
-        while let Some(result) = stream.next().await {
-            let info = match result {
-                Ok(info) => info,
-                Err(e) => return (lines, Err(e.into())),
-            };
+        // Shared line buffer the sync `on_line` closure appends to, drained by a
+        // concurrent persister so a page load mid-build sees output so far.
+        let buf: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::with_capacity(256)));
+        let secrets = secrets.to_vec();
 
-            if let Some(stream_msg) = &info.stream {
-                let line = stream_msg.trim_end();
-                if !line.is_empty() {
-                    lines.push(redact_secrets(line, secrets));
+        let build = {
+            let buf = buf.clone();
+            let events = self.events.clone();
+            let app_id = app_id.to_string();
+            let deploy_id_owned = deploy_id.to_string();
+            self.docker
+                .build_image_cli(tag, context_dir, no_cache, move |raw| {
+                    let line = redact_secrets(raw.trim_end(), &secrets);
+                    if line.is_empty() {
+                        return;
+                    }
+                    events.emit(
+                        EventType::BuildStepOutput,
+                        Some(&app_id),
+                        Some(&deploy_id_owned),
+                        serde_json::json!({ "line": line }),
+                    );
+                    if let Ok(mut g) = buf.lock() {
+                        g.push(line);
+                    }
+                })
+        };
+
+        // Persist the accumulated step snapshot every second so a refresh shows
+        // progress, and abort the build if the deploy is cancelled meanwhile.
+        let persist = async {
+            let mut last_len = 0usize;
+            loop {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let snapshot: Vec<String> = buf.lock().map(|g| g.clone()).unwrap_or_default();
+                if snapshot.len() != last_len {
+                    last_len = snapshot.len();
+                    let mut live = step.clone();
+                    live.output = snapshot;
+                    self.persist_steps(deploy_id, prior_steps, &live).await;
+                }
+                if self.is_cancelled(deploy_id).await {
+                    return Err(BuildError::Cancelled);
                 }
             }
+        };
 
-            if let Some(ref detail) = info.error_detail {
-                let msg = detail
-                    .message
-                    .clone()
-                    .unwrap_or_else(|| "unknown build error".to_string());
-                return (lines, Err(BuildError::DockerBuild(msg)));
+        let outcome = tokio::time::timeout(Duration::from_secs(timeout_secs), async {
+            tokio::select! {
+                r = build => r.map_err(BuildError::from),
+                // `persist` only returns on cancellation; otherwise it loops
+                // forever and `build` completing wins the select.
+                e = persist => e,
             }
+        })
+        .await;
 
-            line_count += 1;
-            if line_count % 50 == 0 && self.is_cancelled(deploy_id).await {
-                return (lines, Err(BuildError::Cancelled));
-            }
+        // Drain the buffer into the step regardless of outcome.
+        if let Ok(g) = buf.lock() {
+            step.output.extend(g.iter().cloned());
         }
 
-        (lines, Ok(()))
+        match outcome {
+            Ok(r) => r,
+            Err(_) => Err(BuildError::Timeout(timeout_secs)),
+        }
     }
 
     async fn is_cancelled(&self, deploy_id: &str) -> bool {

@@ -202,6 +202,7 @@ pub(super) async fn migrate_app(
                     state.docker.clone(),
                     state.db.clone(),
                     state.config.clone(),
+                    state.event_bus.clone(),
                 );
                 match orchestrator
                     .build(&deploy_id, &target_app, None, false)

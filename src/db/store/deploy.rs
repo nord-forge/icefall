@@ -17,6 +17,10 @@ pub trait DeployStore: Send + Sync {
         status: &str,
         log: Option<&str>,
     ) -> Result<(), DbError>;
+    /// Overwrite the build log with the latest accumulated output without
+    /// touching status or `finished_at`. Used to persist build output as it
+    /// streams, so a page load mid-build shows progress so far.
+    async fn set_deploy_log(&self, id: &str, log: &str) -> Result<(), DbError>;
     async fn list_due_scheduled_deploys(&self) -> Result<Vec<Deploy>, DbError>;
     async fn start_scheduled_deploy(&self, deploy_id: &str) -> Result<bool, DbError>;
     async fn reschedule_deploy(&self, deploy_id: &str, scheduled_at: &str)

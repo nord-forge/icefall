@@ -391,6 +391,10 @@ impl DeployStore for SqliteDatabase {
         deploys::update_deploy_status(&self.pool, id, status, log).await
     }
 
+    async fn set_deploy_log(&self, id: &str, log: &str) -> Result<(), DbError> {
+        deploys::set_deploy_log(&self.pool, id, log).await
+    }
+
     async fn list_due_scheduled_deploys(&self) -> Result<Vec<Deploy>, DbError> {
         deploys::list_due_scheduled_deploys(&self.pool).await
     }
