@@ -6,8 +6,8 @@ mod team_isolation {
 
     use crate::db::encryption::Encryptor;
     use crate::db::models::*;
+    use crate::db::prelude::*;
     use crate::db::sqlite::SqliteDatabase;
-    use crate::db::Database;
 
     async fn setup_db() -> SqliteDatabase {
         let pool = SqlitePoolOptions::new()

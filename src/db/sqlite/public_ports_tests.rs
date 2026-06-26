@@ -8,8 +8,9 @@ mod public_ports {
     use sqlx::sqlite::SqlitePoolOptions;
 
     use crate::db::encryption::Encryptor;
+    use crate::db::prelude::*;
     use crate::db::sqlite::SqliteDatabase;
-    use crate::db::{Database, DbError};
+    use crate::db::DbError;
 
     async fn setup_db() -> SqliteDatabase {
         let pool = SqlitePoolOptions::new()
