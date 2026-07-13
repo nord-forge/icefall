@@ -68,7 +68,7 @@ hex = "0.4"
 jsonwebtoken = "10"
 
 # Self-update & release verification
-ed25519-dalek = { version = "2", features = ["pkcs8", "pem"] }
+ed25519-dalek = { version = "3", features = ["pkcs8", "pem"] }
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 semver = { version = "1", features = ["serde"] }
 
