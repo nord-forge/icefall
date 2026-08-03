@@ -15,7 +15,7 @@
     "@astrojs/preact": "^5.1.2",
     "@nanostores/preact": "^1.1.0",
     "@preact/signals": "^2.9.0",
-    "astro": "^6.2.2",
+    "astro": "^7.1.6",
     "lucide-preact": "^1.14.0",
     "nanostores": "^1.3.0",
     "preact": "^10.29.1",
